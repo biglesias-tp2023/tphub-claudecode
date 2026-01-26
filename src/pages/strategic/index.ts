@@ -1,0 +1,1 @@
+export { StrategicPage } from './StrategicPage';

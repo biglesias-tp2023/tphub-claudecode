@@ -1,0 +1,199 @@
+/**
+ * CRP Portal Database Types
+ *
+ * This module defines the database schema types for the CRP Portal tables.
+ * These types represent the raw data structure from Supabase tables prefixed with crp_portal__.
+ *
+ * @module services/crp-portal/types
+ *
+ * SOLID Principles Applied:
+ * - Interface Segregation: Each entity has its own specific interface
+ * - Single Responsibility: Only defines types, no logic
+ *
+ * Database Naming Convention (CRP Portal):
+ * - pk_id_* : Primary key columns
+ * - pfk_id_* : Foreign key columns
+ * - des_* : Description/text columns
+ * - flg_* : Flag/boolean columns
+ * - td_* : Date columns
+ * - url_* : URL columns
+ */
+
+// ============================================
+// COMPANY STATUS
+// ============================================
+
+/**
+ * Valid status values for companies in the portal.
+ * Only companies with these statuses are shown to users.
+ */
+export const VALID_COMPANY_STATUSES = [
+  'Onboarding',
+  'Cliente Activo',
+  'Stand By',
+  'PiP',
+] as const;
+
+export type CompanyStatus = typeof VALID_COMPANY_STATUSES[number];
+
+// ============================================
+// DATABASE ROW TYPES
+// ============================================
+
+/**
+ * Raw database row from crp_portal__dt_company table.
+ * Represents a client company in ThinkPaladar's system.
+ */
+export interface DbCrpCompany {
+  /** Primary key - unique company identifier */
+  pk_id_company: number;
+  /** Company name */
+  des_company_name: string;
+  /** Company status (Onboarding, Cliente Activo, Stand By, PiP) */
+  des_status: string;
+  /** Assigned Key Account Manager */
+  des_key_account_manager: string | null;
+  /** URL to Paladar Portal */
+  url_paladar_portal: string | null;
+  /** Contract signature date */
+  td_firma_contrato: string | null;
+  /** Soft delete flag (0 = active, 1 = deleted) */
+  flg_deleted?: number;
+  /** Month of the snapshot (e.g., '2026-01-01') */
+  pk_ts_month: string;
+}
+
+/**
+ * Raw database row from crp_portal__dt_store table.
+ * Represents a brand/store owned by a company.
+ */
+export interface DbCrpStore {
+  /** Primary key - unique store identifier */
+  pk_id_store: number;
+  /** Store/brand name */
+  des_store: string;
+  /** Foreign key to company */
+  pfk_id_company: number;
+  /** Soft delete flag */
+  flg_deleted?: number;
+  /** Month of the snapshot (e.g., '2026-01-01') */
+  pk_ts_month: string;
+}
+
+/**
+ * Raw database row from crp_portal__dt_address table.
+ * Represents a physical restaurant location.
+ */
+export interface DbCrpAddress {
+  /** Primary key - unique address identifier */
+  pk_id_address: number;
+  /** Address/location name */
+  des_address: string;
+  /** Foreign key to company */
+  pfk_id_company: number;
+  /** Foreign key to store (nullable - not all addresses are linked to stores) */
+  pfk_id_store: number | null;
+  /** Foreign key to business area (nullable) */
+  pfk_id_business_area: number | null;
+  /** Latitude coordinate */
+  des_latitude: number | null;
+  /** Longitude coordinate */
+  des_longitude: number | null;
+  /** Soft delete flag */
+  flg_deleted?: number;
+  /** Month of the snapshot (e.g., '2026-01-01') */
+  pk_ts_month: string;
+}
+
+/**
+ * Raw database row from crp_portal__ct_business_area table.
+ * Represents a geographic business area (city/region).
+ */
+export interface DbCrpBusinessArea {
+  /** Primary key - unique business area identifier */
+  pk_id_business_area: number;
+  /** Business area name */
+  des_business_area: string;
+  /** Soft delete flag */
+  flg_deleted?: number;
+}
+
+/**
+ * Raw database row from crp_portal__dt_portal table.
+ * Represents a delivery platform (Glovo, UberEats, JustEat).
+ */
+export interface DbCrpPortal {
+  /** Primary key - unique portal identifier */
+  pk_id_portal: number;
+  /** Portal/platform name */
+  des_portal: string;
+  /** Soft delete flag */
+  flg_deleted?: number;
+}
+
+// ============================================
+// QUERY PARAMETERS
+// ============================================
+
+/**
+ * Parameters for fetching restaurants with optional filtering.
+ */
+export interface FetchRestaurantsParams {
+  /** Filter by company IDs */
+  companyIds?: string[];
+  /** Filter by brand/store IDs (handled at hook level due to DB limitations) */
+  brandIds?: string[];
+  /** Filter by business area IDs */
+  areaIds?: string[];
+}
+
+/**
+ * Portal entity for frontend use.
+ */
+export interface Portal {
+  id: string;
+  name: string;
+}
+
+// ============================================
+// ORDER HEAD (Cabecera de pedidos)
+// ============================================
+
+/**
+ * Portal ID constants for channel mapping.
+ * Maps internal portal IDs to channel names.
+ */
+export const PORTAL_IDS = {
+  GLOVO: 'E22BC362-2',
+  UBEREATS: '3CCD6861',
+  // JUSTEAT: pending
+} as const;
+
+export type PortalId = typeof PORTAL_IDS[keyof typeof PORTAL_IDS];
+
+/**
+ * Raw database row from crp_portal__ft_order_head table.
+ * Represents a sales order from delivery platforms.
+ */
+export interface DbCrpOrderHead {
+  /** Primary key - unique order identifier */
+  pk_uuid_order: string;
+  /** Foreign key to company */
+  pfk_id_company: number;
+  /** Foreign key to store/brand */
+  pfk_id_store: number;
+  /** Foreign key to store address */
+  pfk_id_store_address: number;
+  /** Foreign key to portal (delivery platform) */
+  pfk_id_portal: string;
+  /** Order creation timestamp */
+  td_creation_time: string;
+  /** Total order amount in EUR */
+  amt_total_price: number;
+  /** Promotional discounts in EUR */
+  amt_promotions: number | null;
+  /** Refunds amount in EUR */
+  amt_refunds: number | null;
+  /** Customer identifier */
+  cod_id_customer: string | null;
+}

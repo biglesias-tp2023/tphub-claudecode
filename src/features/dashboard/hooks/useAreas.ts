@@ -1,0 +1,40 @@
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/constants/queryKeys';
+import { useDashboardFiltersStore } from '@/stores/filtersStore';
+import { fetchCrpAreas, fetchCrpAreaById } from '@/services/crp-portal';
+
+/**
+ * Fetches all geographic areas (business areas) from CRP Portal.
+ * Areas are not company-specific, so all authenticated users can see all areas.
+ *
+ * @returns React Query result with areas array
+ *
+ * @example
+ * const { data: areas, isLoading } = useAreas();
+ */
+export function useAreas() {
+  const { brandIds } = useDashboardFiltersStore();
+
+  return useQuery({
+    queryKey: queryKeys.areas.list(brandIds),
+    queryFn: fetchCrpAreas,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Fetches a single area by ID from CRP Portal.
+ *
+ * @param areaId - The area ID to fetch
+ * @returns React Query result with area object
+ *
+ * @example
+ * const { data: area } = useArea('uuid-here');
+ */
+export function useArea(areaId: string) {
+  return useQuery({
+    queryKey: queryKeys.areas.detail(areaId),
+    queryFn: () => fetchCrpAreaById(areaId),
+    enabled: !!areaId,
+  });
+}

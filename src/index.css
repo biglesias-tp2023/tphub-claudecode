@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+
+/* ThinkPaladar Theme - Colores Corporativos */
+@theme {
+  /* Primary - Azul ThinkPaladar #095789 */
+  --color-primary-50: #e8f4fa;
+  --color-primary-100: #c5e3f3;
+  --color-primary-200: #9dd0eb;
+  --color-primary-300: #6bb8e0;
+  --color-primary-400: #3a9fd4;
+  --color-primary-500: #0b7bb8;
+  --color-primary-600: #095789;
+  --color-primary-700: #074567;
+  --color-primary-800: #053448;
+  --color-primary-900: #03222e;
+  --color-primary-950: #021519;
+
+  /* Accent - Naranja ThinkPaladar #ffa166 */
+  --color-accent-50: #fff7f0;
+  --color-accent-100: #ffead9;
+  --color-accent-200: #ffd5b3;
+  --color-accent-300: #ffbb85;
+  --color-accent-400: #ffa166;
+  --color-accent-500: #ff8533;
+  --color-accent-600: #e66a1a;
+  --color-accent-700: #b35215;
+  --color-accent-800: #803b0f;
+  --color-accent-900: #4d2409;
+
+  /* Gray - Neutral tones con fondo claro #f3f7f9 */
+  --color-gray-50: #f3f7f9;
+  --color-gray-100: #e8eff3;
+  --color-gray-200: #d4e0e8;
+  --color-gray-300: #b8c9d4;
+  --color-gray-400: #8fa3b3;
+  --color-gray-500: #5f7a8c;
+  --color-gray-600: #4a6070;
+  --color-gray-700: #3a4b57;
+  --color-gray-800: #2a363f;
+  --color-gray-900: #1a2127;
+  --color-gray-950: #0d1114;
+
+  /* Success - Verde */
+  --color-success-50: #f0fdf4;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+
+  /* Warning - Amarillo */
+  --color-warning-50: #fffbeb;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+
+  /* Error - Rojo */
+  --color-error-50: #fef2f2;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+
+  /* Platform Colors */
+  --color-glovo: #ffc244;
+  --color-ubereats: #06c167;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Base styles */
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+/* Ripple animation for Aceternity effect */
+@keyframes cell-ripple {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+.animate-cell-ripple {
+  animation: cell-ripple var(--duration, 200ms) ease-out none 1 var(--delay, 0ms);
+}
+
+/* Live breathing animation for status indicators */
+@keyframes live-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.animate-live-breathe {
+  animation: live-breathe 2s ease-in-out infinite;
+}
+
+/* Leaflet Map Styles */
+.leaflet-container {
+  font-family: var(--font-sans);
+  z-index: 0;
+}
+
+/* Ensure map panes stay below modals */
+.leaflet-pane,
+.leaflet-control-container,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 0 !important;
+}
+
+.leaflet-pane.leaflet-tile-pane { z-index: 1 !important; }
+.leaflet-pane.leaflet-overlay-pane { z-index: 2 !important; }
+.leaflet-pane.leaflet-shadow-pane { z-index: 3 !important; }
+.leaflet-pane.leaflet-marker-pane { z-index: 4 !important; }
+.leaflet-pane.leaflet-tooltip-pane { z-index: 5 !important; }
+.leaflet-pane.leaflet-popup-pane { z-index: 6 !important; }
+.leaflet-control-container { z-index: 7 !important; }
+
+.leaflet-popup-content-wrapper {
+  @apply rounded-lg shadow-lg border border-gray-100;
+  padding: 0;
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+  line-height: 1.4;
+}
+
+.leaflet-popup-tip {
+  @apply bg-white;
+}
+
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Remove default marker icon */
+.leaflet-marker-icon.leaflet-interactive {
+  background: transparent;
+  border: none;
+}

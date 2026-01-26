@@ -1,0 +1,23 @@
+export const ROUTES = {
+  // Auth routes (públicas)
+  AUTH: {
+    LOGIN: '/login',
+    REGISTER: '/register',
+    FORGOT_PASSWORD: '/forgot-password',
+  },
+
+  // Protected routes
+  CONTROLLING: '/controlling',
+  OPERATIONS: '/operations',
+  CLIENTS: '/clients',
+  REPUTATION: '/reputation',
+  STRATEGIC: '/strategic',
+  CALENDAR: '/calendar',
+  AUDITS: '/audits',
+  MAPS: '/maps',
+  MARKET: '/market',
+  ADMIN: '/admin',
+
+  // Catch-all
+  NOT_FOUND: '*',
+} as const;

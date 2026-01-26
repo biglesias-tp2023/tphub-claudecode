@@ -1,0 +1,725 @@
+# TPHub - Contexto del Proyecto
+
+## Que es este proyecto
+
+**TPHub** es el portal interno de ThinkPaladar para consultores.
+
+- **ThinkPaladar**: Consultoria de crecimiento para restaurantes en delivery (Glovo/UberEats/JustEat) en Espana
+- **Usuarios**: Consultores internos que manejan 30-40 clientes cada uno
+- **Proposito**: Dashboard de analytics, proyecciones de venta y gestion estrategica
+
+## Navegacion del Portal
+
+| Seccion | Ruta | Descripcion |
+|---------|------|-------------|
+| **Controlling** | `/controlling` | KPIs financieros, rendimiento por canal/marca/area |
+| **Calendario** | `/calendar` | Gestion de campanas promocionales y eventos |
+| **Estrategia** | `/strategic` | Proyeccion de ventas y objetivos estrategicos |
+| **Objetivos** | `/objectives` | Objetivos de venta por restaurante/canal/mes |
+| **Operaciones** | `/operations` | Gestion operativa de pedidos |
+| **Clientes** | `/clients` | Gestion de cartera de clientes |
+| **Reputacion** | `/reputation` | Valoraciones y resenas |
+| **Mapas** | `/maps` | Visualizacion geografica |
+| **Mercado** | `/market` | Analisis de mercado |
+| **Admin** | `/admin` | Gestion de usuarios (solo admins) |
+
+## Stack Tecnologico
+
+| Capa | Tecnologia |
+|------|------------|
+| Frontend | React 19 + TypeScript 5.9 + Vite 7 |
+| Estilos | TailwindCSS 4 |
+| Charts | Recharts |
+| Auth + Data | Supabase |
+| State (cliente) | Zustand |
+| State (servidor) | React Query |
+| Busqueda | Fuse.js |
+
+## Jerarquia de Datos
+
+```
+Company -> Brand -> Area -> Restaurant -> Channel
+Ej: Restalia -> 100 Montaditos -> Madrid -> Gran Via 42 -> Glovo
+```
+
+## Estructura de Carpetas
+
+```
+src/
+├── components/
+│   ├── ui/         # Primitivos (Button, Card, Input...)
+│   ├── layout/     # TopBar, Sidebar, MainLayout
+│   ├── charts/     # Wrappers de Recharts
+│   └── common/     # MetricCard, ProtectedRoute
+├── features/
+│   ├── strategic/  # Proyeccion de ventas, objetivos
+│   │   └── components/
+│   │       ├── SalesProjection.tsx       # Dashboard con scorecards y chart
+│   │       ├── SalesProjectionSetup.tsx  # Wizard de configuracion
+│   │       └── SalesProjectionWarning.tsx
+│   ├── controlling/
+│   │   └── hooks/
+│   │       ├── useControllingData.ts  # Orquestacion datos demo + reales
+│   │       ├── useOrdersData.ts       # React Query hook para pedidos
+│   │       └── index.ts               # Public exports
+│   ├── calendar/
+│   │   ├── components/
+│   │   │   ├── CalendarView.tsx       # Vista principal del calendario
+│   │   │   ├── CalendarGrid.tsx       # Grid mensual con dias
+│   │   │   ├── CalendarDay.tsx        # Celda de dia individual
+│   │   │   ├── CalendarSidebar.tsx    # Sidebar con filtros
+│   │   │   ├── CampaignEditor/        # Wizard de creacion de campanas
+│   │   │   └── CampaignEvent.tsx      # Renderizado de campana en calendario
+│   │   ├── hooks/
+│   │   │   ├── useCampaigns.ts        # CRUD campanas (localStorage demo)
+│   │   │   ├── useCalendarEvents.ts   # Festivos y eventos
+│   │   │   └── useWeather.ts          # Pronostico meteorologico
+│   │   ├── services/
+│   │   │   └── weatherApi.ts          # Open-Meteo API integration
+│   │   └── config/
+│   │       ├── platforms.ts           # Configuracion plataformas
+│   │       └── weatherCodes.ts        # Mapeo codigos WMO a iconos
+│   ├── dashboard/
+│   │   └── components/
+│   │       └── DashboardFilters/      # Filtros reutilizables
+│   │           ├── ChannelSelector.tsx
+│   │           ├── DateRangePicker/
+│   │           └── ...
+│   ├── clients/
+│   └── ...
+├── pages/
+├── services/
+│   └── crp-portal/  # CRP Portal Data Service (SOLID)
+│       ├── types.ts      # Database types (DbCrpOrderHead, PORTAL_IDS)
+│       ├── utils.ts      # Helper functions
+│       ├── mappers.ts    # Data transformation
+│       ├── companies.ts  # Company operations
+│       ├── brands.ts     # Brand operations
+│       ├── areas.ts      # Area operations
+│       ├── restaurants.ts # Restaurant operations
+│       ├── portals.ts    # Portal operations
+│       ├── orders.ts     # Order data & aggregations (NEW)
+│       └── index.ts      # Public API
+├── stores/
+│   └── filtersStore.ts   # Zustand stores para filtros globales y dashboard
+├── hooks/
+├── types/
+└── constants/
+```
+
+## CRP Portal Service (SOLID)
+
+Servicio de datos para el CRP Portal de ThinkPaladar, implementado siguiendo principios SOLID.
+
+### Arquitectura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CRP Portal Service                        │
+│                      (Public API)                            │
+├─────────────────────────────────────────────────────────────┤
+│  companies.ts  │  brands.ts  │  areas.ts  │  restaurants.ts │
+│                │             │            │                  │
+│  fetchCompanies│  fetchBrands│ fetchAreas │ fetchRestaurants│
+│  fetchById     │  fetchById  │ fetchById  │ fetchById       │
+├─────────────────────────────────────────────────────────────┤
+│                       orders.ts                              │
+│              (Order data & aggregations)                     │
+│  fetchCrpOrdersRaw │ fetchCrpOrdersAggregated │ Comparison  │
+├─────────────────────────────────────────────────────────────┤
+│                      mappers.ts                              │
+│           (Data transformation layer)                        │
+├─────────────────────────────────────────────────────────────┤
+│                       types.ts                               │
+│    (Database types: DbCrpOrderHead, PORTAL_IDS, etc.)       │
+├─────────────────────────────────────────────────────────────┤
+│                       utils.ts                               │
+│            (Shared utility functions)                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Orders Service (Datos de Ventas Reales)
+
+El modulo `orders.ts` proporciona acceso a datos de ventas reales desde la tabla `crp_portal__ft_order_head`.
+
+#### Tabla de Origen: `crp_portal__ft_order_head`
+
+| Campo | Columna | Descripcion |
+|-------|---------|-------------|
+| ID Pedido | `pk_uuid_order` | UUID unico del pedido |
+| Compania | `pfk_id_company` | FK a dt_company |
+| Marca | `pfk_id_store` | FK a dt_store |
+| Direccion | `pfk_id_store_address` | FK a dt_address |
+| Canal/Portal | `pfk_id_portal` | ID del portal de delivery |
+| Fecha/Hora | `td_creation_time` | Timestamp de creacion |
+| Importe Total | `amt_total_price` | EUR del pedido |
+| Descuentos | `amt_promotions` | EUR en promociones |
+| Reembolsos | `amt_refunds` | EUR reembolsado |
+
+#### Mapeo de Canales (Portal IDs)
+
+| Portal ID | Canal |
+|-----------|-------|
+| `E22BC362-2` | Glovo |
+| `3CCD6861` | UberEats |
+| *(pendiente)* | JustEat |
+
+#### Funciones Disponibles
+
+```typescript
+import {
+  fetchCrpOrdersRaw,
+  fetchCrpOrdersAggregated,
+  fetchCrpOrdersComparison,
+  PORTAL_IDS
+} from '@/services/crp-portal';
+
+// Datos crudos de pedidos
+const orders = await fetchCrpOrdersRaw({
+  companyIds: [1, 2],
+  startDate: '2026-01-01',
+  endDate: '2026-01-31'
+});
+
+// Datos agregados (totales, por canal)
+const aggregation = await fetchCrpOrdersAggregated({
+  companyIds: [1],
+  channelIds: ['glovo', 'ubereats'],
+  startDate: '2026-01-01',
+  endDate: '2026-01-31'
+});
+// Returns: { totalRevenue, totalOrders, avgTicket, byChannel: { glovo, ubereats, justeat } }
+
+// Comparacion con periodo anterior
+const comparison = await fetchCrpOrdersComparison(currentParams, previousParams);
+// Returns: { current, previous, changes: { revenueChange, ordersChange, avgTicketChange } }
+```
+
+#### KPIs Calculados
+
+| KPI | Calculo |
+|-----|---------|
+| **Ventas** | `SUM(amt_total_price)` |
+| **Pedidos** | `COUNT(pk_uuid_order)` |
+| **Ticket Medio** | `Ventas / Pedidos` |
+| **Reembolsos** | `SUM(amt_refunds)` |
+| **Promos/Descuentos** | `SUM(amt_promotions)` |
+
+### Principios SOLID Aplicados
+
+| Principio | Implementacion |
+|-----------|----------------|
+| **Single Responsibility** | Cada modulo tiene una sola razon para cambiar |
+| **Open/Closed** | Extensible sin modificar codigo existente |
+| **Liskov Substitution** | Tipos de retorno consistentes en funciones similares |
+| **Interface Segregation** | Interfaces especificas para cada entidad |
+| **Dependency Inversion** | Depende de abstracciones (types), no concreciones |
+
+### Uso
+
+```typescript
+import {
+  fetchCrpCompanies,
+  fetchCrpBrands,
+  fetchCrpRestaurants
+} from '@/services/crp-portal';
+
+// Fetch companies (solo status validos)
+const companies = await fetchCrpCompanies();
+
+// Fetch brands por company
+const brands = await fetchCrpBrands(['1', '2']);
+
+// Fetch restaurants con filtros
+const restaurants = await fetchCrpRestaurants({
+  companyIds: ['1'],
+  areaIds: ['10']
+});
+```
+
+### Status de Companias Validos
+
+```typescript
+const VALID_COMPANY_STATUSES = [
+  'Onboarding',
+  'Cliente Activo',
+  'Stand By',
+  'PiP'
+];
+```
+
+## Controlling Dashboard
+
+### Arquitectura de Datos
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    ControllingPage.tsx                        │
+│                   (Presentation Layer)                        │
+├──────────────────────────────────────────────────────────────┤
+│                  useControllingData.ts                        │
+│            (Orchestration & Data Merging)                     │
+│     - Combina datos demo con datos reales                     │
+│     - Aplica filtros de canal/marca/area                      │
+├──────────────────────────────────────────────────────────────┤
+│                   useOrdersData.ts                            │
+│              (React Query Hook - SOLID)                       │
+│     - Fetches real order data from CRP Portal                 │
+│     - Calculates period comparisons                           │
+├──────────────────────────────────────────────────────────────┤
+│                services/crp-portal/orders.ts                  │
+│                (Data Access Layer - SOLID)                    │
+│     - fetchCrpOrdersRaw / Aggregated / Comparison             │
+├──────────────────────────────────────────────────────────────┤
+│                    Supabase (Database)                        │
+│              crp_portal__ft_order_head                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Hooks del Controlling
+
+| Hook | Responsabilidad | Ubicacion |
+|------|-----------------|-----------|
+| `useControllingData` | Orquesta datos demo + reales, aplica filtros | `features/controlling/hooks/` |
+| `useOrdersData` | Fetch de datos reales con React Query | `features/controlling/hooks/` |
+
+### Uso de useOrdersData
+
+```typescript
+import { useOrdersData } from '@/features/controlling';
+
+const { data, isLoading, error } = useOrdersData({
+  companyIds: ['1', '2'],           // String IDs (se convierten a number)
+  brandIds: ['10'],                  // Opcional
+  channelIds: ['glovo', 'ubereats'], // Opcional
+  dateRange: { start: new Date(), end: new Date() },
+  datePreset: '30d'
+});
+
+// data.current: OrdersAggregation del periodo actual
+// data.previous: OrdersAggregation del periodo anterior
+// data.changes: { revenueChange, ordersChange, avgTicketChange } en %
+```
+
+### Flujo de Datos Real
+
+1. Usuario selecciona companias en filtro global (Sidebar)
+2. `useControllingData` lee filtros del store (Zustand)
+3. `useOrdersData` fetch datos de `crp_portal__ft_order_head`
+4. Se calculan agregaciones (totales, por canal)
+5. Se compara con periodo anterior
+6. Datos reales sobreescriben datos demo en el dashboard
+
+## Calendario de Campanas
+
+### Arquitectura
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      CalendarPage.tsx                         │
+│                    (Orchestration Layer)                      │
+├──────────────────────────────────────────────────────────────┤
+│  CalendarView  │  CalendarSidebar  │  CampaignEditor         │
+│  (Main View)   │  (Filters)        │  (Wizard 5 steps)       │
+├──────────────────────────────────────────────────────────────┤
+│  useCampaignsByMonth  │  useCalendarEvents  │  useWeather    │
+│  (localStorage demo)  │  (Supabase)         │  (Open-Meteo)  │
+├──────────────────────────────────────────────────────────────┤
+│                     Data Sources                              │
+│  localStorage        │  calendar_events   │  Open-Meteo API  │
+│  (tphub_campaigns)   │  (Supabase)        │  (forecast/hist) │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Componentes Principales
+
+| Componente | Responsabilidad |
+|------------|-----------------|
+| `CalendarPage` | Orquestacion, filtros, modales |
+| `CalendarView` | Vista mensual con header de navegacion |
+| `CalendarGrid` | Grid 7x6 con dias del mes |
+| `CalendarDay` | Celda individual: clima, eventos, campanas |
+| `CalendarSidebar` | Mini calendario, filtros de plataforma/estado |
+| `CampaignEditor` | Wizard 5 pasos para crear campanas |
+
+### Sistema de Campanas (Demo Mode)
+
+Actualmente usa **localStorage** para persistencia (modo demo).
+Configurado en `features/calendar/hooks/useCampaigns.ts`:
+
+```typescript
+const USE_LOCAL_STORAGE = true;  // Cambiar a false para usar Supabase
+const STORAGE_KEY = 'tphub_campaigns';
+```
+
+#### Hooks de Campanas
+
+| Hook | Funcion |
+|------|---------|
+| `useCampaignsByMonth` | Fetch campanas por mes/restaurantes |
+| `useCreateCampaign` | Crear nueva campana |
+| `useUpdateCampaign` | Actualizar campana existente |
+| `useDeleteCampaign` | Eliminar campana |
+| `useCancelCampaign` | Cancelar campana (status='cancelled') |
+
+#### Wizard de Creacion (5 pasos)
+
+1. **Plataforma**: Glovo / UberEats / JustEat / Google Ads
+2. **Tipo**: BOGO, Descuento %, Envio Gratis, etc.
+3. **Configuracion**: Campos dinamicos segun tipo
+4. **Fechas**: Selector con eventos y clima
+5. **Revisar**: Resumen antes de crear
+
+#### Estados de Campana
+
+| Status | Descripcion | Calculo automatico |
+|--------|-------------|-------------------|
+| `scheduled` | Programada (futuro) | `startDate > today` |
+| `active` | Activa (en curso) | `startDate <= today <= endDate` |
+| `completed` | Completada (pasado) | `endDate < today` |
+| `cancelled` | Cancelada manualmente | Usuario cancela |
+
+### Integracion Meteorologica
+
+Usa **Open-Meteo API** (gratuita, sin API key).
+
+#### Fuentes de Datos
+
+| Tipo | API | Rango |
+|------|-----|-------|
+| **Pronostico** | `api.open-meteo.com/v1/forecast` | Hoy + 16 dias |
+| **Historico** | `archive-api.open-meteo.com/v1/archive` | Datos pasados |
+
+#### Hooks de Clima
+
+```typescript
+import { useWeatherByMonth, useWeatherByRestaurant } from '@/features/calendar';
+
+// Clima mensual (historico + pronostico)
+const { data: forecasts } = useWeatherByMonth(restaurant, year, month);
+
+// Clima por restaurante (7 dias)
+const { data: weather } = useWeatherByRestaurant(restaurant);
+```
+
+#### Requisitos para Clima
+
+El clima requiere un **restaurante con coordenadas**:
+- `restaurant.latitude` debe existir
+- `restaurant.longitude` debe existir
+
+Si no hay coordenadas, se muestra mensaje:
+> "Selecciona un establecimiento con coordenadas para ver el clima"
+
+#### Iconos de Clima (WMO Codes)
+
+| Codigo | Condicion | Icono |
+|--------|-----------|-------|
+| 0 | Despejado | Sun |
+| 1-3 | Parcialmente nublado | CloudSun |
+| 45-48 | Niebla | CloudFog |
+| 51-67 | Lluvia | CloudRain |
+| 71-77 | Nieve | CloudSnow |
+| 80-82 | Chubascos | CloudRainWind |
+| 95-99 | Tormenta | CloudLightning |
+
+### Eventos del Calendario
+
+Eventos almacenados en Supabase (`calendar_events`):
+
+#### Categorias
+
+| Categoria | Icono | Color |
+|-----------|-------|-------|
+| `holiday` | Flag | Rojo |
+| `sports` | Trophy | Verde |
+| `entertainment` | Tv | Purpura |
+| `commercial` | ShoppingBag | Ambar |
+
+#### Filtros de Region
+
+- **Nacional (ES)**: Festivos de toda Espana
+- **Regional (ES-XX)**: Festivos de comunidad autonoma
+
+### Uso del Calendario
+
+```typescript
+// En CalendarPage.tsx
+const { data: campaigns } = useCampaignsByMonth(
+  restaurantIds,
+  currentMonth.year,
+  currentMonth.month
+);
+
+const { data: events } = useCalendarEventsByMonth(
+  year, month, regionCode
+);
+
+const { data: weather } = useWeatherByMonth(
+  selectedRestaurant, year, month
+);
+
+<CalendarView
+  campaigns={campaigns}
+  events={events}
+  weatherForecasts={weather}
+  onDayClick={handleDayClick}
+/>
+```
+
+## Proyeccion de Ventas (Sales Projection)
+
+### Componentes SOLID
+
+| Componente | Responsabilidad |
+|------------|-----------------|
+| `SalesProjection` | Dashboard: scorecards, chart, tabla colapsable |
+| `SalesProjectionSetup` | Wizard 4 pasos: canales, inversion, baseline, targets |
+| `SalesProjectionWarning` | Alerta 60 dias antes del fin |
+
+### Wizard de Setup (4 pasos)
+
+1. **Canales**: Seleccion Glovo/UberEats/JustEat
+2. **Inversion**: % maximo ADS y Promos (global o por canal)
+3. **Baseline**: Confirmar facturacion mes anterior
+4. **Targets**: Tabla de objetivos por canal/mes (6 meses)
+
+### Dashboard
+
+- **Scorecards**: Ventas/ADS/Promos (objetivo grande + real pequeno)
+- **Chart**: AreaChart objetivo vs real, linea mes actual
+- **Tabla**: Colapsable "Ajustar objetivos", edicion por canal/mes
+
+### Tipos
+
+```typescript
+type SalesChannel = 'glovo' | 'ubereats' | 'justeat';
+type SalesInvestmentMode = 'per_channel' | 'global';
+
+interface SalesProjectionConfig {
+  activeChannels: SalesChannel[];
+  investmentMode: SalesInvestmentMode;
+  maxAdsPercent: InvestmentConfig | number;
+  maxPromosPercent: InvestmentConfig | number;
+  startDate: string;
+  endDate: string;
+}
+```
+
+## Objetivos Estrategicos
+
+### Categorias
+
+| ID | Color |
+|----|-------|
+| `finanzas` | Verde |
+| `operaciones` | Azul |
+| `clientes` | Naranja |
+| `marca` | Rosa |
+| `reputacion` | Ambar |
+| `proveedores` | Gris |
+| `menu` | Indigo |
+
+### Componentes
+
+- `ObjectiveCard`: Card con estado dropdown, progreso KPI
+- `StrategicObjectiveEditor`: Modal edicion
+- `StrategicTaskCalendar`: Vista calendario estilo Notion
+
+## Sistema de Exportacion
+
+### Formatos Soportados
+
+| Formato | Libreria | Caracteristicas |
+|---------|----------|-----------------|
+| **PDF** | jsPDF + jspdf-autotable | Branding completo, tablas formateadas |
+| **Excel** | xlsx | Multiples hojas, formato de celdas |
+| **CSV** | Nativo | Datos crudos, compatible con cualquier herramienta |
+
+### Branding ThinkPaladar
+
+Todos los PDFs incluyen:
+- Logo circular "TP" (azul primario)
+- Header: "ThinkPaladar - Consultoria de Delivery"
+- Titulo y subtitulo del reporte
+- Footer: Fecha, numero de pagina, copyright
+
+### Componentes
+
+| Componente | Ubicacion | Funcion |
+|------------|-----------|---------|
+| `ExportButtons` | `components/common/` | Dropdown/inline buttons para exportar |
+| `ExportPreviewModal` | `components/common/` | Preview real del PDF en iframe |
+
+### Patron de Uso
+
+```typescript
+// En cada pagina que exporta:
+const buildExportData = useCallback(() => {
+  // Construir datos para exportacion
+  return { ... };
+}, [data]);
+
+const generatePdfBlob = useCallback((): Blob => {
+  const exportData = buildExportData();
+  return generateXxxPdfBlob(exportData);
+}, [buildExportData]);
+
+<ExportButtons
+  onExport={handleExport}
+  getPreviewData={getPreviewData}
+  generatePdfBlob={generatePdfBlob}
+  previewTitle="Titulo"
+/>
+```
+
+### Funciones de Export (`utils/export.ts`)
+
+- `exportXxxToPDF()`: Genera y descarga PDF
+- `exportXxxToExcel()`: Genera y descarga XLSX
+- `exportXxxToCSV()`: Genera y descarga CSV
+- `generateXxxPdfBlob()`: Genera Blob para preview
+
+## Seguridad
+
+- Solo @thinkpaladar.com
+- RLS por compania asignada
+- Roles: admin, consultant, viewer
+
+## Comandos
+
+```bash
+npm run dev      # localhost:5173
+npm run build    # Build produccion
+npm run lint     # ESLint
+```
+
+## Variables de Entorno
+
+```bash
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=xxx
+VITE_DEV_AUTH_BYPASS=true  # Mock data
+```
+
+## Convenciones
+
+- Componentes: `PascalCase.tsx`
+- Hooks: `use*.ts`
+- Stores: `*Store.ts`
+- SOLID: Single Responsibility, Open/Closed, Dependency Inversion
+
+## Paleta de Colores ThinkPaladar
+
+| Nombre | Hex | Tailwind Class | Uso |
+|--------|-----|----------------|-----|
+| **Primario** | `#095789` | `primary-600` | Botones principales, enlaces, elementos destacados |
+| **Primario claro** | `#e8f4fa` | `primary-50` | Fondos de badges, hover states |
+| **Fondo claro** | `#f3f7f9` | `gray-50` | Fondos alternativos a blanco |
+| **Acento naranja** | `#ffa166` | `accent-400` | Iconos puntuales, alertas, romper monotonia |
+
+### Escala de Primarios (Azul)
+```
+primary-50:  #e8f4fa  - Fondos muy claros
+primary-100: #c5e3f3  - Hover sobre fondos claros
+primary-200: #9dd0eb  - Bordes suaves
+primary-300: #6bb8e0  - Iconos secundarios
+primary-400: #3a9fd4  - Elementos interactivos hover
+primary-500: #0b7bb8  - Texto secundario destacado
+primary-600: #095789  - COLOR PRINCIPAL (botones, enlaces)
+primary-700: #074567  - Hover en botones
+primary-800: #053448  - Active states
+primary-900: #03222e  - Texto muy destacado
+```
+
+### Escala de Acentos (Naranja)
+```
+accent-400:  #ffa166  - Iconos, badges destacados
+accent-500:  #ff8533  - Hover en elementos naranja
+```
+
+### Uso en Tailwind
+```tsx
+// Botones principales
+<button className="bg-primary-600 hover:bg-primary-700 text-white">
+
+// Fondos alternativos
+<div className="bg-gray-50">
+
+// Badges destacados
+<span className="bg-primary-50 text-primary-700">
+
+// Iconos de acento
+<Icon className="text-accent-400">
+```
+
+## Dashboard Filters (Reutilizables)
+
+### Componentes de Filtros
+
+| Componente | Descripcion | Props |
+|------------|-------------|-------|
+| `DashboardFilters` | Contenedor de todos los filtros | `excludeChannels?: ChannelId[]` |
+| `ChannelSelector` | Botones Glovo/UberEats/JustEat | `excludeChannels?: ChannelId[]` |
+| `DateRangePicker` | Selector de rango de fechas | `value, presetId, onChange` |
+| `BrandSelector` | Dropdown de marcas | - |
+| `AreaSelector` | Dropdown de areas | - |
+| `EstablishmentSelector` | Dropdown de establecimientos | - |
+
+### Presets de Fecha
+
+| ID | Label | Descripcion |
+|----|-------|-------------|
+| `this_week` | Esta semana | Lunes actual a hoy |
+| `this_month` | Este mes | Dia 1 a hoy |
+| `last_week` | La semana pasada | Lunes a domingo anterior |
+| `last_month` | El mes pasado | Mes completo anterior |
+| `last_7_days` | Los ultimos 7 dias | Hoy - 6 dias |
+| `last_30_days` | Los ultimos 30 dias | Hoy - 29 dias |
+| `last_12_weeks` | Ultimas 12 semanas | ~3 meses |
+| `last_12_months` | Ultimos 12 meses | ~1 ano |
+| `custom` | Personalizar | Calendario manual |
+
+### Stores (Zustand)
+
+```typescript
+// Filtro global (persiste en Sidebar)
+const { companyIds, setCompanyIds } = useGlobalFiltersStore();
+
+// Filtros de dashboard (por pagina)
+const {
+  brandIds, setBrandIds,
+  areaIds, setAreaIds,
+  channelIds, setChannelIds,
+  dateRange, datePreset, setDatePreset
+} = useDashboardFiltersStore();
+```
+
+## Tareas Pendientes
+
+### Calendario - Migracion a Supabase
+
+La tabla `promotional_campaigns` existe pero tiene un problema de esquema:
+- Referencia `restaurant_id UUID` → `public.restaurants(id)`
+- Los restaurantes vienen de CRP Portal con IDs numericos
+
+**Solucion pendiente**: Modificar migracion para usar `TEXT` en lugar de `UUID`:
+
+```sql
+-- Cambiar en 007_calendar_campaigns.sql
+restaurant_id TEXT NOT NULL,  -- En lugar de UUID con FK
+```
+
+Una vez aplicada la migracion, cambiar en `useCampaigns.ts`:
+```typescript
+const USE_LOCAL_STORAGE = false;  // Activar Supabase
+```
+
+### Filtros de Fecha
+
+- El calendario personalizado no aparece al seleccionar "Personalizar"
+- Los filtros de fecha no actualizan datos correctamente en algunos casos
+
+---
+
+*Enero 2026 - Sistema de Calendario con Campanas, Clima y Eventos*

@@ -1,0 +1,141 @@
+/**
+ * CRP Portal Service
+ *
+ * Unified data access layer for ThinkPaladar's CRP Portal database.
+ * This module provides a clean API for accessing company, brand, area,
+ * restaurant, and portal data from Supabase.
+ *
+ * @module services/crp-portal
+ *
+ * Architecture Overview:
+ * ```
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │                    CRP Portal Service                        │
+ * │                      (Public API)                            │
+ * ├─────────────────────────────────────────────────────────────┤
+ * │  companies.ts  │  brands.ts  │  areas.ts  │  restaurants.ts │
+ * │                │             │            │                  │
+ * │  fetchCompanies│  fetchBrands│ fetchAreas │ fetchRestaurants│
+ * │  fetchById     │  fetchById  │ fetchById  │ fetchById       │
+ * ├─────────────────────────────────────────────────────────────┤
+ * │                      mappers.ts                              │
+ * │           (Data transformation layer)                        │
+ * ├─────────────────────────────────────────────────────────────┤
+ * │                       types.ts                               │
+ * │              (Database & domain types)                       │
+ * ├─────────────────────────────────────────────────────────────┤
+ * │                       utils.ts                               │
+ * │            (Shared utility functions)                        │
+ * └─────────────────────────────────────────────────────────────┘
+ * ```
+ *
+ * SOLID Principles Applied:
+ * - Single Responsibility: Each module has one reason to change
+ * - Open/Closed: Extensible without modifying existing code
+ * - Liskov Substitution: Consistent return types across similar functions
+ * - Interface Segregation: Specific interfaces for each entity
+ * - Dependency Inversion: Depends on abstractions (types), not concretions
+ *
+ * Data Hierarchy:
+ * ```
+ * Company (Empresa)
+ *    └── Brand (Marca/Store)
+ *          └── Restaurant (Dirección/Address)
+ *                └── Area (Zona geográfica)
+ * ```
+ *
+ * @example
+ * // Import specific functions
+ * import { fetchCompanies, fetchBrands } from '@/services/crp-portal';
+ *
+ * // Fetch companies and their brands
+ * const companies = await fetchCompanies();
+ * const brands = await fetchBrands(companies.map(c => c.id));
+ */
+
+// ============================================
+// TYPE EXPORTS
+// ============================================
+
+export type {
+  CompanyStatus,
+  DbCrpCompany,
+  DbCrpStore,
+  DbCrpAddress,
+  DbCrpBusinessArea,
+  DbCrpPortal,
+  DbCrpOrderHead,
+  FetchRestaurantsParams,
+  Portal,
+  PortalId,
+} from './types';
+
+export { VALID_COMPANY_STATUSES, PORTAL_IDS } from './types';
+
+// ============================================
+// SERVICE EXPORTS
+// ============================================
+
+// Companies
+export {
+  fetchCompanies as fetchCrpCompanies,
+  fetchCompanyById as fetchCrpCompanyById,
+} from './companies';
+
+// Brands
+export {
+  fetchBrands as fetchCrpBrands,
+  fetchBrandById as fetchCrpBrandById,
+} from './brands';
+
+// Areas
+export {
+  fetchAreas as fetchCrpAreas,
+  fetchAreaById as fetchCrpAreaById,
+} from './areas';
+
+// Restaurants
+export {
+  fetchRestaurants as fetchCrpRestaurants,
+  fetchRestaurantById as fetchCrpRestaurantById,
+} from './restaurants';
+
+// Portals
+export { fetchPortals as fetchCrpPortals } from './portals';
+
+// Orders
+export {
+  fetchCrpOrdersAggregated,
+  fetchCrpOrdersRaw,
+  fetchCrpOrdersComparison,
+} from './orders';
+
+export type {
+  FetchOrdersParams,
+  OrdersAggregation,
+  ChannelAggregation,
+} from './orders';
+
+// ============================================
+// UTILITY EXPORTS
+// ============================================
+
+export {
+  deduplicateBy,
+  deduplicateByNameKeepingLatest,
+  deduplicateAddressesKeepingLatest,
+  normalizeAddress,
+  getCurrentMonthFilter,
+} from './utils';
+
+// ============================================
+// MAPPER EXPORTS (for testing/extension)
+// ============================================
+
+export {
+  mapCompany,
+  mapBrand,
+  mapRestaurant,
+  mapArea,
+  mapPortal,
+} from './mappers';
