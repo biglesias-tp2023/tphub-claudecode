@@ -94,14 +94,16 @@ export function generateAuditNumber(typeSlug: string, clientName: string): strin
 }
 
 /**
- * Get the scope label for an audit (Company, Restaurant, or Area name)
+ * Get the scope label for an audit (Address, Brand, Company, or Area name)
  */
 export function getAuditScopeLabel(audit: {
   company?: { name: string } | null;
-  restaurant?: { name: string } | null;
+  brand?: { name: string } | null;
+  address?: { name: string } | null;
   area?: { name: string } | null;
 }): string {
-  if (audit.restaurant?.name) return audit.restaurant.name;
+  if (audit.address?.name) return audit.address.name;
+  if (audit.brand?.name) return audit.brand.name;
   if (audit.company?.name) return audit.company.name;
   if (audit.area?.name) return audit.area.name;
   return 'Sin asignar';

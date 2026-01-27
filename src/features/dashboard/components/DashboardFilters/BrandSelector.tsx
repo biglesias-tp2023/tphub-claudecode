@@ -9,7 +9,7 @@ interface BrandSelectorProps {
 
 export function BrandSelector({ className }: BrandSelectorProps) {
   const { data: brands = [], isLoading } = useBrands();
-  const { brandIds, toggleBrandId, clearBrands } = useDashboardFiltersStore();
+  const { brandIds, toggleBrandId, clearBrands, setBrandIds } = useDashboardFiltersStore();
 
   const options = useMemo(() => {
     return brands
@@ -27,10 +27,12 @@ export function BrandSelector({ className }: BrandSelectorProps) {
       selectedIds={brandIds}
       onToggle={toggleBrandId}
       onClear={clearBrands}
+      onSelectAll={setBrandIds}
       placeholder="Todas"
       isLoading={isLoading}
       disabled={brands.length === 0 && !isLoading}
       className={className}
+      treatEmptyAsAll={true}
     />
   );
 }

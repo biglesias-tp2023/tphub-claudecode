@@ -54,6 +54,10 @@ export interface ChannelAggregation {
   orders: number;
   discounts: number;
   refunds: number;
+  /** Net revenue after refunds (revenue - refunds) */
+  netRevenue: number;
+  /** Unique customer count */
+  uniqueCustomers: number;
 }
 
 export interface OrdersAggregation {
@@ -67,6 +71,18 @@ export interface OrdersAggregation {
   totalDiscounts: number;
   /** Total refunds */
   totalRefunds: number;
+  /** Net revenue after refunds (totalRevenue - totalRefunds) */
+  netRevenue: number;
+  /** Promotion rate percentage (totalDiscounts / totalRevenue * 100) */
+  promotionRate: number;
+  /** Refund rate percentage (totalRefunds / totalRevenue * 100) */
+  refundRate: number;
+  /** Average discount per order (totalDiscounts / totalOrders) */
+  avgDiscountPerOrder: number;
+  /** Unique customer count */
+  uniqueCustomers: number;
+  /** Average orders per customer (totalOrders / uniqueCustomers) */
+  ordersPerCustomer: number;
   /** Aggregation by channel */
   byChannel: {
     glovo: ChannelAggregation;
@@ -130,6 +146,8 @@ function createEmptyChannelAggregation(): ChannelAggregation {
     orders: 0,
     discounts: 0,
     refunds: 0,
+    netRevenue: 0,
+    uniqueCustomers: 0,
   };
 }
 
@@ -244,6 +262,12 @@ export async function fetchCrpOrdersAggregated(
     avgTicket: 0,
     totalDiscounts: 0,
     totalRefunds: 0,
+    netRevenue: 0,
+    promotionRate: 0,
+    refundRate: 0,
+    avgDiscountPerOrder: 0,
+    uniqueCustomers: 0,
+    ordersPerCustomer: 0,
     byChannel: {
       glovo: createEmptyChannelAggregation(),
       ubereats: createEmptyChannelAggregation(),
@@ -251,17 +275,31 @@ export async function fetchCrpOrdersAggregated(
     },
   };
 
+  // Track unique customers globally and per channel
+  const globalCustomerIds = new Set<string>();
+  const channelCustomerIds: Record<ChannelId, Set<string>> = {
+    glovo: new Set(),
+    ubereats: new Set(),
+    justeat: new Set(),
+  };
+
   // Aggregate order data
   for (const order of orders) {
     const revenue = order.amt_total_price || 0;
     const discounts = order.amt_promotions || 0;
     const refunds = order.amt_refunds || 0;
+    const customerId = order.cod_id_customer;
 
     // Add to totals
     result.totalRevenue += revenue;
     result.totalOrders += 1;
     result.totalDiscounts += discounts;
     result.totalRefunds += refunds;
+
+    // Track unique customers
+    if (customerId) {
+      globalCustomerIds.add(customerId);
+    }
 
     // Add to channel-specific aggregation
     const channelId = portalIdToChannelId(order.pfk_id_portal);
@@ -270,13 +308,45 @@ export async function fetchCrpOrdersAggregated(
       result.byChannel[channelId].orders += 1;
       result.byChannel[channelId].discounts += discounts;
       result.byChannel[channelId].refunds += refunds;
+
+      // Track unique customers per channel
+      if (customerId) {
+        channelCustomerIds[channelId].add(customerId);
+      }
     }
   }
 
-  // Calculate average ticket
+  // Calculate derived metrics
   result.avgTicket = result.totalOrders > 0
     ? result.totalRevenue / result.totalOrders
     : 0;
+
+  result.netRevenue = result.totalRevenue - result.totalRefunds;
+
+  result.promotionRate = result.totalRevenue > 0
+    ? (result.totalDiscounts / result.totalRevenue) * 100
+    : 0;
+
+  result.refundRate = result.totalRevenue > 0
+    ? (result.totalRefunds / result.totalRevenue) * 100
+    : 0;
+
+  result.avgDiscountPerOrder = result.totalOrders > 0
+    ? result.totalDiscounts / result.totalOrders
+    : 0;
+
+  result.uniqueCustomers = globalCustomerIds.size;
+
+  result.ordersPerCustomer = result.uniqueCustomers > 0
+    ? result.totalOrders / result.uniqueCustomers
+    : 0;
+
+  // Calculate channel-level derived metrics
+  for (const channelId of ['glovo', 'ubereats', 'justeat'] as ChannelId[]) {
+    const channel = result.byChannel[channelId];
+    channel.netRevenue = channel.revenue - channel.refunds;
+    channel.uniqueCustomers = channelCustomerIds[channelId].size;
+  }
 
   return result;
 }
@@ -303,43 +373,50 @@ export async function fetchCrpOrdersAggregated(
  * console.log(result.previous.totalRevenue); // 50000
  * ```
  */
+export interface OrdersChanges {
+  revenueChange: number;
+  ordersChange: number;
+  avgTicketChange: number;
+  netRevenueChange: number;
+  discountsChange: number;
+  refundsChange: number;
+  promotionRateChange: number;
+  refundRateChange: number;
+  uniqueCustomersChange: number;
+  ordersPerCustomerChange: number;
+}
+
 export async function fetchCrpOrdersComparison(
   currentParams: FetchOrdersParams,
   previousParams: FetchOrdersParams
 ): Promise<{
   current: OrdersAggregation;
   previous: OrdersAggregation;
-  changes: {
-    revenueChange: number;
-    ordersChange: number;
-    avgTicketChange: number;
-  };
+  changes: OrdersChanges;
 }> {
   const [current, previous] = await Promise.all([
     fetchCrpOrdersAggregated(currentParams),
     fetchCrpOrdersAggregated(previousParams),
   ]);
 
-  // Calculate percentage changes
-  const revenueChange = previous.totalRevenue > 0
-    ? ((current.totalRevenue - previous.totalRevenue) / previous.totalRevenue) * 100
-    : 0;
-
-  const ordersChange = previous.totalOrders > 0
-    ? ((current.totalOrders - previous.totalOrders) / previous.totalOrders) * 100
-    : 0;
-
-  const avgTicketChange = previous.avgTicket > 0
-    ? ((current.avgTicket - previous.avgTicket) / previous.avgTicket) * 100
-    : 0;
+  // Helper function to calculate percentage change
+  const calcChange = (curr: number, prev: number): number =>
+    prev > 0 ? ((curr - prev) / prev) * 100 : 0;
 
   return {
     current,
     previous,
     changes: {
-      revenueChange,
-      ordersChange,
-      avgTicketChange,
+      revenueChange: calcChange(current.totalRevenue, previous.totalRevenue),
+      ordersChange: calcChange(current.totalOrders, previous.totalOrders),
+      avgTicketChange: calcChange(current.avgTicket, previous.avgTicket),
+      netRevenueChange: calcChange(current.netRevenue, previous.netRevenue),
+      discountsChange: calcChange(current.totalDiscounts, previous.totalDiscounts),
+      refundsChange: calcChange(current.totalRefunds, previous.totalRefunds),
+      promotionRateChange: calcChange(current.promotionRate, previous.promotionRate),
+      refundRateChange: calcChange(current.refundRate, previous.refundRate),
+      uniqueCustomersChange: calcChange(current.uniqueCustomers, previous.uniqueCustomers),
+      ordersPerCustomerChange: calcChange(current.ordersPerCustomer, previous.ordersPerCustomer),
     },
   };
 }

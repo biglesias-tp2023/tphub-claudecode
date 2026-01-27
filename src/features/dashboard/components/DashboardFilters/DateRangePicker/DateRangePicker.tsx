@@ -121,21 +121,22 @@ export function DateRangePicker({
       {isOpen && (
         <div
           className={cn(
-            'absolute z-50 mt-2 bg-white rounded-xl border border-gray-200 shadow-xl',
+            'absolute z-50 mt-1 bg-white rounded-lg border border-gray-200 shadow-lg',
             'animate-in fade-in zoom-in-95 duration-150',
-            // When calendar is shown, position left to avoid overflow; otherwise right-0
-            showCalendar ? 'right-0 lg:right-auto lg:left-0 w-auto min-w-[600px]' : 'right-0 w-64'
+            // Position from the right edge, constrain to viewport
+            'right-0 max-w-[calc(100vw-2rem)]',
+            showCalendar ? 'w-auto' : 'w-48'
           )}
         >
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-900">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-900">
               Seleccionar período
             </h3>
           </div>
 
           {/* Presets list */}
-          <div className="p-2">
+          <div className="p-1.5">
             <PresetList
               value={tempPresetId}
               onChange={handlePresetChange}

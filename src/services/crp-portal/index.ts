@@ -65,7 +65,9 @@ export type {
   DbCrpBusinessArea,
   DbCrpPortal,
   DbCrpOrderHead,
+  DbRestaurantCoordinate,
   FetchRestaurantsParams,
+  FetchCoordinatesParams,
   Portal,
   PortalId,
 } from './types';
@@ -103,6 +105,14 @@ export {
 // Portals
 export { fetchPortals as fetchCrpPortals } from './portals';
 
+// Coordinates (new unified table)
+export {
+  fetchRestaurantCoordinates,
+  fetchRestaurantsForMap,
+  fetchRestaurantCoordinateById,
+  fetchRawCoordinates,
+} from './coordinates';
+
 // Orders
 export {
   fetchCrpOrdersAggregated,
@@ -114,6 +124,7 @@ export type {
   FetchOrdersParams,
   OrdersAggregation,
   ChannelAggregation,
+  OrdersChanges,
 } from './orders';
 
 // ============================================

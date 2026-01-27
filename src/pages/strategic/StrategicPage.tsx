@@ -310,6 +310,7 @@ export function StrategicPage() {
     objectivesByHorizon,
     stats: objectiveStats,
     restaurants,
+    companyIds,
     isLoading: isLoadingObjectives,
   } = useStrategicObjectives();
 
@@ -434,11 +435,10 @@ export function StrategicPage() {
         success('Objetivo actualizado');
       } else {
         const newObjective = await createObjective.mutateAsync(input);
-        const restaurant = restaurants.find((r) => r.id === input.restaurantId);
         try {
           const generatedTasks = await generateTasks.mutateAsync({
             objective: newObjective,
-            companyName: restaurant?.name,
+            companyName: undefined, // TODO: Fetch company name from CRP Portal if needed
           });
           if (generatedTasks.length > 0) {
             success(`Objetivo creado con ${generatedTasks.length} tareas`);
@@ -828,8 +828,7 @@ export function StrategicPage() {
         onSave={handleSaveObjective}
         onDelete={handleDeleteObjective}
         objective={selectedObjective}
-        restaurants={restaurants}
-        defaultRestaurantId={defaultRestaurantId}
+        defaultCompanyId={companyIds[0]}
         isLoading={createObjective.isPending || updateObjective.isPending}
         isDeleting={deleteObjective.isPending}
       />

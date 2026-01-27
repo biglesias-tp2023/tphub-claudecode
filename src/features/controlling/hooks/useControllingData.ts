@@ -72,6 +72,18 @@ export interface PortfolioMetrics {
   reembolsos: number;
   reembolsosChange: number;
   reembolsosPercentage: number;
+  // New metrics from CRP Portal
+  /** Net revenue after refunds (ventas - reembolsos) */
+  netRevenue: number;
+  netRevenueChange: number;
+  /** Unique customer count */
+  uniqueCustomers: number;
+  uniqueCustomersChange: number;
+  /** Average orders per customer */
+  ordersPerCustomer: number;
+  ordersPerCustomerChange: number;
+  /** Average discount per order */
+  avgDiscountPerOrder: number;
 }
 
 export interface ChannelMetrics {
@@ -92,6 +104,11 @@ export interface ChannelMetrics {
   promosPercentage: number;
   reembolsos: number;
   reembolsosPercentage: number;
+  // New metrics from CRP Portal
+  /** Net revenue after refunds */
+  netRevenue: number;
+  /** Unique customer count per channel */
+  uniqueCustomers: number;
 }
 
 export interface HierarchyRow {
@@ -964,6 +981,14 @@ function calculatePortfolioFromHierarchy(hierarchy: HierarchyRow[], companyFilte
     reembolsos: totals.reembolsos,
     reembolsosChange,
     reembolsosPercentage: totals.ventas > 0 ? (totals.reembolsos / totals.ventas) * 100 : 0,
+    // New metrics - defaults for demo data (will be overridden with real data)
+    netRevenue: totals.ventas - totals.reembolsos,
+    netRevenueChange: ventasChange, // Approximate
+    uniqueCustomers: 0, // Not available in demo data
+    uniqueCustomersChange: 0,
+    ordersPerCustomer: 0, // Not available in demo data
+    ordersPerCustomerChange: 0,
+    avgDiscountPerOrder: totals.pedidos > 0 ? totals.inversionPromos / totals.pedidos : 0,
   };
 }
 
@@ -1038,6 +1063,9 @@ function calculateChannelsFromHierarchy(hierarchy: HierarchyRow[], companyFilter
       promosPercentage: t.ventas > 0 ? (t.promos / t.ventas) * 100 : 0,
       reembolsos: t.reembolsos,
       reembolsosPercentage: t.ventas > 0 ? (t.reembolsos / t.ventas) * 100 : 0,
+      // New metrics - defaults for demo data
+      netRevenue: t.ventas - t.reembolsos,
+      uniqueCustomers: 0, // Not available in demo data
     };
   });
 }
@@ -1058,8 +1086,10 @@ function calculatePortfolioFromChannels(channels: ChannelMetrics[]): PortfolioMe
       count: acc.count + 1,
       // Weighted change calculation
       ventasChangeWeighted: acc.ventasChangeWeighted + (ch.revenueChange * ch.revenue),
+      netRevenue: acc.netRevenue + ch.netRevenue,
+      uniqueCustomers: acc.uniqueCustomers + ch.uniqueCustomers,
     }),
-    { ventas: 0, pedidos: 0, inversionAds: 0, inversionPromos: 0, reembolsos: 0, openTimeSum: 0, count: 0, ventasChangeWeighted: 0 }
+    { ventas: 0, pedidos: 0, inversionAds: 0, inversionPromos: 0, reembolsos: 0, openTimeSum: 0, count: 0, ventasChangeWeighted: 0, netRevenue: 0, uniqueCustomers: 0 }
   );
 
   const avgOpenTime = totals.count > 0 ? totals.openTimeSum / totals.count : 0;
@@ -1087,6 +1117,14 @@ function calculatePortfolioFromChannels(channels: ChannelMetrics[]): PortfolioMe
     reembolsos: totals.reembolsos,
     reembolsosChange: ventasChange * -0.3,
     reembolsosPercentage: totals.ventas > 0 ? (totals.reembolsos / totals.ventas) * 100 : 0,
+    // New metrics
+    netRevenue: totals.netRevenue,
+    netRevenueChange: ventasChange, // Approximate
+    uniqueCustomers: totals.uniqueCustomers,
+    uniqueCustomersChange: 0, // Not calculated from channels
+    ordersPerCustomer: totals.uniqueCustomers > 0 ? totals.pedidos / totals.uniqueCustomers : 0,
+    ordersPerCustomerChange: 0,
+    avgDiscountPerOrder: totals.pedidos > 0 ? totals.inversionPromos / totals.pedidos : 0,
   };
 }
 
@@ -1232,11 +1270,22 @@ export function useControllingData() {
         pedidosChange: changes.ordersChange,
         ticketMedio: current.avgTicket,
         ticketMedioChange: changes.avgTicketChange,
-        // Also update reembolsos from real data
+        // Reembolsos from real data
         reembolsos: current.totalRefunds,
-        reembolsosPercentage: current.totalRevenue > 0
-          ? (current.totalRefunds / current.totalRevenue) * 100
-          : 0,
+        reembolsosChange: changes.refundsChange,
+        reembolsosPercentage: current.refundRate,
+        // Promos/descuentos from real data
+        inversionPromos: current.totalDiscounts,
+        inversionPromosChange: changes.discountsChange,
+        promosPercentage: current.promotionRate,
+        // New metrics from CRP Portal
+        netRevenue: current.netRevenue,
+        netRevenueChange: changes.netRevenueChange,
+        uniqueCustomers: current.uniqueCustomers,
+        uniqueCustomersChange: changes.uniqueCustomersChange,
+        ordersPerCustomer: current.ordersPerCustomer,
+        ordersPerCustomerChange: changes.ordersPerCustomerChange,
+        avgDiscountPerOrder: current.avgDiscountPerOrder,
       };
 
       // Update channel metrics with real data
@@ -1277,6 +1326,9 @@ export function useControllingData() {
           promosPercentage: channelData.revenue > 0 ? (channelData.discounts / channelData.revenue) * 100 : 0,
           reembolsos: channelData.refunds,
           reembolsosPercentage: channelData.revenue > 0 ? (channelData.refunds / channelData.revenue) * 100 : 0,
+          // New metrics from CRP Portal
+          netRevenue: channelData.netRevenue,
+          uniqueCustomers: channelData.uniqueCustomers,
         };
       });
 

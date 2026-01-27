@@ -9,7 +9,7 @@ interface AreaSelectorProps {
 
 export function AreaSelector({ className }: AreaSelectorProps) {
   const { data: areas = [], isLoading } = useAreas();
-  const { areaIds, toggleAreaId, clearAreas, brandIds } = useDashboardFiltersStore();
+  const { areaIds, toggleAreaId, clearAreas, setAreaIds, brandIds } = useDashboardFiltersStore();
 
   const options = useMemo(() => {
     return areas
@@ -30,10 +30,12 @@ export function AreaSelector({ className }: AreaSelectorProps) {
       selectedIds={areaIds}
       onToggle={toggleAreaId}
       onClear={clearAreas}
+      onSelectAll={setAreaIds}
       placeholder="Todas"
       isLoading={isLoading}
       disabled={isDisabled}
       className={className}
+      treatEmptyAsAll={true}
     />
   );
 }

@@ -64,7 +64,8 @@ export function useAuditTypeBySlug(slug: string | undefined) {
 
 interface UseAuditsParams {
   companyIds?: string[];
-  restaurantIds?: string[];
+  brandIds?: string[];
+  addressIds?: string[];
   auditTypeIds?: string[];
   status?: AuditStatus;
 }

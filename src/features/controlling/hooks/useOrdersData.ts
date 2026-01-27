@@ -55,6 +55,13 @@ export interface OrdersDataResult {
     revenueChange: number;
     ordersChange: number;
     avgTicketChange: number;
+    netRevenueChange: number;
+    discountsChange: number;
+    refundsChange: number;
+    promotionRateChange: number;
+    refundRateChange: number;
+    uniqueCustomersChange: number;
+    ordersPerCustomerChange: number;
   };
 }
 

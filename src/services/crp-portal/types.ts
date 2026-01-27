@@ -171,6 +171,55 @@ export const PORTAL_IDS = {
 
 export type PortalId = typeof PORTAL_IDS[keyof typeof PORTAL_IDS];
 
+// ============================================
+// RESTAURANT COORDINATES (Nueva tabla unificada)
+// ============================================
+
+/**
+ * Raw database row from tphub_restaurant_coordinates table.
+ * Contains deduplicated restaurant addresses with geocoded coordinates.
+ */
+export interface DbRestaurantCoordinate {
+  /** UUID primary key */
+  id: string;
+  /** Normalized address for deduplication (e.g., "mozart 5") */
+  normalized_address: string;
+  /** Full display address (e.g., "Calle de Mozart 5, 28008 Madrid, España") */
+  display_address: string;
+  /** Latitude coordinate from Mapbox */
+  latitude: number | null;
+  /** Longitude coordinate from Mapbox */
+  longitude: number | null;
+  /** Company ID reference (pfk_id_company as string) */
+  company_id: string;
+  /** Original CRP address ID (pk_id_address as string) */
+  crp_address_id: string;
+  /** Brand/store ID reference (pfk_id_store as string, nullable) */
+  brand_id: string | null;
+  /** Business area ID reference (pfk_id_business_area as string, nullable) */
+  area_id: string | null;
+  /** Geocoding confidence score (0-1) */
+  geocode_confidence: number | null;
+  /** Timestamp of creation */
+  created_at: string;
+  /** Timestamp of last update */
+  updated_at: string;
+}
+
+/**
+ * Parameters for fetching restaurant coordinates.
+ */
+export interface FetchCoordinatesParams {
+  /** Filter by company IDs */
+  companyIds?: string[];
+  /** Filter by brand/store IDs */
+  brandIds?: string[];
+  /** Filter by business area IDs */
+  areaIds?: string[];
+  /** Minimum geocode confidence (0-1), default 0 */
+  minConfidence?: number;
+}
+
 /**
  * Raw database row from crp_portal__ft_order_head table.
  * Represents a sales order from delivery platforms.

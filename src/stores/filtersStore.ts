@@ -96,6 +96,7 @@ interface DashboardFiltersState {
   // Actions - Fechas
   setDateRange: (range: DateRange) => void;
   setDatePreset: (preset: DatePreset) => void;
+  setDateRangeWithPreset: (range: DateRange, preset: DatePreset) => void;
 
   // Reset
   resetDashboardFilters: () => void;
@@ -173,6 +174,19 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
           dateRange: newRange,
         });
       },
+      setDateRangeWithPreset: (range, preset) => {
+        if (import.meta.env.DEV) {
+          console.log('[FiltersStore] setDateRangeWithPreset:', {
+            preset,
+            start: range.start.toISOString(),
+            end: range.end.toISOString(),
+          });
+        }
+        set({
+          datePreset: preset,
+          dateRange: range,
+        });
+      },
 
       // Reset jerárquico (cuando cambia Compañía)
       resetDashboardFilters: () => set({
@@ -199,7 +213,38 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
         // Solo persistir Canal y Fecha (el resto se resetea con Compañía)
         channelIds: state.channelIds,
         datePreset: state.datePreset,
+        dateRange: state.dateRange,
       }),
+      // Custom storage to handle Date serialization/deserialization
+      storage: {
+        getItem: (name) => {
+          try {
+            const str = localStorage.getItem(name);
+            if (!str) return null;
+            const parsed = JSON.parse(str);
+            // Convert date strings back to Date objects
+            if (parsed.state?.dateRange?.start && parsed.state?.dateRange?.end) {
+              parsed.state.dateRange = {
+                start: new Date(parsed.state.dateRange.start),
+                end: new Date(parsed.state.dateRange.end),
+              };
+            } else {
+              // If dateRange is missing or invalid, use default
+              delete parsed.state?.dateRange;
+            }
+            return parsed;
+          } catch {
+            // If parsing fails, return null to use defaults
+            return null;
+          }
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name);
+        },
+      },
     }
   )
 );

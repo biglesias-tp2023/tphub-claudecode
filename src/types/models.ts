@@ -732,7 +732,9 @@ export interface ObjectiveFieldData {
  */
 export interface StrategicObjective {
   id: string;
-  restaurantId: string;
+  companyId: string;                    // CRP Portal: pk_id_company (requerido)
+  brandId: string | null;               // CRP Portal: pk_id_store (opcional)
+  addressId: string | null;             // CRP Portal: pk_id_address (opcional)
   title: string;
   description: string | null;
   category: ObjectiveCategory;
@@ -760,7 +762,9 @@ export interface StrategicObjective {
  * Input for creating/updating strategic objectives
  */
 export interface StrategicObjectiveInput {
-  restaurantId: string;
+  companyId: string;                    // CRP Portal: pk_id_company (requerido)
+  brandId?: string;                     // CRP Portal: pk_id_store (opcional)
+  addressId?: string;                   // CRP Portal: pk_id_address (opcional)
   title: string;
   description?: string;
   category: ObjectiveCategory;
@@ -784,7 +788,9 @@ export interface StrategicObjectiveInput {
  */
 export interface DbStrategicObjective {
   id: string;
-  restaurant_id: string;
+  company_id: string;                   // CRP Portal: pk_id_company
+  brand_id: string | null;              // CRP Portal: pk_id_store
+  address_id: string | null;            // CRP Portal: pk_id_address
   title: string;
   description: string | null;
   category: string;
@@ -1087,9 +1093,10 @@ export interface AuditType {
 export interface Audit {
   id: string;
   auditNumber: string;          // AUD-2026-001
-  companyId: string | null;
-  restaurantId: string | null;
-  areaId: string | null;
+  companyId: string | null;     // CRP Portal: pk_id_company
+  brandId: string | null;       // CRP Portal: pk_id_store
+  addressId: string | null;     // CRP Portal: pk_id_address
+  areaId: string | null;        // CRP Portal: pk_id_business_area
   auditTypeId: string;
   fieldData: Record<string, unknown> | null;
   status: AuditStatus;
@@ -1107,7 +1114,8 @@ export interface Audit {
 export interface AuditWithDetails extends Audit {
   auditType?: AuditType;
   company?: Company;
-  restaurant?: Restaurant;
+  brand?: Brand;
+  address?: Restaurant;  // Using Restaurant type for address data
   area?: Area;
   createdByProfile?: { fullName: string; avatarUrl: string | null };
 }
@@ -1116,9 +1124,10 @@ export interface AuditWithDetails extends Audit {
  * Input type for creating/updating audits
  */
 export interface AuditInput {
-  companyId?: string;
-  restaurantId?: string;
-  areaId?: string;
+  companyId?: string;           // CRP Portal: pk_id_company
+  brandId?: string;             // CRP Portal: pk_id_store
+  addressId?: string;           // CRP Portal: pk_id_address
+  areaId?: string;              // CRP Portal: pk_id_business_area
   auditTypeId: string;
   auditNumber?: string; // Optional - will be generated if not provided
   fieldData?: Record<string, unknown>;
@@ -1148,9 +1157,10 @@ export interface DbAuditType {
 export interface DbAudit {
   id: string;
   audit_number: string;
-  company_id: string | null;
-  restaurant_id: string | null;
-  area_id: string | null;
+  company_id: string | null;    // CRP Portal: pk_id_company
+  brand_id: string | null;      // CRP Portal: pk_id_store
+  address_id: string | null;    // CRP Portal: pk_id_address
+  area_id: string | null;       // CRP Portal: pk_id_business_area
   audit_type_id: string;
   field_data: Record<string, unknown> | null;
   status: string;

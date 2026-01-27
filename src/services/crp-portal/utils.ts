@@ -121,6 +121,7 @@ export function deduplicateByNameKeepingLatest<T extends { pk_ts_month: string }
 /**
  * Normalize an address string for deduplication.
  * Handles Spanish/Catalan street name variations.
+ * Extracts only street name + number, ignoring city/postal code.
  *
  * @param address - Address string to normalize
  * @returns Normalized address string for comparison
@@ -128,10 +129,19 @@ export function deduplicateByNameKeepingLatest<T extends { pk_ts_month: string }
  * @example
  * normalizeAddress('C/ de Sancho de Ávila, 175') // 'sancho avila 175'
  * normalizeAddress('Calle de Sancho de Ávila 175') // 'sancho avila 175'
- * normalizeAddress('Carrer de Sancho de Ávila 175') // 'sancho avila 175'
+ * normalizeAddress('Calle de Mozart 5, 28008 Madrid, Spain') // 'mozart 5'
+ * normalizeAddress('Calle Mozart 5') // 'mozart 5'
  */
 export function normalizeAddress(address: string): string {
-  return address
+  // First, extract only the street part (before first comma or postal code)
+  let streetPart = address
+    // Remove everything after first comma (city, country, etc.)
+    .split(',')[0]
+    // Also remove postal codes that might be without comma (5 digits)
+    .replace(/\s+\d{5}\s*.*$/, '')
+    .trim();
+
+  return streetPart
     .toLowerCase()
     // Remove common street prefixes (Spanish/Catalan)
     .replace(/^(c\/|calle|carrer|carretera|avenida|avinguda|av\.|avda\.|paseo|passeig|plaza|plaça|pl\.|ronda|travesía|travessera)\s*/i, '')
@@ -146,31 +156,57 @@ export function normalizeAddress(address: string): string {
 }
 
 /**
- * Deduplicate addresses by normalized name, keeping the most recent pk_ts_month.
+ * Deduplicate addresses by normalized name.
+ * Keeps the most complete address (longest) and merges coordinates from all duplicates.
  * Uses address normalization to handle variations like "C/", "Calle", "Carrer".
  *
- * @template T - The type of items in the array (must have pk_ts_month)
+ * @template T - The type of items in the array (must have pk_ts_month and optional coordinates)
  * @param items - Array of address items to deduplicate
  * @param addressFn - Function to extract the address string from each item
- * @returns Deduplicated array with the most recent version of each unique address
+ * @returns Deduplicated array with the most complete version of each unique address
  */
-export function deduplicateAddressesKeepingLatest<T extends { pk_ts_month: string }>(
+export function deduplicateAddressesKeepingLatest<T extends { pk_ts_month: string; des_latitude?: number | null; des_longitude?: number | null }>(
   items: T[],
   addressFn: (item: T) => string
 ): T[] {
-  // Sort by pk_ts_month descending (most recent first)
-  const sorted = [...items].sort((a, b) =>
-    b.pk_ts_month.localeCompare(a.pk_ts_month)
-  );
+  // Group items by normalized address
+  const groups = new Map<string, T[]>();
 
-  // Keep only the first occurrence of each normalized address
-  const seen = new Map<string, T>();
-  for (const item of sorted) {
+  for (const item of items) {
     const normalizedKey = normalizeAddress(addressFn(item));
-    if (!seen.has(normalizedKey)) {
-      seen.set(normalizedKey, item);
+    if (!groups.has(normalizedKey)) {
+      groups.set(normalizedKey, []);
     }
+    groups.get(normalizedKey)!.push(item);
   }
 
-  return Array.from(seen.values());
+  // For each group, pick the best representative
+  const results: T[] = [];
+
+  for (const [, group] of groups) {
+    // Sort by: 1) address length (longest first), 2) pk_ts_month (most recent first)
+    const sorted = [...group].sort((a, b) => {
+      const lenDiff = addressFn(b).length - addressFn(a).length;
+      if (lenDiff !== 0) return lenDiff;
+      return b.pk_ts_month.localeCompare(a.pk_ts_month);
+    });
+
+    // Take the best (longest, most recent)
+    const best = { ...sorted[0] };
+
+    // If the best doesn't have coordinates, try to find them in other duplicates
+    if (!best.des_latitude || !best.des_longitude) {
+      for (const item of group) {
+        if (item.des_latitude && item.des_longitude) {
+          best.des_latitude = item.des_latitude;
+          best.des_longitude = item.des_longitude;
+          break;
+        }
+      }
+    }
+
+    results.push(best as T);
+  }
+
+  return results;
 }

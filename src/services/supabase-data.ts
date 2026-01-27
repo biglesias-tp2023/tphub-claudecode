@@ -702,7 +702,9 @@ function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObjective {
 
   return {
     id: db.id,
-    restaurantId: db.restaurant_id,
+    companyId: db.company_id,
+    brandId: db.brand_id,
+    addressId: db.address_id,
     title: db.title,
     description: db.description,
     category: db.category as ObjectiveCategory,
@@ -726,7 +728,9 @@ function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObjective {
 }
 
 interface FetchStrategicObjectivesParams {
-  restaurantIds?: string[];
+  companyIds?: string[];
+  brandIds?: string[];
+  addressIds?: string[];
   horizon?: ObjectiveHorizon;
   status?: ObjectiveStatus;
 }
@@ -740,8 +744,14 @@ export async function fetchStrategicObjectives(
   // Return mock data in dev mode
   if (isDevMode) {
     let objectives = [...mockStrategicObjectives];
-    if (params.restaurantIds && params.restaurantIds.length > 0) {
-      objectives = objectives.filter((o) => params.restaurantIds!.includes(o.restaurantId));
+    if (params.companyIds && params.companyIds.length > 0) {
+      objectives = objectives.filter((o) => params.companyIds!.includes(o.companyId));
+    }
+    if (params.brandIds && params.brandIds.length > 0) {
+      objectives = objectives.filter((o) => o.brandId && params.brandIds!.includes(o.brandId));
+    }
+    if (params.addressIds && params.addressIds.length > 0) {
+      objectives = objectives.filter((o) => o.addressId && params.addressIds!.includes(o.addressId));
     }
     if (params.horizon) {
       objectives = objectives.filter((o) => o.horizon === params.horizon);
@@ -757,8 +767,14 @@ export async function fetchStrategicObjectives(
     .select('*')
     .order('display_order', { ascending: true });
 
-  if (params.restaurantIds && params.restaurantIds.length > 0) {
-    query = query.in('restaurant_id', params.restaurantIds);
+  if (params.companyIds && params.companyIds.length > 0) {
+    query = query.in('company_id', params.companyIds);
+  }
+  if (params.brandIds && params.brandIds.length > 0) {
+    query = query.in('brand_id', params.brandIds);
+  }
+  if (params.addressIds && params.addressIds.length > 0) {
+    query = query.in('address_id', params.addressIds);
   }
   if (params.horizon) {
     query = query.eq('horizon', params.horizon);
@@ -782,7 +798,9 @@ export async function createStrategicObjective(
   // Mock mode: add to in-memory storage
   if (isDevMode) {
     return addMockStrategicObjective({
-      restaurantId: input.restaurantId,
+      companyId: input.companyId,
+      brandId: input.brandId || null,
+      addressId: input.addressId || null,
       title: input.title,
       description: input.description || null,
       category: input.category,
@@ -807,7 +825,9 @@ export async function createStrategicObjective(
   const userId = user?.id || null;
 
   const dbInput = {
-    restaurant_id: input.restaurantId,
+    company_id: input.companyId,
+    brand_id: input.brandId || null,
+    address_id: input.addressId || null,
     title: input.title,
     description: input.description || null,
     category: input.category,
@@ -874,6 +894,11 @@ export async function updateStrategicObjective(
   const userId = user?.id || null;
 
   const dbUpdates: Record<string, unknown> = { updated_by: userId };
+
+  // Scope fields (CRP Portal references)
+  if (updates.companyId !== undefined) dbUpdates.company_id = updates.companyId;
+  if (updates.brandId !== undefined) dbUpdates.brand_id = updates.brandId;
+  if (updates.addressId !== undefined) dbUpdates.address_id = updates.addressId;
 
   if (updates.title !== undefined) dbUpdates.title = updates.title;
   if (updates.description !== undefined) dbUpdates.description = updates.description;
@@ -1255,8 +1280,8 @@ export async function fetchStrategicTasksWithDetails(
   // Get unique assignee IDs
   const assigneeIds = [...new Set(tasks.filter((t) => t.assigneeId).map((t) => t.assigneeId!))];
 
-  // Fetch objectives
-  const objectives = await fetchStrategicObjectives({ restaurantIds: params.restaurantIds });
+  // Fetch objectives (map restaurantIds to addressIds for CRP Portal model)
+  const objectives = await fetchStrategicObjectives({ addressIds: params.restaurantIds });
   const objectiveMap = new Map(objectives.map((o) => [o.id, o]));
 
   // Fetch profiles if needed
@@ -1372,7 +1397,7 @@ export async function generateTasksForObjective(
 
     const task = await createStrategicTask({
       objectiveId: objective.id,
-      restaurantId: objective.restaurantId,
+      restaurantId: objective.addressId || '',  // Map addressId to restaurantId for task
       title: template.title,
       description: template.description,
       category: objective.category,
@@ -1529,7 +1554,8 @@ function mapDbAuditToAudit(db: DbAudit): Audit {
     id: db.id,
     auditNumber: db.audit_number,
     companyId: db.company_id,
-    restaurantId: db.restaurant_id,
+    brandId: db.brand_id,
+    addressId: db.address_id,
     areaId: db.area_id,
     auditTypeId: db.audit_type_id,
     fieldData: db.field_data,
@@ -1593,7 +1619,8 @@ export async function fetchAuditTypeById(id: string): Promise<AuditType | null> 
 
 interface FetchAuditsParams {
   companyIds?: string[];
-  restaurantIds?: string[];
+  brandIds?: string[];
+  addressIds?: string[];
   auditTypeIds?: string[];
   status?: AuditStatus;
   search?: string;
@@ -1611,8 +1638,11 @@ export async function fetchAudits(params: FetchAuditsParams = {}): Promise<Audit
   if (params.companyIds && params.companyIds.length > 0) {
     query = query.in('company_id', params.companyIds);
   }
-  if (params.restaurantIds && params.restaurantIds.length > 0) {
-    query = query.in('restaurant_id', params.restaurantIds);
+  if (params.brandIds && params.brandIds.length > 0) {
+    query = query.in('brand_id', params.brandIds);
+  }
+  if (params.addressIds && params.addressIds.length > 0) {
+    query = query.in('address_id', params.addressIds);
   }
   if (params.auditTypeIds && params.auditTypeIds.length > 0) {
     query = query.in('audit_type_id', params.auditTypeIds);
@@ -1640,7 +1670,8 @@ export async function fetchAuditsWithDetails(
   // Fetch related data
   const auditTypeIds = [...new Set(audits.map((a) => a.auditTypeId))];
   const companyIds = [...new Set(audits.filter((a) => a.companyId).map((a) => a.companyId!))];
-  const restaurantIds = [...new Set(audits.filter((a) => a.restaurantId).map((a) => a.restaurantId!))];
+  const brandIds = [...new Set(audits.filter((a) => a.brandId).map((a) => a.brandId!))];
+  const addressIds = [...new Set(audits.filter((a) => a.addressId).map((a) => a.addressId!))];
   const areaIds = [...new Set(audits.filter((a) => a.areaId).map((a) => a.areaId!))];
   const creatorIds = [...new Set(audits.filter((a) => a.createdBy).map((a) => a.createdBy!))];
 
@@ -1665,15 +1696,41 @@ export async function fetchAuditsWithDetails(
     );
   }
 
-  // Fetch restaurants
-  let restaurantMap = new Map<string, Restaurant>();
-  if (restaurantIds.length > 0) {
-    const { data: restaurants } = await supabase
-      .from('restaurants')
-      .select('*')
-      .in('id', restaurantIds);
-    restaurantMap = new Map(
-      (restaurants as DbRestaurant[] || []).map((r) => [r.id, mapDbRestaurantToRestaurant(r)])
+  // Fetch brands from CRP Portal
+  let brandMap = new Map<string, Brand>();
+  if (brandIds.length > 0) {
+    const { data: brands } = await supabase
+      .from('crp_portal__dt_store')
+      .select('pk_id_store, des_store, pfk_id_company')
+      .in('pk_id_store', brandIds.map(Number));
+    brandMap = new Map(
+      (brands || []).map((b: { pk_id_store: number; des_store: string; pfk_id_company: number }) => [
+        String(b.pk_id_store),
+        { id: String(b.pk_id_store), name: b.des_store, companyId: String(b.pfk_id_company) } as Brand,
+      ])
+    );
+  }
+
+  // Fetch addresses from CRP Portal
+  let addressMap = new Map<string, Restaurant>();
+  if (addressIds.length > 0) {
+    const { data: addresses } = await supabase
+      .from('crp_portal__dt_address')
+      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude')
+      .in('pk_id_address', addressIds.map(Number));
+    addressMap = new Map(
+      (addresses || []).map((a: { pk_id_address: number; des_address: string; pfk_id_company: number; pfk_id_store: number | null; pfk_id_business_area: number | null; des_latitude: number | null; des_longitude: number | null }) => [
+        String(a.pk_id_address),
+        {
+          id: String(a.pk_id_address),
+          name: a.des_address,
+          companyId: String(a.pfk_id_company),
+          brandId: a.pfk_id_store ? String(a.pfk_id_store) : null,
+          areaId: a.pfk_id_business_area ? String(a.pfk_id_business_area) : null,
+          latitude: a.des_latitude,
+          longitude: a.des_longitude,
+        } as Restaurant,
+      ])
     );
   }
 
@@ -1709,7 +1766,8 @@ export async function fetchAuditsWithDetails(
     ...audit,
     auditType: auditTypeMap.get(audit.auditTypeId),
     company: audit.companyId ? companyMap.get(audit.companyId) : undefined,
-    restaurant: audit.restaurantId ? restaurantMap.get(audit.restaurantId) : undefined,
+    brand: audit.brandId ? brandMap.get(audit.brandId) : undefined,
+    address: audit.addressId ? addressMap.get(audit.addressId) : undefined,
     area: audit.areaId ? areaMap.get(audit.areaId) : undefined,
     createdByProfile: audit.createdBy ? creatorMap.get(audit.createdBy) : undefined,
   }));
@@ -1739,10 +1797,45 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
   const audit = await fetchAuditById(id);
   if (!audit) return null;
 
-  const [auditType, company, restaurant, area, creator] = await Promise.all([
+  // Fetch brand from CRP Portal
+  const fetchBrandById = async (brandId: string): Promise<Brand | null> => {
+    const { data } = await supabase
+      .from('crp_portal__dt_store')
+      .select('pk_id_store, des_store, pfk_id_company')
+      .eq('pk_id_store', Number(brandId))
+      .single();
+    if (!data) return null;
+    return {
+      id: String(data.pk_id_store),
+      name: data.des_store,
+      companyId: String(data.pfk_id_company),
+    } as Brand;
+  };
+
+  // Fetch address from CRP Portal
+  const fetchAddressById = async (addressId: string): Promise<Restaurant | null> => {
+    const { data } = await supabase
+      .from('crp_portal__dt_address')
+      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude')
+      .eq('pk_id_address', Number(addressId))
+      .single();
+    if (!data) return null;
+    return {
+      id: String(data.pk_id_address),
+      name: data.des_address,
+      companyId: String(data.pfk_id_company),
+      brandId: data.pfk_id_store ? String(data.pfk_id_store) : null,
+      areaId: data.pfk_id_business_area ? String(data.pfk_id_business_area) : null,
+      latitude: data.des_latitude,
+      longitude: data.des_longitude,
+    } as Restaurant;
+  };
+
+  const [auditType, company, brand, address, area, creator] = await Promise.all([
     fetchAuditTypeById(audit.auditTypeId),
     audit.companyId ? fetchCompanyById(audit.companyId) : null,
-    audit.restaurantId ? fetchRestaurantById(audit.restaurantId) : null,
+    audit.brandId ? fetchBrandById(audit.brandId) : null,
+    audit.addressId ? fetchAddressById(audit.addressId) : null,
     audit.areaId ? fetchAreaById(audit.areaId) : null,
     audit.createdBy
       ? supabase.from('profiles').select('full_name, avatar_url').eq('id', audit.createdBy).single()
@@ -1753,7 +1846,8 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
     ...audit,
     auditType: auditType || undefined,
     company: company || undefined,
-    restaurant: restaurant || undefined,
+    brand: brand || undefined,
+    address: address || undefined,
     area: area || undefined,
     createdByProfile: creator?.data
       ? { fullName: creator.data.full_name || 'Usuario', avatarUrl: creator.data.avatar_url }
@@ -1770,7 +1864,8 @@ export async function createAudit(input: AuditInput): Promise<Audit> {
 
   const dbInput: Record<string, unknown> = {
     company_id: input.companyId || null,
-    restaurant_id: input.restaurantId || null,
+    brand_id: input.brandId || null,
+    address_id: input.addressId || null,
     area_id: input.areaId || null,
     audit_type_id: input.auditTypeId,
     field_data: input.fieldData || null,
@@ -1808,7 +1903,8 @@ export async function updateAudit(
   const dbUpdates: Record<string, unknown> = { updated_by: userId };
 
   if (updates.companyId !== undefined) dbUpdates.company_id = updates.companyId;
-  if (updates.restaurantId !== undefined) dbUpdates.restaurant_id = updates.restaurantId;
+  if (updates.brandId !== undefined) dbUpdates.brand_id = updates.brandId;
+  if (updates.addressId !== undefined) dbUpdates.address_id = updates.addressId;
   if (updates.areaId !== undefined) dbUpdates.area_id = updates.areaId;
   if (updates.auditNumber !== undefined) dbUpdates.audit_number = updates.auditNumber;
   if (updates.fieldData !== undefined) dbUpdates.field_data = updates.fieldData;

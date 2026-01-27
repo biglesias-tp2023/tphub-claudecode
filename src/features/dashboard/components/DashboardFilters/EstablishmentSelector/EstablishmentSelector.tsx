@@ -28,12 +28,18 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
     return [...restaurants].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   }, [restaurants]);
 
-  // Check if all are selected
-  const allSelected = sortedRestaurants.length > 0 &&
-    sortedRestaurants.every(r => restaurantIds.includes(r.id));
+  // When restaurantIds is empty, treat as "all selected"
+  const isEmptyMeansAll = restaurantIds.length === 0;
+
+  // Check if all are selected (empty = all, or all explicitly selected)
+  const allSelected = sortedRestaurants.length > 0 && (
+    isEmptyMeansAll ||
+    sortedRestaurants.every(r => restaurantIds.includes(r.id))
+  );
 
   // Check if some (but not all) are selected
-  const someSelected = restaurantIds.length > 0 && !allSelected;
+  const someSelected = restaurantIds.length > 0 &&
+    restaurantIds.length < sortedRestaurants.length;
 
   // Close on click outside
   useEffect(() => {
@@ -110,7 +116,7 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
             </h3>
             {sortedRestaurants.length > 0 && (
               <p className="text-xs text-gray-500 mt-0.5">
-                {restaurantIds.length} de {sortedRestaurants.length} seleccionados
+                {isEmptyMeansAll ? sortedRestaurants.length : restaurantIds.length} de {sortedRestaurants.length} seleccionados
               </p>
             )}
           </div>
@@ -145,8 +151,18 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
                     <CheckboxItem
                       key={restaurant.id}
                       label={restaurant.name}
-                      checked={restaurantIds.includes(restaurant.id)}
-                      onChange={() => toggleRestaurantId(restaurant.id)}
+                      checked={isEmptyMeansAll || restaurantIds.includes(restaurant.id)}
+                      onChange={() => {
+                        if (isEmptyMeansAll) {
+                          // If all selected (empty), clicking one should select all EXCEPT this one
+                          const allExceptThis = sortedRestaurants
+                            .filter(r => r.id !== restaurant.id)
+                            .map(r => r.id);
+                          setRestaurantIds(allExceptThis);
+                        } else {
+                          toggleRestaurantId(restaurant.id);
+                        }
+                      }}
                     />
                   ))}
                 </div>

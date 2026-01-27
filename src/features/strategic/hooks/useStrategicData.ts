@@ -40,35 +40,33 @@ import type {
 // ============================================
 
 /**
- * Fetch strategic objectives for selected restaurants
+ * Fetch strategic objectives for selected companies
+ * Now uses companyIds directly instead of filtering through restaurants
  */
 export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
   const { companyIds } = useGlobalFiltersStore();
-  const { restaurantIds: filterRestaurantIds } = useDashboardFiltersStore();
+  const { brandIds, restaurantIds: filterAddressIds } = useDashboardFiltersStore();
 
-  // First fetch restaurants to get IDs
+  // Also fetch restaurants for backward compatibility (used by other components)
   const restaurantsQuery = useQuery({
     queryKey: queryKeys.restaurants.list({ companyIds }),
     queryFn: () => fetchRestaurants({ companyIds }),
     staleTime: 5 * 60 * 1000,
   });
 
-  // Filter restaurant IDs
-  const restaurantIds = useMemo(() => {
-    if (!restaurantsQuery.data) return [];
-    if (filterRestaurantIds.length > 0) {
-      return filterRestaurantIds;
-    }
-    return restaurantsQuery.data.map((r) => r.id);
-  }, [restaurantsQuery.data, filterRestaurantIds]);
-
-  // Fetch objectives
+  // Fetch objectives directly by companyIds (no longer filtered through restaurants)
+  // Note: restaurantIds from store maps to addressIds in the new CRP Portal model
   const objectivesQuery = useQuery({
     queryKey: horizon
-      ? queryKeys.strategicObjectives.byHorizon(restaurantIds, horizon)
-      : queryKeys.strategicObjectives.all(restaurantIds),
-    queryFn: () => fetchStrategicObjectives({ restaurantIds, horizon }),
-    enabled: restaurantIds.length > 0,
+      ? queryKeys.strategicObjectives.byHorizon(companyIds, horizon)
+      : queryKeys.strategicObjectives.all(companyIds),
+    queryFn: () => fetchStrategicObjectives({
+      companyIds: companyIds.length > 0 ? companyIds : undefined,
+      brandIds: brandIds.length > 0 ? brandIds : undefined,
+      addressIds: filterAddressIds.length > 0 ? filterAddressIds : undefined,
+      horizon,
+    }),
+    // Always enabled - show all objectives if no company filter is set
     staleTime: 2 * 60 * 1000,
   });
 
@@ -101,12 +99,18 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
     };
   }, [objectivesQuery.data]);
 
+  // Get restaurant IDs from fetched restaurants (for backward compatibility)
+  const restaurantIds = useMemo(() => {
+    return (restaurantsQuery.data || []).map((r) => r.id);
+  }, [restaurantsQuery.data]);
+
   return {
     objectives: objectivesQuery.data || [],
     objectivesByHorizon,
     stats,
     restaurants: restaurantsQuery.data || [],
     restaurantIds,
+    companyIds, // Expose companyIds for the editor
     isLoading: restaurantsQuery.isLoading || objectivesQuery.isLoading,
     error: restaurantsQuery.error || objectivesQuery.error,
     refetch: objectivesQuery.refetch,

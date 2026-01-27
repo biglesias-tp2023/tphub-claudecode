@@ -9,6 +9,7 @@ import { Calendar, Trash2 } from 'lucide-react';
 import { Modal, Button, Input, Select } from '@/components/ui';
 import { cn } from '@/utils/cn';
 import { FieldRenderer } from './fields';
+import { EntityScopeSelector } from '@/components/common';
 import {
   CATEGORIES,
   RESPONSIBLES,
@@ -23,7 +24,6 @@ import type {
   ObjectiveCategory,
   ObjectiveResponsible,
   ObjectiveFieldData,
-  Restaurant,
 } from '@/types';
 
 // ============================================
@@ -36,14 +36,15 @@ interface StrategicObjectiveEditorProps {
   onSave: (input: StrategicObjectiveInput) => Promise<void>;
   onDelete?: () => Promise<void>;
   objective?: StrategicObjective;
-  restaurants: Restaurant[];
-  defaultRestaurantId?: string;
+  defaultCompanyId?: string;
   isLoading?: boolean;
   isDeleting?: boolean;
 }
 
 interface FormData {
-  restaurantId: string;
+  companyId: string | null;
+  brandId: string | null;
+  addressId: string | null;
   title: string;
   description: string;
   category: ObjectiveCategory;
@@ -103,7 +104,6 @@ function formatDaysRemaining(days: number): string {
 
 interface ObjectiveFormProps {
   initialData: FormData;
-  restaurants: Restaurant[];
   onSave: (data: FormData, calculatedHorizon: ObjectiveHorizon) => void;
   onDelete?: () => void;
   onCancel: () => void;
@@ -114,7 +114,6 @@ interface ObjectiveFormProps {
 
 function ObjectiveForm({
   initialData,
-  restaurants,
   onSave,
   onDelete,
   onCancel,
@@ -163,8 +162,8 @@ function ObjectiveForm({
   const daysRemaining = useMemo(() => calculateDaysRemaining(formData.deadline), [formData.deadline]);
   const autoHorizon = useMemo(() => getHorizonFromDeadline(formData.deadline), [formData.deadline]);
 
-  // Validation
-  const isValid = formData.restaurantId && formData.title.trim() && formData.category && formData.deadline;
+  // Validation - companyId es requerido
+  const isValid = formData.companyId && formData.title.trim() && formData.category && formData.deadline;
 
   // Handle submit
   const handleSubmit = () => {
@@ -175,14 +174,17 @@ function ObjectiveForm({
   return (
     <>
       <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-2">
-        {/* Restaurant selector */}
-        <Select
-          label="Restaurante"
-          value={formData.restaurantId}
-          onChange={(e) => updateField('restaurantId', e.target.value)}
-          options={restaurants.map((r) => ({ value: r.id, label: r.name }))}
-          placeholder="Seleccionar restaurante"
+        {/* Scope selector: Company → Brand → Address */}
+        <EntityScopeSelector
+          companyId={formData.companyId}
+          brandId={formData.brandId}
+          addressId={formData.addressId}
+          onCompanyChange={(id) => updateField('companyId', id)}
+          onBrandChange={(id) => updateField('brandId', id)}
+          onAddressChange={(id) => updateField('addressId', id)}
+          required
           disabled={isEditing}
+          summaryLabel="Alcance del objetivo"
         />
 
         {/* Category selector */}
@@ -380,8 +382,7 @@ export function StrategicObjectiveEditor({
   onSave,
   onDelete,
   objective,
-  restaurants,
-  defaultRestaurantId,
+  defaultCompanyId,
   isLoading = false,
   isDeleting = false,
 }: StrategicObjectiveEditorProps) {
@@ -393,7 +394,9 @@ export function StrategicObjectiveEditor({
     const defaultType = getDefaultObjectiveType(defaultCategory);
 
     return {
-      restaurantId: objective?.restaurantId || defaultRestaurantId || '',
+      companyId: objective?.companyId || defaultCompanyId || null,
+      brandId: objective?.brandId || null,
+      addressId: objective?.addressId || null,
       title: objective?.title || '',
       description: objective?.description || '',
       category: defaultCategory,
@@ -406,8 +409,12 @@ export function StrategicObjectiveEditor({
 
   // Handle form save
   const handleFormSave = async (formData: FormData, calculatedHorizon: ObjectiveHorizon) => {
+    if (!formData.companyId) return;
+
     const input: StrategicObjectiveInput = {
-      restaurantId: formData.restaurantId,
+      companyId: formData.companyId,
+      brandId: formData.brandId || undefined,
+      addressId: formData.addressId || undefined,
       title: formData.title,
       description: formData.description || undefined,
       category: formData.category,
@@ -436,7 +443,6 @@ export function StrategicObjectiveEditor({
       <ObjectiveForm
         key={formKey}
         initialData={getDefaultData()}
-        restaurants={restaurants}
         onSave={handleFormSave}
         onDelete={onDelete}
         onCancel={onClose}

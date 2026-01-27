@@ -48,7 +48,8 @@ interface ObjectivesFilters {
 
 interface AuditFilters {
   companyIds?: string[];
-  restaurantIds?: string[];
+  brandIds?: string[];
+  addressIds?: string[];
   auditTypeIds?: string[];
   status?: string;
 }

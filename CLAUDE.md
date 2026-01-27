@@ -188,22 +188,49 @@ const aggregation = await fetchCrpOrdersAggregated({
   startDate: '2026-01-01',
   endDate: '2026-01-31'
 });
-// Returns: { totalRevenue, totalOrders, avgTicket, byChannel: { glovo, ubereats, justeat } }
+// Returns: {
+//   totalRevenue, totalOrders, avgTicket, totalDiscounts, totalRefunds,
+//   netRevenue, promotionRate, refundRate, avgDiscountPerOrder,
+//   uniqueCustomers, ordersPerCustomer,
+//   byChannel: { glovo, ubereats, justeat }
+// }
 
 // Comparacion con periodo anterior
 const comparison = await fetchCrpOrdersComparison(currentParams, previousParams);
-// Returns: { current, previous, changes: { revenueChange, ordersChange, avgTicketChange } }
+// Returns: {
+//   current: OrdersAggregation,
+//   previous: OrdersAggregation,
+//   changes: {
+//     revenueChange, ordersChange, avgTicketChange,
+//     netRevenueChange, discountsChange, refundsChange,
+//     promotionRateChange, refundRateChange,
+//     uniqueCustomersChange, ordersPerCustomerChange
+//   }
+// }
 ```
 
 #### KPIs Calculados
 
-| KPI | Calculo |
-|-----|---------|
-| **Ventas** | `SUM(amt_total_price)` |
-| **Pedidos** | `COUNT(pk_uuid_order)` |
-| **Ticket Medio** | `Ventas / Pedidos` |
-| **Reembolsos** | `SUM(amt_refunds)` |
-| **Promos/Descuentos** | `SUM(amt_promotions)` |
+| KPI | Calculo | Fuente |
+|-----|---------|--------|
+| **Ventas** | `SUM(amt_total_price)` | Real |
+| **Pedidos** | `COUNT(pk_uuid_order)` | Real |
+| **Ticket Medio** | `Ventas / Pedidos` | Real |
+| **Reembolsos** | `SUM(amt_refunds)` | Real |
+| **Promos/Descuentos** | `SUM(amt_promotions)` | Real |
+| **Net Revenue** | `Ventas - Reembolsos` | Real |
+| **Promotion Rate %** | `Promos / Ventas * 100` | Real |
+| **Refund Rate %** | `Reembolsos / Ventas * 100` | Real |
+| **Avg Discount/Order** | `Promos / Pedidos` | Real |
+| **Clientes Unicos** | `COUNT(DISTINCT cod_id_customer)` | Real |
+| **Pedidos/Cliente** | `Pedidos / Clientes Unicos` | Real |
+
+#### Campo `cod_id_customer`
+
+El campo `cod_id_customer` en `crp_portal__ft_order_head` permite:
+- Conteo de clientes unicos por periodo
+- Calculo de frecuencia de compra (pedidos/cliente)
+- Analisis por canal de clientes unicos
 
 ### Principios SOLID Aplicados
 
@@ -508,23 +535,92 @@ interface SalesProjectionConfig {
 
 ## Objetivos Estrategicos
 
+### Arquitectura
+
+Los objetivos estrategicos usan referencias CRP Portal (IDs como TEXT) en lugar de FKs a tablas internas.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    StrategicPage.tsx                          │
+│                   (Presentation Layer)                        │
+├──────────────────────────────────────────────────────────────┤
+│  ObjectiveCard  │  StrategicObjectiveEditor  │  TaskCalendar │
+├──────────────────────────────────────────────────────────────┤
+│                  useStrategicData.ts                          │
+│               (React Query Hooks)                             │
+├──────────────────────────────────────────────────────────────┤
+│                services/supabase-data.ts                      │
+│      fetchStrategicObjectives / createStrategicObjective      │
+│            (Mock mode or Supabase real)                       │
+├──────────────────────────────────────────────────────────────┤
+│                    Supabase (Database)                        │
+│   strategic_objectives (company_id, brand_id, address_id)    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Tabla: `strategic_objectives`
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `company_id` | TEXT | CRP Portal company ID (requerido) |
+| `brand_id` | TEXT | CRP Portal brand/store ID (opcional) |
+| `address_id` | TEXT | CRP Portal address ID (opcional) |
+| `title` | TEXT | Titulo del objetivo |
+| `category` | ENUM | finanzas, operaciones, clientes, marca, reputacion, proveedores, menu |
+| `horizon` | ENUM | short (0-3m), medium (3-12m), long (+1a) |
+| `status` | ENUM | pending, in_progress, completed |
+| `responsible` | ENUM | thinkpaladar, cliente, ambos, plataforma |
+| `objective_type_id` | TEXT | Referencia a objectiveConfig |
+| `field_data` | JSONB | Datos dinamicos segun tipo de objetivo |
+| `evaluation_date` | DATE | Fecha limite |
+
 ### Categorias
 
-| ID | Color |
-|----|-------|
-| `finanzas` | Verde |
-| `operaciones` | Azul |
-| `clientes` | Naranja |
-| `marca` | Rosa |
-| `reputacion` | Ambar |
-| `proveedores` | Gris |
-| `menu` | Indigo |
+| ID | Color | Icono |
+|----|-------|-------|
+| `finanzas` | Verde | TrendingUp |
+| `operaciones` | Azul | Clock |
+| `clientes` | Naranja | Users |
+| `marca` | Rosa | Tag |
+| `reputacion` | Ambar | Star |
+| `proveedores` | Gris | Handshake |
+| `menu` | Indigo | UtensilsCrossed |
 
 ### Componentes
 
-- `ObjectiveCard`: Card con estado dropdown, progreso KPI
-- `StrategicObjectiveEditor`: Modal edicion
-- `StrategicTaskCalendar`: Vista calendario estilo Notion
+| Componente | Descripcion |
+|------------|-------------|
+| `ObjectiveCard` | Card con estado dropdown, progreso KPI |
+| `StrategicObjectiveEditor` | Modal edicion con selector de scope |
+| `StrategicTaskCalendar` | Vista calendario estilo Notion |
+| `AuditScopeSelector` | Selector cascada Company → Brand → Address (compartido) |
+
+### Hooks
+
+```typescript
+import {
+  useStrategicObjectives,      // Fetch objectives por companyIds
+  useCreateStrategicObjective, // Crear objetivo
+  useUpdateStrategicObjective, // Actualizar objetivo
+  useDeleteStrategicObjective, // Eliminar objetivo
+  useStrategicTasks,           // Tareas vinculadas a objetivos
+  useGenerateTasksForObjective // Generar tareas automaticas
+} from '@/features/strategic/hooks';
+
+// Ejemplo de uso
+const { objectives, objectivesByHorizon, stats, isLoading } = useStrategicObjectives();
+```
+
+### Migracion Supabase
+
+**Archivo**: `supabase/migrations/011_strategic_objectives_standalone.sql`
+
+Crea:
+- Tabla `strategic_objectives` con company_id, brand_id, address_id (TEXT)
+- Tabla `strategic_tasks` vinculada a objectives
+- Tipos ENUM (objective_horizon, objective_status, objective_category, objective_responsible)
+- Indices y triggers de updated_at
+- RLS permisivo (puede restringirse despues)
 
 ## Sistema de Exportacion
 
@@ -697,6 +793,49 @@ const {
 
 ## Tareas Pendientes
 
+### Objetivos Estrategicos - Activar Supabase
+
+**Estado actual**: Modo mock activo (`VITE_DEV_AUTH_BYPASS=true`) - guarda en localStorage
+
+**Pasos para activar Supabase:**
+
+1. **Ejecutar migracion en Supabase SQL Editor**:
+   ```sql
+   -- Copiar contenido de:
+   -- supabase/migrations/011_strategic_objectives_standalone.sql
+   ```
+
+2. **Cambiar variable de entorno** en `.env.local`:
+   ```diff
+   - VITE_DEV_AUTH_BYPASS=true
+   + VITE_DEV_AUTH_BYPASS=false
+   ```
+
+3. **Reiniciar servidor de desarrollo**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Verificar**:
+   - Ir a `/strategic`
+   - Crear objetivo seleccionando empresa del dropdown
+   - Verificar en Supabase Table Editor que el registro existe
+
+### Refactorizacion - Duplicidad de Codigo (COMPLETADO)
+
+**Componente EntityScopeSelector:**
+
+- **Solucion aplicada**: El componente ahora se llama `EntityScopeSelector` y esta en `components/common/`
+- Se mantiene alias `AuditScopeSelector` para backward compatibility
+- Nuevo prop `summaryLabel` permite personalizar el texto del resumen
+
+**Archivos modificados:**
+
+- `components/common/EntityScopeSelector.tsx` - Nuevo componente compartido
+- `components/common/index.ts` - Exports actualizados
+- `features/audits/components/index.ts` - Re-exporta desde common
+- `features/strategic/components/StrategicObjectiveEditor.tsx` - Usa EntityScopeSelector
+
 ### Calendario - Migracion a Supabase
 
 La tabla `promotional_campaigns` existe pero tiene un problema de esquema:
@@ -722,4 +861,4 @@ const USE_LOCAL_STORAGE = false;  // Activar Supabase
 
 ---
 
-*Enero 2026 - Sistema de Calendario con Campanas, Clima y Eventos*
+*Enero 2026 - Sistema de Objetivos Estrategicos con CRP Portal*

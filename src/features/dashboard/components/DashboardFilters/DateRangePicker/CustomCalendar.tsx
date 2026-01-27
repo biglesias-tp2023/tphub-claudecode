@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { DayPicker } from 'react-day-picker';
+import { useState, useEffect } from 'react';
+import { DayPicker, getDefaultClassNames } from 'react-day-picker';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/utils/cn';
 import type { DateRange } from '@/types';
 import 'react-day-picker/style.css';
+
+// Type for react-day-picker v9's internal range format
+type DayPickerRange = { from: Date | undefined; to?: Date | undefined };
 
 interface CustomCalendarProps {
   value: DateRange | null;
@@ -15,104 +18,181 @@ interface CustomCalendarProps {
 
 export function CustomCalendar({ value, onChange, onCancel, onApply }: CustomCalendarProps) {
   const [month, setMonth] = useState(value?.start || new Date());
+  const [numberOfMonths, setNumberOfMonths] = useState(2);
 
-  const handleSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (range?.from) {
+  // Internal range state for react-day-picker
+  const [range, setRange] = useState<DayPickerRange | undefined>(
+    value ? { from: value.start, to: value.end } : undefined
+  );
+
+  // Get default class names from react-day-picker v9
+  const defaultClassNames = getDefaultClassNames();
+
+  // Check available width and adjust number of months
+  useEffect(() => {
+    const checkWidth = () => {
+      setNumberOfMonths(window.innerWidth > 768 ? 2 : 1);
+    };
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
+
+  // Sync internal state with external value when value changes from outside
+  useEffect(() => {
+    if (value) {
+      setRange({ from: value.start, to: value.end });
+    }
+  }, [value]);
+
+  // Handle range selection from DayPicker
+  const handleRangeSelect = (newRange: DayPickerRange | undefined) => {
+    setRange(newRange);
+
+    if (newRange?.from) {
       onChange({
-        start: range.from,
-        end: range.to || range.from,
+        start: newRange.from,
+        end: newRange.to || newRange.from,
       });
     }
   };
 
-  const formatDateDisplay = (date: Date) => {
-    return format(date, "dd MMM yy", { locale: es });
+  const formatDateDisplay = (date: Date | undefined) => {
+    return date ? format(date, "dd MMM yy", { locale: es }) : '-- --- --';
   };
 
+  // Determine if we're selecting start or end
+  const isSelectingEnd = range?.from && !range?.to;
+
   return (
-    <div className="p-4 border-t border-gray-200">
+    <div className="p-3 border-t border-gray-200">
       {/* Selected range display */}
-      <div className="flex items-center justify-center gap-2 mb-4 text-sm">
-        <span className="px-3 py-1.5 bg-gray-100 rounded-lg font-medium">
-          {value?.start ? formatDateDisplay(value.start) : '-- --- --'}
+      <div className="flex items-center justify-center gap-2 mb-2 text-xs">
+        <span className={cn(
+          "px-2 py-1 rounded font-medium",
+          !isSelectingEnd ? "bg-primary-100 text-primary-700" : "bg-gray-100"
+        )}>
+          {formatDateDisplay(range?.from)}
         </span>
         <span className="text-gray-400">—</span>
-        <span className="px-3 py-1.5 bg-gray-100 rounded-lg font-medium">
-          {value?.end ? formatDateDisplay(value.end) : '-- --- --'}
+        <span className={cn(
+          "px-2 py-1 rounded font-medium",
+          isSelectingEnd ? "bg-primary-100 text-primary-700" : "bg-gray-100"
+        )}>
+          {formatDateDisplay(range?.to)}
         </span>
       </div>
 
-      {/* Dual Calendar */}
-      <div className="flex gap-4 justify-center">
+      {/* Helper text */}
+      <p className="text-[10px] text-gray-500 text-center mb-2">
+        {isSelectingEnd ? 'Ahora selecciona fecha de fin' : 'Selecciona fecha de inicio'}
+      </p>
+
+      {/* Calendar - react-day-picker v9 with custom styles */}
+      <style>{`
+        .rdp-custom {
+          --rdp-accent-color: #095789;
+          --rdp-accent-background-color: #e8f4fa;
+          --rdp-range_start-color: white;
+          --rdp-range_start-background: #095789;
+          --rdp-range_end-color: white;
+          --rdp-range_end-background: #095789;
+          --rdp-range_middle-color: #095789;
+          --rdp-range_middle-background-color: #e8f4fa;
+          --rdp-selected-color: white;
+          --rdp-selected-background: #095789;
+          --rdp-day-height: 32px;
+          --rdp-day-width: 32px;
+          font-size: 13px;
+        }
+        .rdp-custom .rdp-day {
+          border-radius: 0;
+        }
+        .rdp-custom .rdp-range_start .rdp-day_button {
+          background-color: #095789;
+          color: white;
+          border-top-left-radius: 6px;
+          border-bottom-left-radius: 6px;
+        }
+        .rdp-custom .rdp-range_end .rdp-day_button {
+          background-color: #095789;
+          color: white;
+          border-top-right-radius: 6px;
+          border-bottom-right-radius: 6px;
+        }
+        .rdp-custom .rdp-range_middle {
+          background-color: #e8f4fa;
+        }
+        .rdp-custom .rdp-range_middle .rdp-day_button {
+          color: #095789;
+        }
+        .rdp-custom .rdp-today .rdp-day_button {
+          font-weight: 600;
+          border: 2px solid #fbbf24;
+        }
+        .rdp-custom .rdp-day_button:hover:not(.rdp-selected) {
+          background-color: #f3f4f6;
+        }
+        .rdp-custom .rdp-selected .rdp-day_button {
+          background-color: #095789;
+          color: white;
+        }
+        .rdp-custom .rdp-outside .rdp-day_button {
+          color: #9ca3af;
+          opacity: 0.5;
+        }
+        .rdp-custom .rdp-nav button {
+          color: #6b7280;
+        }
+        .rdp-custom .rdp-nav button:hover {
+          background-color: #f3f4f6;
+        }
+        .rdp-custom .rdp-caption_label {
+          font-weight: 600;
+          font-size: 13px;
+        }
+        .rdp-custom .rdp-weekday {
+          font-size: 11px;
+          color: #6b7280;
+        }
+      `}</style>
+
+      <div className="flex justify-center overflow-x-auto">
         <DayPicker
+          className="rdp-custom"
           mode="range"
-          selected={value ? { from: value.start, to: value.end } : undefined}
-          onSelect={handleSelect}
+          selected={range}
+          onSelect={handleRangeSelect}
           month={month}
           onMonthChange={setMonth}
           locale={es}
           weekStartsOn={1}
-          numberOfMonths={2}
+          numberOfMonths={numberOfMonths}
           showOutsideDays
           classNames={{
-            months: 'flex gap-4',
-            month: 'space-y-2',
-            caption: 'flex justify-center relative items-center h-10',
-            caption_label: 'text-sm font-semibold text-gray-900',
-            nav: 'flex items-center gap-1',
-            nav_button: cn(
-              'h-7 w-7 bg-transparent p-0 text-gray-500',
-              'hover:bg-gray-100 rounded-lg transition-colors',
-              'inline-flex items-center justify-center'
-            ),
-            nav_button_previous: 'absolute left-1',
-            nav_button_next: 'absolute right-1',
-            table: 'w-full border-collapse',
-            head_row: 'flex',
-            head_cell: 'text-gray-500 rounded-md w-9 font-normal text-xs',
-            row: 'flex w-full mt-1',
-            cell: cn(
-              'relative p-0 text-center text-sm',
-              'focus-within:relative focus-within:z-20',
-              '[&:has([aria-selected])]:bg-primary-50',
-              '[&:has([aria-selected].day-range-end)]:rounded-r-lg',
-              '[&:has([aria-selected].day-range-start)]:rounded-l-lg',
-              'first:[&:has([aria-selected])]:rounded-l-lg',
-              'last:[&:has([aria-selected])]:rounded-r-lg'
-            ),
-            day: cn(
-              'h-9 w-9 p-0 font-normal',
-              'hover:bg-gray-100 rounded-lg transition-colors',
-              'aria-selected:opacity-100'
-            ),
-            day_range_start: 'day-range-start bg-primary-500 text-white hover:bg-primary-600 rounded-l-lg',
-            day_range_end: 'day-range-end bg-primary-500 text-white hover:bg-primary-600 rounded-r-lg',
-            day_selected: 'bg-primary-500 text-white hover:bg-primary-600',
-            day_today: 'bg-gray-100 text-gray-900 font-semibold',
-            day_outside: 'text-gray-400 opacity-50',
-            day_disabled: 'text-gray-400 opacity-50',
-            day_range_middle: 'aria-selected:bg-primary-50 aria-selected:text-primary-900',
-            day_hidden: 'invisible',
+            ...defaultClassNames,
+            months: `${defaultClassNames.months} flex gap-4`,
+            month: `${defaultClassNames.month}`,
           }}
         />
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
+      <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-gray-200">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors"
         >
           Cancelar
         </button>
         <button
           type="button"
           onClick={onApply}
-          disabled={!value?.start || !value?.end}
+          disabled={!range?.from || !range?.to}
           className={cn(
-            'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-            value?.start && value?.end
+            'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+            range?.from && range?.to
               ? 'bg-primary-500 text-white hover:bg-primary-600'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           )}

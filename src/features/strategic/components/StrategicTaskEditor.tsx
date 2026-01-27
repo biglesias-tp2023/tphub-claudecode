@@ -86,13 +86,14 @@ export function StrategicTaskEditor({
     }
   }, [isOpen, task, defaultRestaurantId, defaultObjectiveId]);
 
-  // When objective changes, update category and restaurant
+  // When objective changes, update category and address
   useEffect(() => {
     if (objectiveId && !isEditing) {
       const objective = objectives.find((o) => o.id === objectiveId);
       if (objective) {
         setCategory(objective.category);
-        setRestaurantId(objective.restaurantId);
+        // Use addressId from new CRP Portal model (fallback to empty string)
+        setRestaurantId(objective.addressId || '');
       }
     }
   }, [objectiveId, objectives, isEditing]);
@@ -128,7 +129,7 @@ export function StrategicTaskEditor({
   const restaurantOptions = restaurants.map((r) => ({ value: r.id, label: r.name }));
 
   const objectiveOptions = objectives
-    .filter((o) => !restaurantId || o.restaurantId === restaurantId)
+    .filter((o) => !restaurantId || o.addressId === restaurantId)
     .map((o) => ({ value: o.id, label: o.title }));
 
   const categoryOptions = CATEGORIES.map((c) => ({

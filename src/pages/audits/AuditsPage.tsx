@@ -4,7 +4,7 @@ import { Card, Spinner } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { DashboardFilters } from '@/features/dashboard';
 import { cn } from '@/utils/cn';
-import { AuditCard, AuditCardSkeleton, AuditEditorModal } from '@/features/audits/components';
+import { AuditCard, AuditCardSkeleton, AuditEditorModal, AuditScopeSelector } from '@/features/audits/components';
 import { useAuditsWithDetails, useAuditTypes, useCreateAudit } from '@/features/audits/hooks';
 import { AUDIT_STATUS_CONFIG, getAuditScopeLabel, calculateTotalScore } from '@/features/audits/config';
 import { fetchAuditWithDetailsById, fetchAuditTypeById } from '@/services/supabase-data';
@@ -359,16 +359,43 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
   const { data: auditTypes = [], isLoading: typesLoading } = useAuditTypes();
   const createAudit = useCreateAudit();
 
+  const [step, setStep] = useState<'type' | 'scope'>('type');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [brandId, setBrandId] = useState<string | null>(null);
+  const [addressId, setAddressId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!open) {
+      setStep('type');
+      setSelectedTypeId(null);
+      setCompanyId(null);
+      setBrandId(null);
+      setAddressId(null);
+    }
+  }, [open]);
+
+  const handleTypeSelect = (typeId: string) => {
+    setSelectedTypeId(typeId);
+    setStep('scope');
+  };
+
+  const handleBack = () => {
+    setStep('type');
+  };
+
   const handleCreate = async () => {
-    if (!selectedTypeId) return;
+    if (!selectedTypeId || !companyId) return;
 
     setIsCreating(true);
     try {
       const newAudit = await createAudit.mutateAsync({
         auditTypeId: selectedTypeId,
+        companyId,
+        brandId: brandId || undefined,
+        addressId: addressId || undefined,
       });
       onCreated(newAudit.id);
       onClose();
@@ -384,14 +411,16 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Nueva Auditoría</h2>
+      <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Nueva Auditoría {step === 'scope' && '- Alcance'}
+        </h2>
 
         {typesLoading ? (
           <div className="flex items-center justify-center py-8">
             <Spinner size="md" />
           </div>
-        ) : (
+        ) : step === 'type' ? (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
               Selecciona el tipo de auditoría que deseas crear:
@@ -402,7 +431,7 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
                 <button
                   key={auditType.id}
                   type="button"
-                  onClick={() => setSelectedTypeId(auditType.id)}
+                  onClick={() => handleTypeSelect(auditType.id)}
                   className={cn(
                     'flex items-center gap-3 p-4 rounded-lg border text-left transition-all',
                     selectedTypeId === auditType.id
@@ -434,14 +463,41 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
               <Button variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={!selectedTypeId || isCreating}
-                className="gap-2"
-              >
-                {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-                Crear auditoría
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Selecciona la compañía, marca y dirección para esta auditoría:
+            </p>
+
+            <AuditScopeSelector
+              companyId={companyId}
+              brandId={brandId}
+              addressId={addressId}
+              onCompanyChange={setCompanyId}
+              onBrandChange={setBrandId}
+              onAddressChange={setAddressId}
+              required
+            />
+
+            <div className="flex justify-between gap-3 pt-4 border-t border-gray-100">
+              <Button variant="outline" onClick={handleBack}>
+                Atrás
               </Button>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={onClose}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCreate}
+                  disabled={!companyId || isCreating}
+                  className="gap-2"
+                >
+                  {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Crear auditoría
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -631,7 +687,8 @@ export function AuditsPage() {
         const matchesType = audit.auditType?.name.toLowerCase().includes(searchLower);
         const matchesScope =
           audit.company?.name.toLowerCase().includes(searchLower) ||
-          audit.restaurant?.name.toLowerCase().includes(searchLower);
+          audit.brand?.name.toLowerCase().includes(searchLower) ||
+          audit.address?.name.toLowerCase().includes(searchLower);
 
         if (!matchesNumber && !matchesType && !matchesScope) {
           return false;

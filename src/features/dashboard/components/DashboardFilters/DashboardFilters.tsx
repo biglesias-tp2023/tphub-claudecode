@@ -59,17 +59,14 @@ interface DashboardFiltersProps {
 }
 
 export function DashboardFilters({ className, excludeChannels }: DashboardFiltersProps) {
-  const { dateRange, datePreset, setDatePreset, setDateRange } = useDashboardFiltersStore();
+  const { dateRange, datePreset, setDateRangeWithPreset } = useDashboardFiltersStore();
 
   const handleDateChange = (range: DateRange, presetId: DatePresetId) => {
     const storePreset = toStorePreset(presetId);
-    if (presetId === 'custom') {
-      setDateRange(range);
-    } else {
-      // Pass the actual range from the picker to ensure exact dates are used
-      // The store will update both datePreset and dateRange
-      setDatePreset(storePreset);
-    }
+
+    // Always use the range from the picker directly - don't recalculate
+    // This ensures presets like "last_month" use the exact dates from presets.ts
+    setDateRangeWithPreset(range, storePreset);
 
     // Debug logging
     if (import.meta.env.DEV) {
