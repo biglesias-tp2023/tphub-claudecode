@@ -16,18 +16,39 @@ function getColorIntensity(value: number): string {
   return 'bg-gray-50 text-gray-400';
 }
 
+/**
+ * Get the Monday of a given ISO week.
+ */
+function getDateOfISOWeek(week: number, year: number): Date {
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7);
+  return monday;
+}
+
 function formatCohortLabel(cohortId: string, granularity: 'week' | 'month'): string {
   if (granularity === 'week') {
-    // Format: 2026-W01 -> S01
-    const match = cohortId.match(/\d{4}-W(\d{2})/);
-    return match ? `S${match[1]}` : cohortId;
+    // Format: 2026-W01 -> S01: 30/12/2025
+    const match = cohortId.match(/(\d{4})-W(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const week = parseInt(match[2], 10);
+      const monday = getDateOfISOWeek(week, year);
+      const day = String(monday.getDate()).padStart(2, '0');
+      const month = String(monday.getMonth() + 1).padStart(2, '0');
+      const dateYear = monday.getFullYear();
+      return `S${match[2]}: ${day}/${month}/${dateYear}`;
+    }
+    return cohortId;
   }
-  // Format: 2026-01 -> Ene
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  const match = cohortId.match(/\d{4}-(\d{2})/);
+  // Format: 2026-01 -> Enero 2026
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const match = cohortId.match(/(\d{4})-(\d{2})/);
   if (match) {
-    const monthIndex = parseInt(match[1], 10) - 1;
-    return months[monthIndex] || cohortId;
+    const year = match[1];
+    const monthIndex = parseInt(match[2], 10) - 1;
+    return `${months[monthIndex]} ${year}`;
   }
   return cohortId;
 }
@@ -55,7 +76,7 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="text-left py-2.5 px-4 font-medium text-gray-500 text-xs w-24">Cohorte</th>
+              <th className="text-left py-2.5 px-4 font-medium text-gray-500 text-xs w-40">Cohorte</th>
               <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs w-16">Tam.</th>
               {periodLabels.map((label, i) => (
                 <th key={i} className="text-center py-2.5 px-1 font-medium text-gray-500 text-xs w-14">
