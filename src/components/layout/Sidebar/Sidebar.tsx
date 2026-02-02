@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   PieChart,
   Truck,
-  Users,
   UsersRound,
   Star,
   Target,
@@ -36,7 +35,6 @@ const navItems: NavItem[] = [
   { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
   { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS },
   { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS },
-  { label: 'Cartera', icon: Users, to: ROUTES.CLIENTS },
   { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION },
   { label: 'Tus objetivos', icon: Target, to: ROUTES.STRATEGIC },
   { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR },
