@@ -21,8 +21,15 @@ const TABLE_NAME = 'tphub_restaurant_coordinates';
  * Maps a database row to the Restaurant domain model.
  */
 function mapCoordinateToRestaurant(coord: DbRestaurantCoordinate): Restaurant {
+  // Include both UUID and CRP address ID in allIds for channel matching
+  const allIds = [coord.id];
+  if (coord.crp_address_id) {
+    allIds.push(coord.crp_address_id);
+  }
+
   return {
     id: coord.id,
+    allIds,
     externalId: coord.crp_address_id ? parseInt(coord.crp_address_id, 10) : null,
     companyId: coord.company_id,
     brandId: coord.brand_id || '',

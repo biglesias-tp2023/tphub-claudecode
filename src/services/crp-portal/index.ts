@@ -118,6 +118,7 @@ export {
   fetchCrpOrdersAggregated,
   fetchCrpOrdersRaw,
   fetchCrpOrdersComparison,
+  fetchHierarchyData,
 } from './orders';
 
 export type {
@@ -125,7 +126,45 @@ export type {
   OrdersAggregation,
   ChannelAggregation,
   OrdersChanges,
+  HierarchyMetrics,
+  HierarchyDataRow,
 } from './orders';
+
+// Brand Channels (active channels per brand/restaurant)
+export {
+  fetchBrandActiveChannels,
+  fetchRestaurantActiveChannels,
+} from './brand-channels';
+
+// Products (from order lines)
+export {
+  fetchCrpProducts,
+  fetchCrpProductsByIds,
+} from './products';
+
+export type { CrpProduct } from './products';
+
+// Customers (analytics)
+export {
+  fetchCustomerMetrics,
+  fetchCustomerMetricsByChannel,
+  fetchCustomerCohorts,
+  fetchChurnRiskCustomers,
+  fetchSpendDistribution,
+  fetchMultiPlatformAnalysis,
+} from './customers';
+
+export type {
+  FetchCustomerDataParams,
+  CustomerMetrics,
+  CustomerMetricsWithChanges,
+  ChannelCustomerMetrics,
+  CohortData,
+  CustomerChurnRisk,
+  SpendSegment,
+  SpendDistribution,
+  MultiPlatformAnalysis,
+} from './customers';
 
 // ============================================
 // UTILITY EXPORTS

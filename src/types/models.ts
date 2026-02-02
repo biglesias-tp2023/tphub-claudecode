@@ -76,7 +76,8 @@ export interface Company {
  * Brand from Supabase brands table
  */
 export interface Brand {
-  id: string;                       // UUID
+  id: string;                       // UUID (primary, most recent)
+  allIds: string[];                 // All IDs that share this name (for multi-portal dedup)
   externalId?: number | null;       // pk_id_store from Athena
   companyId: string;                // FK → Company (UUID)
   name: string;
@@ -120,7 +121,8 @@ export interface Coordinates {
  * Restaurant from Supabase restaurants table
  */
 export interface Restaurant {
-  id: string;                       // UUID
+  id: string;                       // UUID (primary, most recent)
+  allIds: string[];                 // All IDs that share this name (for multi-portal dedup)
   externalId?: number | null;       // pk_id_address from Athena
   companyId: string;                // FK → Company (UUID)
   brandId: string;                  // FK → Brand (UUID)
@@ -1393,4 +1395,36 @@ export interface ProductWithTier extends Product {
   tier: ProductTier;
   salesRank?: number;
   isNew?: boolean;
+}
+
+// ============================================
+// USER INVITATIONS
+// ============================================
+
+export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
+
+export interface UserInvitation {
+  id: string;
+  email: string;
+  role: UserRole;
+  assignedCompanyIds: string[];
+  status: InvitationStatus;
+  invitedBy: string | null;
+  invitedAt: string;
+  acceptedAt: string | null;
+  expiresAt: string;
+  invitationNote: string | null;
+}
+
+export interface DbUserInvitation {
+  id: string;
+  email: string;
+  role: string;
+  assigned_company_ids: string[];
+  status: string;
+  invited_by: string | null;
+  invited_at: string;
+  accepted_at: string | null;
+  expires_at: string;
+  invitation_note: string | null;
 }

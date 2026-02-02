@@ -21,6 +21,10 @@ interface FilterDropdownProps {
   searchable?: boolean;
   /** When true, empty selectedIds means "all selected" (default: true) */
   treatEmptyAsAll?: boolean;
+  /** Show header with title and count display */
+  showHeader?: boolean;
+  /** Header title (defaults to "Seleccionar {label}") */
+  headerTitle?: string;
 }
 
 export function FilterDropdown({
@@ -36,6 +40,8 @@ export function FilterDropdown({
   className,
   searchable = true,
   treatEmptyAsAll = true,
+  showHeader = false,
+  headerTitle,
 }: FilterDropdownProps) {
   // When treatEmptyAsAll is true and selectedIds is empty, treat as "all selected"
   const isAllSelected = treatEmptyAsAll && selectedIds.length === 0;
@@ -146,6 +152,19 @@ export function FilterDropdown({
       {/* Dropdown panel */}
       {isOpen && (
         <div className="absolute z-50 mt-1 min-w-[280px] w-max max-w-[400px] bg-white rounded-lg border border-gray-200 shadow-lg">
+          {/* Header with count */}
+          {showHeader && (
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">
+                {headerTitle || `Seleccionar ${label.toLowerCase()}`}
+              </h3>
+              {options.length > 0 && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {isAllSelected ? options.length : selectedIds.length} de {options.length} seleccionados
+                </p>
+              )}
+            </div>
+          )}
           {/* Search input */}
           {searchable && options.length > 5 && (
             <div className="p-2 border-b border-gray-100">

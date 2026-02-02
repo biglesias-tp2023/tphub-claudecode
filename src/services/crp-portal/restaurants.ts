@@ -22,7 +22,7 @@ import { supabase } from '../supabase';
 import type { Restaurant } from '@/types';
 import type { DbCrpAddress, FetchRestaurantsParams } from './types';
 import { mapRestaurant } from './mappers';
-import { deduplicateAddressesKeepingLatest, getCurrentMonthFilter, parseNumericIds } from './utils';
+import { groupAddressesByName, parseNumericIds } from './utils';
 
 /** Table name for addresses/restaurants in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_address';
@@ -62,10 +62,11 @@ const TABLE_NAME = 'crp_portal__dt_address';
 export async function fetchRestaurants(
   params: FetchRestaurantsParams = {}
 ): Promise<Restaurant[]> {
+  // Query all months, order by pk_ts_month DESC so groupAddressesByName selects most recent
   let query = supabase
     .from(TABLE_NAME)
     .select('*')
-    .eq('pk_ts_month', getCurrentMonthFilter())
+    .order('pk_ts_month', { ascending: false })
     .order('des_address');
 
   // Apply company filter (primary)
@@ -91,14 +92,15 @@ export async function fetchRestaurants(
     throw new Error(`Error fetching restaurants: ${error.message}`);
   }
 
-  // Deduplicate by normalized address, keeping the most recent pk_ts_month
-  // This handles variations like "C/", "Calle", "Carrer" for the same address
-  const uniqueAddresses = deduplicateAddressesKeepingLatest(
+  // Group by normalized address, collecting all IDs that share the same address
+  // This handles multi-portal scenarios where the same address has different IDs per platform
+  const grouped = groupAddressesByName(
     data as DbCrpAddress[],
-    (a) => a.des_address
+    (a) => a.des_address,
+    (a) => String(a.pk_id_address)
   );
 
-  return uniqueAddresses.map(mapRestaurant);
+  return grouped.map(g => mapRestaurant(g.primary, g.allIds));
 }
 
 /**

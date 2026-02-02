@@ -119,6 +119,76 @@ export function deduplicateByNameKeepingLatest<T extends { pk_ts_month: string }
 }
 
 /**
+ * Result type for groupByName function
+ */
+export interface GroupedItem<T> {
+  /** Primary item (most recent by pk_ts_month) */
+  primary: T;
+  /** All IDs that share this name */
+  allIds: string[];
+}
+
+/**
+ * Group items by name, collecting all IDs that share the same name.
+ * This is used for multi-portal deduplication where the same entity
+ * (brand, restaurant) has different IDs for each platform (Glovo, Uber, etc).
+ *
+ * @template T - The type of items (must have pk_ts_month)
+ * @param items - Array of items to group
+ * @param nameFn - Function to extract the normalized name/key from each item
+ * @param idFn - Function to extract the ID from each item
+ * @returns Array of grouped items with primary item and all IDs
+ *
+ * @example
+ * const stores = [
+ *   { pk_id_store: 'A1', des_store: 'Brand A', pk_ts_month: '2026-01-01' },
+ *   { pk_id_store: 'A2', des_store: 'Brand A', pk_ts_month: '2026-01-01' },
+ *   { pk_id_store: 'B1', des_store: 'Brand B', pk_ts_month: '2026-01-01' }
+ * ];
+ * const grouped = groupByName(stores, s => s.des_store.toLowerCase(), s => s.pk_id_store);
+ * // Result: [
+ * //   { primary: { pk_id_store: 'A1', ... }, allIds: ['A1', 'A2'] },
+ * //   { primary: { pk_id_store: 'B1', ... }, allIds: ['B1'] }
+ * // ]
+ */
+export function groupByName<T extends { pk_ts_month: string }>(
+  items: T[],
+  nameFn: (item: T) => string,
+  idFn: (item: T) => string
+): GroupedItem<T>[] {
+  // Group items by normalized name
+  const groups = new Map<string, T[]>();
+
+  for (const item of items) {
+    const key = nameFn(item);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(item);
+  }
+
+  // For each group, select the primary (most recent) and collect all IDs
+  const results: GroupedItem<T>[] = [];
+
+  for (const [, group] of groups) {
+    // Sort by pk_ts_month descending (most recent first)
+    const sorted = [...group].sort((a, b) =>
+      b.pk_ts_month.localeCompare(a.pk_ts_month)
+    );
+
+    // Primary is the most recent
+    const primary = sorted[0];
+
+    // Collect all unique IDs
+    const allIds = [...new Set(group.map(idFn))];
+
+    results.push({ primary, allIds });
+  }
+
+  return results;
+}
+
+/**
  * Normalize an address string for deduplication.
  * Handles Spanish/Catalan street name variations.
  * Extracts only street name + number, ignoring city/postal code.
@@ -206,6 +276,79 @@ export function deduplicateAddressesKeepingLatest<T extends { pk_ts_month: strin
     }
 
     results.push(best as T);
+  }
+
+  return results;
+}
+
+/**
+ * Group addresses by normalized name, collecting all IDs that share the same address.
+ * This is used for multi-portal deduplication where the same address
+ * has different IDs for each platform (Glovo, Uber, etc).
+ *
+ * @template T - The type of items (must have pk_ts_month and optional coordinates)
+ * @param items - Array of address items to group
+ * @param addressFn - Function to extract the address string from each item
+ * @param idFn - Function to extract the ID from each item
+ * @returns Array of grouped items with primary item and all IDs
+ *
+ * @example
+ * const addresses = [
+ *   { pk_id_address: 'A1', des_address: 'C/ Mozart 5', pk_ts_month: '2026-01-01' },
+ *   { pk_id_address: 'A2', des_address: 'Calle Mozart 5', pk_ts_month: '2026-01-01' },
+ *   { pk_id_address: 'B1', des_address: 'Av. Diagonal 123', pk_ts_month: '2026-01-01' }
+ * ];
+ * const grouped = groupAddressesByName(addresses, a => a.des_address, a => a.pk_id_address);
+ * // Result: [
+ * //   { primary: { pk_id_address: 'A1', des_address: 'C/ Mozart 5', ... }, allIds: ['A1', 'A2'] },
+ * //   { primary: { pk_id_address: 'B1', ... }, allIds: ['B1'] }
+ * // ]
+ */
+export function groupAddressesByName<T extends { pk_ts_month: string; des_latitude?: number | null; des_longitude?: number | null }>(
+  items: T[],
+  addressFn: (item: T) => string,
+  idFn: (item: T) => string
+): GroupedItem<T>[] {
+  // Group items by normalized address
+  const groups = new Map<string, T[]>();
+
+  for (const item of items) {
+    const normalizedKey = normalizeAddress(addressFn(item));
+    if (!groups.has(normalizedKey)) {
+      groups.set(normalizedKey, []);
+    }
+    groups.get(normalizedKey)!.push(item);
+  }
+
+  // For each group, select the primary (best) and collect all IDs
+  const results: GroupedItem<T>[] = [];
+
+  for (const [, group] of groups) {
+    // Sort by: 1) address length (longest first), 2) pk_ts_month (most recent first)
+    const sorted = [...group].sort((a, b) => {
+      const lenDiff = addressFn(b).length - addressFn(a).length;
+      if (lenDiff !== 0) return lenDiff;
+      return b.pk_ts_month.localeCompare(a.pk_ts_month);
+    });
+
+    // Primary is the best (longest, most recent)
+    const primary = { ...sorted[0] };
+
+    // If the primary doesn't have coordinates, try to find them in other duplicates
+    if (!primary.des_latitude || !primary.des_longitude) {
+      for (const item of group) {
+        if (item.des_latitude && item.des_longitude) {
+          primary.des_latitude = item.des_latitude;
+          primary.des_longitude = item.des_longitude;
+          break;
+        }
+      }
+    }
+
+    // Collect all unique IDs
+    const allIds = [...new Set(group.map(idFn))];
+
+    results.push({ primary: primary as T, allIds });
   }
 
   return results;

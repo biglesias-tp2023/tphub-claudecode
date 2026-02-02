@@ -16,7 +16,7 @@ import { supabase } from '../supabase';
 import type { Brand } from '@/types';
 import type { DbCrpStore } from './types';
 import { mapBrand } from './mappers';
-import { deduplicateByNameKeepingLatest, getCurrentMonthFilter, parseNumericIds } from './utils';
+import { groupByName, parseNumericIds } from './utils';
 
 /** Table name for stores/brands in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_store';
@@ -42,10 +42,11 @@ const TABLE_NAME = 'crp_portal__dt_store';
  * const companyBrands = await fetchBrands(['1', '2', '3']);
  */
 export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
+  // Query all months, order by pk_ts_month DESC so groupByName selects most recent
   let query = supabase
     .from(TABLE_NAME)
     .select('*')
-    .eq('pk_ts_month', getCurrentMonthFilter())
+    .order('pk_ts_month', { ascending: false })
     .order('des_store');
 
   if (companyIds && companyIds.length > 0) {
@@ -60,14 +61,28 @@ export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
     throw new Error(`Error fetching brands: ${error.message}`);
   }
 
-  // Deduplicate by NAME (des_store) case-insensitive, keeping the most recent pk_ts_month
-  // This handles cases like "Bo&Mie" vs "BO&MIE"
-  const uniqueStores = deduplicateByNameKeepingLatest(
+  // Group by NAME (des_store) case-insensitive, collecting all IDs that share the same name
+  // This handles multi-portal scenarios where the same brand has different IDs per platform
+  const grouped = groupByName(
     data as DbCrpStore[],
-    (s) => s.des_store.toLowerCase()
+    (s) => s.des_store.toLowerCase(),
+    (s) => String(s.pk_id_store)
   );
 
-  return uniqueStores.map(mapBrand);
+  // DEBUG: Log grouping results
+  if (import.meta.env.DEV) {
+    console.log('[fetchBrands] Raw data count:', data.length);
+    console.log('[fetchBrands] Grouped count:', grouped.length);
+    const multipleIds = grouped.filter(g => g.allIds.length > 1);
+    if (multipleIds.length > 0) {
+      console.log('[fetchBrands] Brands with multiple IDs:', multipleIds.map(g => ({
+        name: g.primary.des_store,
+        allIds: g.allIds
+      })));
+    }
+  }
+
+  return grouped.map(g => mapBrand(g.primary, g.allIds));
 }
 
 /**

@@ -23,6 +23,14 @@ interface CalendarDayData {
   weather?: WeatherForecast;
 }
 
+// Helper to format date as YYYY-MM-DD using local timezone
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function CalendarGrid({
   year,
   month,
@@ -32,8 +40,13 @@ export function CalendarGrid({
   onCampaignClick,
   onDayClick,
 }: CalendarGridProps) {
-  const today = useMemo(() => new Date(), []);
-  const todayStr = today.toISOString().split('T')[0];
+  // Create today's date at midnight in local timezone
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
+  const todayStr = formatLocalDate(today);
 
   const calendarDays = useMemo(() => {
     const days: CalendarDayData[] = [];
@@ -51,7 +64,7 @@ export function CalendarGrid({
     const prevMonthLastDay = new Date(year, month - 1, 0);
     for (let i = dayOfWeek - 1; i >= 0; i--) {
       const date = new Date(year, month - 2, prevMonthLastDay.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(date);
 
       days.push({
         date,
@@ -66,7 +79,7 @@ export function CalendarGrid({
     // Add days of current month
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month - 1, day);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(date);
 
       days.push({
         date,
@@ -82,7 +95,7 @@ export function CalendarGrid({
     const remainingDays = 42 - days.length; // 6 weeks * 7 days
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(year, month, day);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(date);
 
       days.push({
         date,

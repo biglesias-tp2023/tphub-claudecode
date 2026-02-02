@@ -1,7 +1,6 @@
 import { cn } from '@/utils/cn';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import { BrandSelector } from './BrandSelector';
-import { AreaSelector } from './AreaSelector';
 import { EstablishmentSelector } from './EstablishmentSelector';
 import { ChannelSelector } from './ChannelSelector';
 import { DateRangePicker } from './DateRangePicker';
@@ -89,7 +88,6 @@ export function DashboardFilters({ className, excludeChannels }: DashboardFilter
       {/* Hierarchical filters (left) */}
       <div className="flex flex-wrap items-center gap-3">
         <BrandSelector />
-        <AreaSelector />
         <EstablishmentSelector />
       </div>
 

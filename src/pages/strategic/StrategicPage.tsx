@@ -213,7 +213,7 @@ interface EmptyStateProps {
 function EmptyState({ onSetupClick }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-8">
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-6 shadow-lg shadow-blue-500/20">
+      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
         <Sparkles className="w-10 h-10 text-white" />
       </div>
       <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
@@ -224,7 +224,7 @@ function EmptyState({ onSetupClick }: EmptyStateProps) {
       </p>
       <button
         onClick={onSetupClick}
-        className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:shadow-xl hover:shadow-blue-500/30"
+        className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-600/25 transition-all hover:shadow-xl hover:shadow-primary-600/30"
       >
         <TrendingUp className="w-5 h-5" />
         Configurar proyección de ventas
@@ -693,11 +693,11 @@ export function StrategicPage() {
                   <h2 className="text-sm font-semibold text-gray-900">Objetivos</h2>
                   <div className="flex items-center gap-2">
                     {hasObjectives && (
-                      <ExportButtons onExport={handleExportObjectives} size="sm" />
+                      <ExportButtons onExport={handleExportObjectives} size="sm" variant="ghost" />
                     )}
                     <button
                       onClick={handleOpenObjectiveEditor}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Nuevo
@@ -718,7 +718,7 @@ export function StrategicPage() {
                           className={cn(
                             'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all',
                             isSelected
-                              ? 'bg-gray-900 text-white'
+                              ? 'bg-primary-600 text-white'
                               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                           )}
                         >
@@ -746,7 +746,7 @@ export function StrategicPage() {
                       </p>
                       <button
                         onClick={handleOpenObjectiveEditor}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Crear objetivo

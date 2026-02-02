@@ -140,7 +140,7 @@ export function EntityScopeSelector({
         <Dropdown
           icon={<MapPin className="w-4 h-4" />}
           placeholder={companyId ? 'Seleccionar dirección' : 'Primero selecciona una compañía'}
-          value={selectedAddress?.name || null}
+          value={addressId === 'all' ? 'Todas las direcciones' : selectedAddress?.name || null}
           options={addresses}
           isLoading={addressesLoading}
           disabled={disabled || !companyId}
@@ -149,11 +149,15 @@ export function EntityScopeSelector({
           }}
           getOptionLabel={(a) => a.name}
           getOptionValue={(a) => a.id}
+          showAllOption={addresses.length > 1}
+          allOptionLabel="Todas las direcciones"
+          onSelectAll={() => onAddressChange('all')}
+          isAllSelected={addressId === 'all'}
         />
       </div>
 
       {/* Summary */}
-      {(selectedCompany || selectedBrand || selectedAddress) && (
+      {(selectedCompany || selectedBrand || selectedAddress || addressId === 'all') && (
         <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
           <p className="text-xs font-medium text-gray-500 uppercase mb-2">{summaryLabel}</p>
           <div className="space-y-1 text-sm">
@@ -169,7 +173,12 @@ export function EntityScopeSelector({
                 <span>{selectedBrand.name}</span>
               </div>
             )}
-            {selectedAddress && (
+            {addressId === 'all' ? (
+              <div className="flex items-center gap-2 text-gray-700 pl-4">
+                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                <span className="font-medium">Todas las direcciones ({addresses.length})</span>
+              </div>
+            ) : selectedAddress && (
               <div className="flex items-center gap-2 text-gray-700 pl-4">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                 <span>{selectedAddress.name}</span>
@@ -196,6 +205,14 @@ interface DropdownProps<T> {
   onChange: (option: T | null) => void;
   getOptionLabel: (option: T) => string;
   getOptionValue: (option: T) => string;
+  /** Show "Select All" option at the top */
+  showAllOption?: boolean;
+  /** Label for the "All" option */
+  allOptionLabel?: string;
+  /** Callback when "All" is selected */
+  onSelectAll?: () => void;
+  /** Whether "All" is currently selected */
+  isAllSelected?: boolean;
 }
 
 function Dropdown<T>({
@@ -208,6 +225,10 @@ function Dropdown<T>({
   onChange,
   getOptionLabel,
   getOptionValue,
+  showAllOption = false,
+  allOptionLabel = 'Todos',
+  onSelectAll,
+  isAllSelected = false,
 }: DropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -269,8 +290,27 @@ function Dropdown<T>({
 
             {/* Options */}
             <div className="max-h-48 overflow-y-auto">
+              {/* "All" option */}
+              {showAllOption && onSelectAll && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectAll();
+                    setIsOpen(false);
+                    setSearch('');
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-gray-50 border-b border-gray-100',
+                    isAllSelected && 'bg-primary-50 text-primary-700'
+                  )}
+                >
+                  <span className="flex-1">{allOptionLabel}</span>
+                  {isAllSelected && <Check className="w-4 h-4 text-primary-500" />}
+                </button>
+              )}
+
               {/* Clear option */}
-              {value && (
+              {value && !isAllSelected && (
                 <button
                   type="button"
                   onClick={() => handleSelect(null)}

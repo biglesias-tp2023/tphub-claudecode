@@ -55,6 +55,7 @@ export function mapCompany(db: DbCrpCompany): Company {
  * Maps a CRP Portal store database row to a Brand domain model.
  *
  * @param db - Raw database row from crp_portal__dt_store
+ * @param allIds - Optional array of all IDs that share this brand name (for multi-portal)
  * @returns Brand domain model
  *
  * Field mappings:
@@ -62,9 +63,11 @@ export function mapCompany(db: DbCrpCompany): Company {
  * - des_store → name, slug
  * - pfk_id_company → companyId
  */
-export function mapBrand(db: DbCrpStore): Brand {
+export function mapBrand(db: DbCrpStore, allIds?: string[]): Brand {
+  const id = String(db.pk_id_store);
   return {
-    id: String(db.pk_id_store),
+    id,
+    allIds: allIds || [id],
     externalId: db.pk_id_store,
     companyId: String(db.pfk_id_company),
     name: db.des_store,
@@ -80,6 +83,7 @@ export function mapBrand(db: DbCrpStore): Brand {
  * Maps a CRP Portal address database row to a Restaurant domain model.
  *
  * @param db - Raw database row from crp_portal__dt_address
+ * @param allIds - Optional array of all IDs that share this address name (for multi-portal)
  * @returns Restaurant domain model
  *
  * Field mappings:
@@ -93,9 +97,11 @@ export function mapBrand(db: DbCrpStore): Brand {
  * Note: activeChannels defaults to all channels as the database
  * doesn't store channel information per address.
  */
-export function mapRestaurant(db: DbCrpAddress): Restaurant {
+export function mapRestaurant(db: DbCrpAddress, allIds?: string[]): Restaurant {
+  const id = String(db.pk_id_address);
   return {
-    id: String(db.pk_id_address),
+    id,
+    allIds: allIds || [id],
     externalId: db.pk_id_address,
     companyId: String(db.pfk_id_company),
     brandId: String(db.pfk_id_store || 0),

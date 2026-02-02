@@ -8,6 +8,7 @@ export const ROUTES = {
 
   // Protected routes
   CONTROLLING: '/controlling',
+  CUSTOMERS: '/customers',
   OPERATIONS: '/operations',
   CLIENTS: '/clients',
   REPUTATION: '/reputation',

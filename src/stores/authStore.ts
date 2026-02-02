@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { supabase, isValidThinkPaladarEmail } from '@/services/supabase';
+import { supabase } from '@/services/supabase';
 import { fetchCurrentProfile } from '@/services/supabase-data';
 import type { User, Profile } from '@/types';
 
@@ -118,12 +118,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: async (email: string, password: string) => {
-        // Validate domain before attempting login
-        if (!isValidThinkPaladarEmail(email)) {
-          set({ error: 'Solo se permite acceso con email @thinkpaladar.com' });
-          return;
-        }
-
         set({ isLoading: true, error: null });
 
         // Dev mode bypass
@@ -242,20 +236,6 @@ export const useAuthStore = create<AuthState>()(
           const { data: { session } } = await supabase.auth.getSession();
 
           if (session?.user) {
-            // Validate domain
-            if (!isValidThinkPaladarEmail(session.user.email || '')) {
-              await supabase.auth.signOut();
-              set({
-                user: null,
-                profile: null,
-                isAuthenticated: false,
-                isLoading: false,
-                isInitialized: true,
-                error: 'Acceso denegado: solo emails @thinkpaladar.com',
-              });
-              return;
-            }
-
             // Fetch profile from Supabase
             const profile = await fetchCurrentProfile();
 

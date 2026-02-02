@@ -97,9 +97,10 @@ export interface OrdersAggregation {
 
 /**
  * Maps a portal ID to a channel ID.
+ * Both Glovo IDs (original and new) map to 'glovo'.
  */
 function portalIdToChannelId(portalId: string): ChannelId | null {
-  if (portalId === PORTAL_IDS.GLOVO) return 'glovo';
+  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
   if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
   // JustEat portal ID not yet configured
   return null;
@@ -107,11 +108,12 @@ function portalIdToChannelId(portalId: string): ChannelId | null {
 
 /**
  * Maps a channel ID to portal IDs for filtering.
+ * Glovo includes both original and new portal IDs.
  */
 function channelIdToPortalIds(channelId: ChannelId): string[] {
   switch (channelId) {
     case 'glovo':
-      return [PORTAL_IDS.GLOVO];
+      return [PORTAL_IDS.GLOVO, PORTAL_IDS.GLOVO_NEW];
     case 'ubereats':
       return [PORTAL_IDS.UBEREATS];
     case 'justeat':
@@ -419,4 +421,637 @@ export async function fetchCrpOrdersComparison(
       ordersPerCustomerChange: calcChange(current.ordersPerCustomer, previous.ordersPerCustomer),
     },
   };
+}
+
+// ============================================
+// HIERARCHY DATA (4 levels: Company → Brand → Address → Channel)
+// ============================================
+
+/**
+ * Metrics for a hierarchy row
+ */
+export interface HierarchyMetrics {
+  ventas: number;
+  ventasChange: number;
+  pedidos: number;
+  ticketMedio: number;
+  nuevosClientes: number;
+  porcentajeNuevos: number;
+}
+
+/**
+ * A single row in the hierarchy table
+ */
+export interface HierarchyDataRow {
+  id: string;
+  level: 'company' | 'brand' | 'address' | 'channel';
+  name: string;
+  parentId?: string;
+  channelId?: ChannelId;
+  companyId: string;
+  brandId?: string;
+  metrics: HierarchyMetrics;
+}
+
+/**
+ * Extended order type with new customer flag
+ */
+interface DbCrpOrderHeadExtended extends DbCrpOrderHead {
+  flg_customer_new?: boolean;
+}
+
+/**
+ * Dimension data structures for hierarchy
+ */
+interface CompanyDim {
+  id: number;
+  name: string;
+}
+
+interface StoreDim {
+  id: string;
+  name: string;
+  companyId: number;
+}
+
+interface AddressDim {
+  id: string;
+  name: string;
+  companyId: number;
+}
+
+interface PortalDim {
+  id: string;
+  name: string;
+}
+
+interface AllDimensions {
+  companies: CompanyDim[];
+  stores: StoreDim[];
+  addresses: AddressDim[];
+  portals: PortalDim[];
+}
+
+/**
+ * Fetch ALL dimension data for selected companies.
+ * This builds the complete hierarchy structure regardless of whether there are orders.
+ *
+ * IMPORTANT: Dimension tables have multiple snapshots per entity (one per month).
+ * We deduplicate by keeping only the most recent snapshot (ORDER BY pk_ts_month DESC).
+ */
+async function fetchAllDimensions(companyIds: number[]): Promise<AllDimensions> {
+  // Fetch all dimension data in parallel (ordered by pk_ts_month DESC for deduplication)
+  const [companiesResult, storesResult, addressesResult, portalsResult] = await Promise.all([
+    // Fetch selected companies
+    supabase
+      .from('crp_portal__dt_company')
+      .select('pk_id_company, des_company_name')
+      .in('pk_id_company', companyIds)
+      .order('pk_ts_month', { ascending: false }),
+
+    // Fetch ALL stores for these companies
+    supabase
+      .from('crp_portal__dt_store')
+      .select('pk_id_store, des_store, pfk_id_company')
+      .in('pfk_id_company', companyIds)
+      .order('pk_ts_month', { ascending: false }),
+
+    // Fetch ALL addresses for these companies
+    supabase
+      .from('crp_portal__dt_address')
+      .select('pk_id_address, des_address, pfk_id_company')
+      .in('pfk_id_company', companyIds)
+      .order('pk_ts_month', { ascending: false }),
+
+    // Fetch all portals
+    supabase
+      .from('crp_portal__dt_portal')
+      .select('pk_id_portal, des_portal')
+      .order('pk_ts_month', { ascending: false }),
+  ]);
+
+  // Deduplicate companies by ID (keeping most recent snapshot)
+  const companyMap = new Map<number, CompanyDim>();
+  for (const c of companiesResult.data || []) {
+    const companyId = c.pk_id_company;
+    if (!companyMap.has(companyId)) {
+      companyMap.set(companyId, {
+        id: companyId,
+        name: c.des_company_name,
+      });
+    }
+  }
+  const companies = Array.from(companyMap.values());
+
+  // Deduplicate stores by ID (keeping most recent snapshot)
+  const storeMap = new Map<string, StoreDim>();
+  for (const s of storesResult.data || []) {
+    const storeId = String(s.pk_id_store);
+    if (!storeMap.has(storeId)) {
+      storeMap.set(storeId, {
+        id: storeId,
+        name: s.des_store,
+        companyId: s.pfk_id_company,
+      });
+    }
+  }
+  const stores = Array.from(storeMap.values());
+
+  // Deduplicate addresses by ID (keeping most recent snapshot)
+  const addressMap = new Map<string, AddressDim>();
+  for (const a of addressesResult.data || []) {
+    const addressId = String(a.pk_id_address);
+    if (!addressMap.has(addressId)) {
+      addressMap.set(addressId, {
+        id: addressId,
+        name: a.des_address,
+        companyId: a.pfk_id_company,
+      });
+    }
+  }
+  const addresses = Array.from(addressMap.values());
+
+  // Deduplicate portals by ID (keeping most recent snapshot)
+  const portalMap = new Map<string, PortalDim>();
+  for (const p of portalsResult.data || []) {
+    const portalId = String(p.pk_id_portal);
+    if (!portalMap.has(portalId)) {
+      portalMap.set(portalId, {
+        id: portalId,
+        name: p.des_portal,
+      });
+    }
+  }
+  const portals = Array.from(portalMap.values());
+
+  if (import.meta.env.DEV) {
+    console.log('[fetchAllDimensions] Raw counts:',
+      'companies:', companiesResult.data?.length || 0,
+      'stores:', storesResult.data?.length || 0,
+      'addresses:', addressesResult.data?.length || 0,
+      'portals:', portalsResult.data?.length || 0
+    );
+    console.log('[fetchAllDimensions] After dedup:',
+      'companies:', companies.length,
+      'stores:', stores.length,
+      'addresses:', addresses.length,
+      'portals:', portals.length
+    );
+
+  }
+
+  return { companies, stores, addresses, portals };
+}
+
+/**
+ * Build complete hierarchy from dimensions and aggregate orders.
+ *
+ * BOTTOM-UP AGGREGATION:
+ * 1. Portal level: Aggregate directly from orders (most granular)
+ * 2. Address level: Sum metrics from child portals
+ * 3. Store level: Sum metrics from child addresses
+ * 4. Company level: Sum metrics from child stores
+ *
+ * Derived metrics (ticketMedio, porcentajeNuevos) are calculated AFTER summing base metrics.
+ *
+ * Hierarchy: Company → Store → Address → Portal
+ */
+function buildHierarchyFromDimensions(
+  dimensions: AllDimensions,
+  currentOrders: DbCrpOrderHeadExtended[],
+  previousOrders: DbCrpOrderHeadExtended[]
+): HierarchyDataRow[] {
+  const { companies, stores, addresses, portals } = dimensions;
+
+  if (import.meta.env.DEV) {
+    console.log('[buildHierarchyFromDimensions] Building hierarchy from:',
+      'companies:', companies.length,
+      'stores:', stores.length,
+      'addresses:', addresses.length,
+      'portals:', portals.length
+    );
+  }
+
+  // Base metrics structure (before derived calculations)
+  interface BaseMetrics {
+    ventas: number;
+    pedidos: number;
+    nuevos: number;
+  }
+
+  const createEmptyBase = (): BaseMetrics => ({
+    ventas: 0,
+    pedidos: 0,
+    nuevos: 0,
+  });
+
+  // Create empty final metrics
+  const emptyMetrics: HierarchyMetrics = {
+    ventas: 0,
+    ventasChange: 0,
+    pedidos: 0,
+    ticketMedio: 0,
+    nuevosClientes: 0,
+    porcentajeNuevos: 0,
+  };
+
+  // =====================================================
+  // STEP 1: Build address → store mapping from orders
+  // =====================================================
+  const addressToStoreMap = new Map<string, string>();
+  for (const order of currentOrders) {
+    const storeId = String(order.pfk_id_store || '');
+    const addressId = String(order.pfk_id_store_address || '');
+    if (addressId && storeId && !addressToStoreMap.has(addressId)) {
+      addressToStoreMap.set(addressId, storeId);
+    }
+  }
+  for (const order of previousOrders) {
+    const storeId = String(order.pfk_id_store || '');
+    const addressId = String(order.pfk_id_store_address || '');
+    if (addressId && storeId && !addressToStoreMap.has(addressId)) {
+      addressToStoreMap.set(addressId, storeId);
+    }
+  }
+
+  // =====================================================
+  // STEP 2: Aggregate at PORTAL level (most granular)
+  // Key: companyId::storeId::addressId::portalId
+  // =====================================================
+  const currentByPortal = new Map<string, BaseMetrics>();
+  const previousByPortal = new Map<string, BaseMetrics>();
+
+  for (const order of currentOrders) {
+    const companyId = order.pfk_id_company;
+    const storeId = String(order.pfk_id_store || '');
+    const addressId = String(order.pfk_id_store_address || '');
+    const portalId = String(order.pfk_id_portal || '');
+
+    if (!companyId || !storeId || !addressId || !portalId) continue;
+
+    const portalKey = `${companyId}::${storeId}::${addressId}::${portalId}`;
+    if (!currentByPortal.has(portalKey)) {
+      currentByPortal.set(portalKey, createEmptyBase());
+    }
+
+    const agg = currentByPortal.get(portalKey)!;
+    agg.ventas += order.amt_total_price || 0;
+    agg.pedidos += 1;
+    if (order.flg_customer_new === true) agg.nuevos += 1;
+  }
+
+  for (const order of previousOrders) {
+    const companyId = order.pfk_id_company;
+    const storeId = String(order.pfk_id_store || '');
+    const addressId = String(order.pfk_id_store_address || '');
+    const portalId = String(order.pfk_id_portal || '');
+
+    if (!companyId || !storeId || !addressId || !portalId) continue;
+
+    const portalKey = `${companyId}::${storeId}::${addressId}::${portalId}`;
+    if (!previousByPortal.has(portalKey)) {
+      previousByPortal.set(portalKey, createEmptyBase());
+    }
+
+    const agg = previousByPortal.get(portalKey)!;
+    agg.ventas += order.amt_total_price || 0;
+    agg.pedidos += 1;
+    if (order.flg_customer_new === true) agg.nuevos += 1;
+  }
+
+  // =====================================================
+  // STEP 3: Aggregate ADDRESS level from portals
+  // Key: companyId::storeId::addressId
+  // =====================================================
+  const currentByAddress = new Map<string, BaseMetrics>();
+  const previousByAddress = new Map<string, BaseMetrics>();
+
+  for (const [portalKey, metrics] of currentByPortal) {
+    const [companyId, storeId, addressId] = portalKey.split('::');
+    const addressKey = `${companyId}::${storeId}::${addressId}`;
+
+    if (!currentByAddress.has(addressKey)) {
+      currentByAddress.set(addressKey, createEmptyBase());
+    }
+    const agg = currentByAddress.get(addressKey)!;
+    agg.ventas += metrics.ventas;
+    agg.pedidos += metrics.pedidos;
+    agg.nuevos += metrics.nuevos;
+  }
+
+  for (const [portalKey, metrics] of previousByPortal) {
+    const [companyId, storeId, addressId] = portalKey.split('::');
+    const addressKey = `${companyId}::${storeId}::${addressId}`;
+
+    if (!previousByAddress.has(addressKey)) {
+      previousByAddress.set(addressKey, createEmptyBase());
+    }
+    const agg = previousByAddress.get(addressKey)!;
+    agg.ventas += metrics.ventas;
+    agg.pedidos += metrics.pedidos;
+    agg.nuevos += metrics.nuevos;
+  }
+
+  // =====================================================
+  // STEP 4: Aggregate STORE level from addresses
+  // Key: companyId::storeId
+  // =====================================================
+  const currentByStore = new Map<string, BaseMetrics>();
+  const previousByStore = new Map<string, BaseMetrics>();
+
+  for (const [addressKey, metrics] of currentByAddress) {
+    const [companyId, storeId] = addressKey.split('::');
+    const storeKey = `${companyId}::${storeId}`;
+
+    if (!currentByStore.has(storeKey)) {
+      currentByStore.set(storeKey, createEmptyBase());
+    }
+    const agg = currentByStore.get(storeKey)!;
+    agg.ventas += metrics.ventas;
+    agg.pedidos += metrics.pedidos;
+    agg.nuevos += metrics.nuevos;
+  }
+
+  for (const [addressKey, metrics] of previousByAddress) {
+    const [companyId, storeId] = addressKey.split('::');
+    const storeKey = `${companyId}::${storeId}`;
+
+    if (!previousByStore.has(storeKey)) {
+      previousByStore.set(storeKey, createEmptyBase());
+    }
+    const agg = previousByStore.get(storeKey)!;
+    agg.ventas += metrics.ventas;
+    agg.pedidos += metrics.pedidos;
+    agg.nuevos += metrics.nuevos;
+  }
+
+  // =====================================================
+  // STEP 5: Aggregate COMPANY level from stores
+  // Key: companyId
+  // =====================================================
+  const currentByCompany = new Map<string, BaseMetrics>();
+  const previousByCompany = new Map<string, BaseMetrics>();
+
+  for (const [storeKey, metrics] of currentByStore) {
+    const [companyId] = storeKey.split('::');
+
+    if (!currentByCompany.has(companyId)) {
+      currentByCompany.set(companyId, createEmptyBase());
+    }
+    const agg = currentByCompany.get(companyId)!;
+    agg.ventas += metrics.ventas;
+    agg.pedidos += metrics.pedidos;
+    agg.nuevos += metrics.nuevos;
+  }
+
+  for (const [storeKey, metrics] of previousByStore) {
+    const [companyId] = storeKey.split('::');
+
+    if (!previousByCompany.has(companyId)) {
+      previousByCompany.set(companyId, createEmptyBase());
+    }
+    const agg = previousByCompany.get(companyId)!;
+    agg.ventas += metrics.ventas;
+    agg.pedidos += metrics.pedidos;
+    agg.nuevos += metrics.nuevos;
+  }
+
+  // =====================================================
+  // HELPER: Convert base metrics to final metrics
+  // Derived metrics calculated AFTER summing
+  // =====================================================
+  const toFinalMetrics = (base: BaseMetrics | undefined, prevBase: BaseMetrics | undefined): HierarchyMetrics => {
+    if (!base) return emptyMetrics;
+
+    const prevVentas = prevBase?.ventas || 0;
+
+    return {
+      ventas: base.ventas,
+      ventasChange: prevVentas > 0 ? ((base.ventas - prevVentas) / prevVentas) * 100 : 0,
+      pedidos: base.pedidos,
+      ticketMedio: base.pedidos > 0 ? base.ventas / base.pedidos : 0,
+      nuevosClientes: base.nuevos,
+      porcentajeNuevos: base.pedidos > 0 ? (base.nuevos / base.pedidos) * 100 : 0,
+    };
+  };
+
+  // =====================================================
+  // BUILD HIERARCHY ROWS
+  // =====================================================
+  const rows: HierarchyDataRow[] = [];
+
+  // 1. COMPANY rows
+  for (const company of companies) {
+    const companyKey = String(company.id);
+    const current = currentByCompany.get(companyKey);
+    const previous = previousByCompany.get(companyKey);
+
+    rows.push({
+      id: `company-${company.id}`,
+      level: 'company',
+      name: `${company.name} (${company.id})`,
+      companyId: companyKey,
+      metrics: toFinalMetrics(current, previous),
+    });
+  }
+
+  // 2. STORE rows
+  for (const store of stores) {
+    const storeKey = `${store.companyId}::${store.id}`;
+    const current = currentByStore.get(storeKey);
+    const previous = previousByStore.get(storeKey);
+    const storeRowId = `brand::${store.companyId}::${store.id}`;
+    rows.push({
+      id: storeRowId,
+      level: 'brand',
+      name: `${store.name} (${store.id})`,
+      parentId: `company-${store.companyId}`,
+      companyId: String(store.companyId),
+      brandId: store.id,
+      metrics: toFinalMetrics(current, previous),
+    });
+  }
+
+  // 3. ADDRESS rows
+  // For addresses WITH orders: assign to the specific store from orders
+  // For addresses WITHOUT orders: assign to ALL stores of that company
+  for (const address of addresses) {
+    const mappedStoreId = addressToStoreMap.get(address.id);
+
+    if (mappedStoreId) {
+      // Address has orders → assign to the specific store
+      const parentStore = stores.find(s => s.id === mappedStoreId && s.companyId === address.companyId);
+      const actualStoreId = parentStore?.id || mappedStoreId;
+
+      const addressKey = `${address.companyId}::${actualStoreId}::${address.id}`;
+      const current = currentByAddress.get(addressKey);
+      const previous = previousByAddress.get(addressKey);
+
+      const parentId = parentStore
+        ? `brand::${parentStore.companyId}::${parentStore.id}`
+        : `company-${address.companyId}`;
+
+      rows.push({
+        id: `address::${address.companyId}::${address.id}`,
+        level: 'address',
+        name: `${address.name} (${address.id})`,
+        parentId,
+        companyId: String(address.companyId),
+        brandId: parentStore?.id,
+        metrics: toFinalMetrics(current, previous),
+      });
+
+      // 4. PORTAL rows for this address
+      for (const portal of portals) {
+        const portalKey = `${address.companyId}::${actualStoreId}::${address.id}::${portal.id}`;
+        const portalCurrent = currentByPortal.get(portalKey);
+        const portalPrevious = previousByPortal.get(portalKey);
+        const channelId = portalIdToChannelId(portal.id);
+
+        rows.push({
+          id: `channel::${address.companyId}::${address.id}::${portal.id}`,
+          level: 'channel',
+          name: `${portal.name} (${portal.id})`,
+          parentId: `address::${address.companyId}::${address.id}`,
+          companyId: String(address.companyId),
+          brandId: parentStore?.id,
+          channelId: channelId || undefined,
+          metrics: toFinalMetrics(portalCurrent, portalPrevious),
+        });
+      }
+    } else {
+      // Address has NO orders → assign to ALL stores of that company
+      const companyStores = stores.filter(s => s.companyId === address.companyId);
+
+      if (companyStores.length === 0) {
+        // No stores for this company, assign directly under company
+        rows.push({
+          id: `address::${address.companyId}::${address.id}`,
+          level: 'address',
+          name: `${address.name} (${address.id})`,
+          parentId: `company-${address.companyId}`,
+          companyId: String(address.companyId),
+          brandId: undefined,
+          metrics: toFinalMetrics(undefined, undefined),
+        });
+
+        // PORTAL rows
+        for (const portal of portals) {
+          const channelId = portalIdToChannelId(portal.id);
+          rows.push({
+            id: `channel::${address.companyId}::${address.id}::${portal.id}`,
+            level: 'channel',
+            name: `${portal.name} (${portal.id})`,
+            parentId: `address::${address.companyId}::${address.id}`,
+            companyId: String(address.companyId),
+            brandId: undefined,
+            channelId: channelId || undefined,
+            metrics: toFinalMetrics(undefined, undefined),
+          });
+        }
+      } else {
+        // Assign to ALL stores of this company
+        for (const store of companyStores) {
+          const addressRowId = `address::${address.companyId}::${store.id}::${address.id}`;
+
+          rows.push({
+            id: addressRowId,
+            level: 'address',
+            name: `${address.name} (${address.id})`,
+            parentId: `brand::${store.companyId}::${store.id}`,
+            companyId: String(address.companyId),
+            brandId: store.id,
+            metrics: toFinalMetrics(undefined, undefined), // No orders = 0 metrics
+          });
+
+          // PORTAL rows for each store-address combination
+          for (const portal of portals) {
+            const channelId = portalIdToChannelId(portal.id);
+            rows.push({
+              id: `channel::${address.companyId}::${store.id}::${address.id}::${portal.id}`,
+              level: 'channel',
+              name: `${portal.name} (${portal.id})`,
+              parentId: addressRowId,
+              companyId: String(address.companyId),
+              brandId: store.id,
+              channelId: channelId || undefined,
+              metrics: toFinalMetrics(undefined, undefined),
+            });
+          }
+        }
+      }
+    }
+  }
+
+  if (import.meta.env.DEV) {
+    const companyRows = rows.filter(r => r.level === 'company').length;
+    const brandRows = rows.filter(r => r.level === 'brand').length;
+    const addressRows = rows.filter(r => r.level === 'address').length;
+    const channelRows = rows.filter(r => r.level === 'channel').length;
+    console.log(`[buildHierarchyFromDimensions] Total rows: ${rows.length} (company: ${companyRows}, brand: ${brandRows}, address: ${addressRows}, channel: ${channelRows})`);
+
+    // Check for duplicate IDs
+    const ids = rows.map(r => r.id);
+    const duplicates = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+    if (duplicates.length > 0) {
+      console.error('[buildHierarchyFromDimensions] DUPLICATE IDs:', [...new Set(duplicates)]);
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Fetches hierarchy data for the Controlling dashboard.
+ *
+ * NEW APPROACH:
+ * 1. Fetch ALL dimension data for selected companies (not just from orders)
+ * 2. Fetch orders for metrics aggregation
+ * 3. Build complete hierarchy with all entities (even those with 0 orders)
+ *
+ * Returns a flat array of rows organized in a 4-level hierarchy:
+ * Company → Store → Address → Portal
+ *
+ * Each row contains metrics: ventas, ventasChange, pedidos, ticketMedio, nuevosClientes, porcentajeNuevos
+ *
+ * @param params - Query parameters including filters and date range
+ * @param previousParams - Parameters for the previous period (for variation calculation)
+ * @returns Promise resolving to array of hierarchy rows
+ */
+export async function fetchHierarchyData(
+  params: FetchOrdersParams,
+  previousParams: FetchOrdersParams
+): Promise<HierarchyDataRow[]> {
+  const { companyIds } = params;
+
+  // If no companies, return empty
+  if (!companyIds || companyIds.length === 0) {
+    return [];
+  }
+
+  // Step 1: Fetch ALL dimensions for selected companies (not filtered by orders)
+  // This ensures we show all entities even if they have 0 orders
+  const dimensions = await fetchAllDimensions(companyIds);
+
+  // Step 2: Fetch orders for both periods
+  const [currentOrders, previousOrders] = await Promise.all([
+    fetchCrpOrdersRaw(params) as Promise<DbCrpOrderHeadExtended[]>,
+    fetchCrpOrdersRaw(previousParams) as Promise<DbCrpOrderHeadExtended[]>,
+  ]);
+
+  if (import.meta.env.DEV) {
+    console.log('[fetchHierarchyData] Dimensions:',
+      'companies:', dimensions.companies.length,
+      'stores:', dimensions.stores.length,
+      'addresses:', dimensions.addresses.length,
+      'portals:', dimensions.portals.length
+    );
+    console.log('[fetchHierarchyData] Orders:',
+      'current:', currentOrders.length,
+      'previous:', previousOrders.length
+    );
+  }
+
+  // Step 3: Build complete hierarchy from dimensions and aggregate orders
+  return buildHierarchyFromDimensions(dimensions, currentOrders, previousOrders);
 }

@@ -5,23 +5,39 @@ import type { DateRange, DatePreset } from '@/types';
 // CURRENCY
 // ============================================
 
+interface FormatCurrencyOptions {
+  currency?: string;
+  locale?: string;
+  compact?: boolean;
+}
+
 /**
  * Formats a number as currency.
  *
  * @param amount - The numeric amount to format
- * @param currency - ISO 4217 currency code (default: 'EUR')
- * @param locale - BCP 47 locale string (default: 'es-ES')
+ * @param options - Formatting options (currency, locale, compact)
  * @returns Formatted currency string
  *
  * @example
  * formatCurrency(1234.56) // "1.234,56 €"
- * formatCurrency(1234.56, 'USD', 'en-US') // "$1,234.56"
+ * formatCurrency(1234.56, { currency: 'USD', locale: 'en-US' }) // "$1,234.56"
+ * formatCurrency(1234567, { compact: true }) // "1,2M €"
  */
 export function formatCurrency(
   amount: number,
-  currency = 'EUR',
-  locale = 'es-ES'
+  options?: FormatCurrencyOptions
 ): string {
+  const { currency = 'EUR', locale = 'es-ES', compact = false } = options || {};
+
+  if (compact) {
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(1).replace('.', ',')}M €`;
+    }
+    if (amount >= 1000) {
+      return `${(amount / 1000).toFixed(1).replace('.', ',')}K €`;
+    }
+  }
+
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
@@ -246,4 +262,41 @@ export function getPeriodLabels(preset: DatePreset): { current: string; comparis
       };
     }
   }
+}
+
+/**
+ * Gets period labels using the actual date range values.
+ * Use this instead of getPeriodLabels when you have the actual dateRange.
+ *
+ * @param dateRange - The actual date range object with start and end
+ * @returns Object with current period and comparison period labels
+ *
+ * @example
+ * getPeriodLabelsFromRange({ start: new Date('2026-01-19'), end: new Date('2026-01-25') })
+ * // { current: "19-25 Ene", comparison: "12-18 Ene" }
+ */
+export function getPeriodLabelsFromRange(dateRange: DateRange): { current: string; comparison: string } {
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  const formatShortDate = (date: Date) => `${date.getDate()} ${monthNames[date.getMonth()]}`;
+  const formatDateRangeLabel = (start: Date, end: Date) => {
+    if (start.getMonth() === end.getMonth()) {
+      return `${start.getDate()}-${end.getDate()} ${monthNames[start.getMonth()]}`;
+    }
+    return `${formatShortDate(start)} - ${formatShortDate(end)}`;
+  };
+
+  // Ensure dates are Date objects (handle string serialization from Zustand)
+  const start = dateRange.start instanceof Date ? dateRange.start : new Date(dateRange.start);
+  const end = dateRange.end instanceof Date ? dateRange.end : new Date(dateRange.end);
+
+  // Calculate comparison period (same duration, immediately before)
+  const durationMs = end.getTime() - start.getTime();
+  const compEnd = new Date(start.getTime() - 86400000); // Day before start
+  const compStart = new Date(compEnd.getTime() - durationMs);
+
+  return {
+    current: formatDateRangeLabel(start, end),
+    comparison: formatDateRangeLabel(compStart, compEnd),
+  };
 }

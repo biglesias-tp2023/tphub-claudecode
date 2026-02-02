@@ -9,10 +9,10 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Building2,
   Store,
   MapPin,
-  Navigation,
   Check,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
@@ -21,7 +21,7 @@ import { DashboardFilters } from '@/features/dashboard';
 import { useControllingData } from '@/features/controlling';
 import type { HierarchyRow, ChannelMetrics } from '@/features/controlling';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import { formatCurrency, formatNumber, getPeriodLabels } from '@/utils/formatters';
+import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
 import {
   exportControllingToCSV,
   exportControllingToExcel,
@@ -161,6 +161,27 @@ function ChannelCard({ data }: ChannelCardProps) {
 
 type ViewTab = 'rendimiento' | 'operaciones' | 'publicidad' | 'promociones';
 
+// Sortable columns
+type SortColumn =
+  | 'name'
+  | 'ventas'
+  | 'ventasChange'
+  | 'pedidos'
+  | 'ticketMedio'
+  | 'nuevosClientes'
+  | 'porcentajeNuevos'
+  | 'openTime'
+  | 'ratioConversion'
+  | 'tiempoEspera'
+  | 'valoraciones'
+  | 'inversionAds'
+  | 'adsPercentage'
+  | 'roas'
+  | 'inversionPromos'
+  | 'promosPercentage'
+  | 'promosRoas';
+type SortDirection = 'asc' | 'desc' | null;
+
 interface HierarchyTableProps {
   data: HierarchyRow[];
 }
@@ -168,8 +189,7 @@ interface HierarchyTableProps {
 const LEVEL_ICONS: Record<HierarchyRow['level'], React.ElementType> = {
   company: Building2,
   brand: Store,
-  area: MapPin,
-  address: Navigation,
+  address: MapPin,
   channel: ShoppingBag,
 };
 
@@ -179,9 +199,54 @@ const CHANNEL_COLORS: Record<ChannelId, string> = {
   justeat: 'bg-orange-100 text-orange-800',
 };
 
+// Sortable column header component
+interface SortableHeaderProps {
+  column: SortColumn;
+  label: string;
+  currentSort: SortColumn | null;
+  currentDirection: SortDirection;
+  onSort: (column: SortColumn) => void;
+  align?: 'left' | 'right';
+}
+
+function SortableHeader({ column, label, currentSort, currentDirection, onSort, align = 'right' }: SortableHeaderProps) {
+  const isActive = currentSort === column;
+
+  return (
+    <th
+      className={cn(
+        'py-2.5 px-2 font-medium text-gray-500 text-xs cursor-pointer hover:bg-gray-100 select-none transition-colors',
+        align === 'left' ? 'text-left' : 'text-right',
+        align === 'left' && 'px-4 w-64'
+      )}
+      onClick={() => onSort(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {align === 'right' && isActive && (
+          currentDirection === 'desc' ? (
+            <ChevronDown className="w-3 h-3 text-primary-600" />
+          ) : (
+            <ChevronUp className="w-3 h-3 text-primary-600" />
+          )
+        )}
+        <span className={isActive ? 'text-primary-600' : ''}>{label}</span>
+        {align === 'left' && isActive && (
+          currentDirection === 'desc' ? (
+            <ChevronDown className="w-3 h-3 text-primary-600" />
+          ) : (
+            <ChevronUp className="w-3 h-3 text-primary-600" />
+          )
+        )}
+      </span>
+    </th>
+  );
+}
+
 function HierarchyTable({ data }: HierarchyTableProps) {
   const [activeTabs, setActiveTabs] = useState<Set<ViewTab>>(new Set(['rendimiento']));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
   const toggleTab = (tab: ViewTab) => {
     setActiveTabs((prev) => {
@@ -195,11 +260,27 @@ function HierarchyTable({ data }: HierarchyTableProps) {
     });
   };
 
+  // Get all descendant IDs for a given row
+  const getDescendantIds = useCallback((parentId: string): string[] => {
+    const descendants: string[] = [];
+    const children = data.filter((r) => r.parentId === parentId);
+    for (const child of children) {
+      descendants.push(child.id);
+      descendants.push(...getDescendantIds(child.id));
+    }
+    return descendants;
+  }, [data]);
+
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
+        // Collapse this row AND all its descendants
         next.delete(id);
+        const descendants = getDescendantIds(id);
+        for (const descendantId of descendants) {
+          next.delete(descendantId);
+        }
       } else {
         next.add(id);
       }
@@ -207,21 +288,111 @@ function HierarchyTable({ data }: HierarchyTableProps) {
     });
   };
 
+  // Handle column sorting: null -> desc -> asc -> null
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      // New column: start with desc for numeric, asc for text
+      setSortColumn(column);
+      setSortDirection(column === 'name' ? 'asc' : 'desc');
+    } else {
+      // Same column: cycle through desc -> asc -> null
+      if (sortDirection === 'desc') {
+        setSortDirection('asc');
+      } else if (sortDirection === 'asc') {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    }
+  };
+
+  // Sort function that respects hierarchy
+  const sortRowsWithHierarchy = useCallback((rows: HierarchyRow[]): HierarchyRow[] => {
+    if (!sortColumn || !sortDirection) return rows;
+
+    // Group rows by parent
+    const childrenByParent = new Map<string | undefined, HierarchyRow[]>();
+    for (const row of rows) {
+      const parentId = row.parentId;
+      if (!childrenByParent.has(parentId)) {
+        childrenByParent.set(parentId, []);
+      }
+      childrenByParent.get(parentId)!.push(row);
+    }
+
+    // Helper to parse time string "mm:ss" to seconds for comparison
+    const parseTimeToSeconds = (time: string | undefined): number => {
+      if (!time) return 0;
+      const parts = time.split(':');
+      if (parts.length === 2) {
+        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+      }
+      return 0;
+    };
+
+    // Sort comparator
+    const compare = (a: HierarchyRow, b: HierarchyRow): number => {
+      let valA: string | number;
+      let valB: string | number;
+
+      if (sortColumn === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (sortColumn === 'tiempoEspera') {
+        // Parse time strings like "5:30" to seconds for proper numeric comparison
+        valA = parseTimeToSeconds(a.tiempoEspera);
+        valB = parseTimeToSeconds(b.tiempoEspera);
+      } else {
+        valA = a[sortColumn] ?? 0;
+        valB = b[sortColumn] ?? 0;
+      }
+
+      let result: number;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        result = valA.localeCompare(valB, 'es');
+      } else {
+        result = (valA as number) - (valB as number);
+      }
+
+      return sortDirection === 'desc' ? -result : result;
+    };
+
+    // Sort each group of siblings
+    for (const [, siblings] of childrenByParent) {
+      siblings.sort(compare);
+    }
+
+    // Rebuild rows array maintaining hierarchy order
+    const sortedRows: HierarchyRow[] = [];
+    const addSorted = (parentId: string | undefined) => {
+      const children = childrenByParent.get(parentId) || [];
+      for (const child of children) {
+        sortedRows.push(child);
+        addSorted(child.id);
+      }
+    };
+    addSorted(undefined);
+
+    return sortedRows;
+  }, [sortColumn, sortDirection]);
+
   const visibleRows = useMemo(() => {
+    // First, sort the data while respecting hierarchy
+    const sortedData = sortRowsWithHierarchy(data);
+
     const result: (HierarchyRow & { _depth: number })[] = [];
-    const topLevel = data.filter((r) => !r.parentId);
+    const topLevel = sortedData.filter((r) => !r.parentId);
 
     const addWithChildren = (row: HierarchyRow, depth: number) => {
       result.push({ ...row, _depth: depth });
       if (expandedRows.has(row.id)) {
-        const children = data.filter((r) => r.parentId === row.id);
+        const children = sortedData.filter((r) => r.parentId === row.id);
         children.forEach((child) => addWithChildren(child, depth + 1));
       }
     };
 
     topLevel.forEach((row) => addWithChildren(row, 0));
     return result;
-  }, [data, expandedRows]);
+  }, [data, expandedRows, sortRowsWithHierarchy]);
 
   const hasChildren = (id: string) => data.some((r) => r.parentId === id);
 
@@ -246,7 +417,7 @@ function HierarchyTable({ data }: HierarchyTableProps) {
                 className={cn(
                   'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5',
                   isActive
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-primary-600 text-white hover:bg-primary-700'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 )}
               >
@@ -261,39 +432,140 @@ function HierarchyTable({ data }: HierarchyTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="text-left py-2.5 px-4 font-medium text-gray-500 text-xs w-64">
-                Compañía / Marca / Área / Local / Canal
-              </th>
-              <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Ventas</th>
-              <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Var.</th>
-              <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Pedidos</th>
+              <SortableHeader
+                column="name"
+                label="Compañía / Marca / Dirección / Canal"
+                currentSort={sortColumn}
+                currentDirection={sortDirection}
+                onSort={handleSort}
+                align="left"
+              />
+              <SortableHeader
+                column="ventas"
+                label="Ventas"
+                currentSort={sortColumn}
+                currentDirection={sortDirection}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                column="ventasChange"
+                label="Var."
+                currentSort={sortColumn}
+                currentDirection={sortDirection}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                column="pedidos"
+                label="Pedidos"
+                currentSort={sortColumn}
+                currentDirection={sortDirection}
+                onSort={handleSort}
+              />
               {activeTabs.has('rendimiento') && (
                 <>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Ticket</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Nuevos</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">% Nuevos</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Open</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Conv.</th>
+                  <SortableHeader
+                    column="ticketMedio"
+                    label="Ticket"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="nuevosClientes"
+                    label="Nuevos"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="porcentajeNuevos"
+                    label="% Nuevos"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="openTime"
+                    label="Open"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="ratioConversion"
+                    label="Conv."
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                 </>
               )}
               {activeTabs.has('operaciones') && (
                 <>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">T.Espera</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Rating</th>
+                  <SortableHeader
+                    column="tiempoEspera"
+                    label="T.Espera"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="valoraciones"
+                    label="Rating"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                 </>
               )}
               {activeTabs.has('publicidad') && (
                 <>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Ads</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Ads %</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">ROAS</th>
+                  <SortableHeader
+                    column="inversionAds"
+                    label="Ads"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="adsPercentage"
+                    label="Ads %"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="roas"
+                    label="ROAS"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                 </>
               )}
               {activeTabs.has('promociones') && (
                 <>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Promos</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">Promos %</th>
-                  <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs">ROAS</th>
+                  <SortableHeader
+                    column="inversionPromos"
+                    label="Promos"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="promosPercentage"
+                    label="Promos %"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="promosRoas"
+                    label="ROAS"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                 </>
               )}
             </tr>
@@ -310,6 +582,7 @@ function HierarchyTable({ data }: HierarchyTableProps) {
                   key={row.id}
                   className={cn(
                     'border-b border-gray-50 hover:bg-gray-50/50 transition-colors',
+                    row.level === 'company' && 'bg-primary-50/60',
                     row.level === 'channel' && 'bg-gray-50/30'
                   )}
                 >
@@ -361,28 +634,28 @@ function HierarchyTable({ data }: HierarchyTableProps) {
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ticketMedio.toFixed(1)}€</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.nuevosClientes)}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeNuevos.toFixed(1)}%</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.openTime.toFixed(0)}%</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratioConversion.toFixed(1)}%</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.openTime != null ? `${row.openTime.toFixed(0)}%` : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratioConversion != null ? `${row.ratioConversion.toFixed(1)}%` : '-'}</td>
                     </>
                   )}
                   {activeTabs.has('operaciones') && (
                     <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm">{row.tiempoEspera}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.valoraciones.toFixed(1)}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm">{row.tiempoEspera || '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.valoraciones != null ? row.valoraciones.toFixed(1) : '-'}</td>
                     </>
                   )}
                   {activeTabs.has('publicidad') && (
                     <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatCurrency(row.inversionAds)}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adsPercentage.toFixed(1)}%</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.roas.toFixed(1)}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionAds != null ? formatCurrency(row.inversionAds) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adsPercentage != null ? `${row.adsPercentage.toFixed(1)}%` : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.roas != null ? row.roas.toFixed(1) : '-'}</td>
                     </>
                   )}
                   {activeTabs.has('promociones') && (
                     <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatCurrency(row.inversionPromos)}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage.toFixed(1)}%</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas.toFixed(1)}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
                     </>
                   )}
                 </tr>
@@ -401,11 +674,11 @@ function HierarchyTable({ data }: HierarchyTableProps) {
 
 export function ControllingPage() {
   const { companyIds } = useGlobalFiltersStore();
-  const { datePreset } = useDashboardFiltersStore();
+  const { dateRange } = useDashboardFiltersStore();
   const { data, isLoading, error } = useControllingData();
 
-  // Period labels for comparison
-  const periodLabels = useMemo(() => getPeriodLabels(datePreset), [datePreset]);
+  // Period labels for comparison - use actual dateRange values
+  const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
 
   const companyText = companyIds.length === 0
     ? 'Todos los negocios'
@@ -426,7 +699,7 @@ export function ControllingPage() {
         `${row.ventasChange >= 0 ? '+' : ''}${row.ventasChange.toFixed(1)}%`,
         formatNumber(row.pedidos),
         `${row.ticketMedio.toFixed(1)}€`,
-        `${row.openTime.toFixed(0)}%`,
+        `${(row.openTime ?? 0).toFixed(0)}%`,
       ]),
       totalRows: data.hierarchy.length,
     };
@@ -464,16 +737,16 @@ export function ControllingPage() {
         ticketMedio: row.ticketMedio,
         nuevosClientes: row.nuevosClientes,
         porcentajeNuevos: row.porcentajeNuevos,
-        openTime: row.openTime,
-        ratioConversion: row.ratioConversion,
-        tiempoEspera: row.tiempoEspera,
-        valoraciones: row.valoraciones,
-        inversionAds: row.inversionAds,
-        adsPercentage: row.adsPercentage,
-        roas: row.roas,
-        inversionPromos: row.inversionPromos,
-        promosPercentage: row.promosPercentage,
-        promosRoas: row.promosRoas,
+        openTime: row.openTime ?? 0,
+        ratioConversion: row.ratioConversion ?? 0,
+        tiempoEspera: row.tiempoEspera ?? '-',
+        valoraciones: row.valoraciones ?? 0,
+        inversionAds: row.inversionAds ?? 0,
+        adsPercentage: row.adsPercentage ?? 0,
+        roas: row.roas ?? 0,
+        inversionPromos: row.inversionPromos ?? 0,
+        promosPercentage: row.promosPercentage ?? 0,
+        promosRoas: row.promosRoas ?? 0,
       })),
       dateRange: `${periodLabels.current} vs. ${periodLabels.comparison}`,
     };

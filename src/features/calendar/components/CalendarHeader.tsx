@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Search, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Settings, Share2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export type CalendarViewType = 'day' | 'week' | 'month' | 'agenda' | '4days';
@@ -14,6 +14,8 @@ interface CalendarHeaderProps {
   onViewChange: (view: CalendarViewType) => void;
   onSearch?: () => void;
   onSettings?: () => void;
+  onShare?: () => void;
+  isClientMode?: boolean;
 }
 
 const MONTHS = [
@@ -29,6 +31,14 @@ const VIEW_OPTIONS: { id: CalendarViewType; label: string }[] = [
   { id: 'agenda', label: 'Agenda' },
 ];
 
+function getWeekNumber(year: number, month: number, day: number): number {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
 function getDisplayTitle(view: CalendarViewType, year: number, month: number, day?: number): string {
   const monthName = MONTHS[month - 1];
 
@@ -36,7 +46,12 @@ function getDisplayTitle(view: CalendarViewType, year: number, month: number, da
     case 'day':
       return day ? `${day} de ${monthName} ${year}` : `${monthName} ${year}`;
     case '4days':
+      return `${monthName} ${year}`;
     case 'week':
+      if (day) {
+        const weekNum = getWeekNumber(year, month, day);
+        return `${monthName} ${year} · Semana ${weekNum}`;
+      }
       return `${monthName} ${year}`;
     case 'month':
     case 'agenda':
@@ -57,6 +72,8 @@ export function CalendarHeader({
   onViewChange,
   onSearch,
   onSettings,
+  onShare,
+  isClientMode = false,
 }: CalendarHeaderProps) {
   return (
     <div className="flex items-center justify-between h-14 px-4 border-b border-gray-200 bg-white">
@@ -122,6 +139,17 @@ export function CalendarHeader({
         <div className="w-px h-6 bg-gray-200 mx-1" />
 
         {/* Action icons */}
+        {onShare && !isClientMode && (
+          <button
+            onClick={onShare}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            aria-label="Compartir"
+          >
+            <Share2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Compartir</span>
+          </button>
+        )}
+
         {onSearch && (
           <button
             onClick={onSearch}

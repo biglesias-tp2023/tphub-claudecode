@@ -8,101 +8,44 @@ interface PlatformSelectorProps {
   onSelect: (platform: CampaignPlatform) => void;
 }
 
-// Platform logo components (styled as SVGs)
-function GlovoLogo({ className }: { className?: string }) {
-  return (
-    <div className={cn('flex items-center justify-center rounded-lg', className)}>
-      <svg viewBox="0 0 40 40" className="w-full h-full">
-        <rect width="40" height="40" rx="8" fill="#FFC244" />
-        <text
-          x="50%"
-          y="55%"
-          dominantBaseline="middle"
-          textAnchor="middle"
-          fill="#000"
-          fontSize="20"
-          fontWeight="bold"
-          fontFamily="system-ui"
-        >
-          G
-        </text>
-      </svg>
-    </div>
-  );
-}
+// Platform logo component - uses real images when available, always circular
+function PlatformLogo({ platform, className }: { platform: CampaignPlatform; className?: string }) {
+  const config = PLATFORMS[platform];
 
-function UberEatsLogo({ className }: { className?: string }) {
-  return (
-    <div className={cn('flex items-center justify-center rounded-lg', className)}>
-      <svg viewBox="0 0 40 40" className="w-full h-full">
-        <rect width="40" height="40" rx="8" fill="#142328" />
-        <text
-          x="50%"
-          y="55%"
-          dominantBaseline="middle"
-          textAnchor="middle"
-          fill="#05C167"
-          fontSize="20"
-          fontWeight="bold"
-          fontFamily="system-ui"
-        >
-          UE
-        </text>
-      </svg>
-    </div>
-  );
-}
+  // Use real logo if available
+  if (config.logoUrl) {
+    return (
+      <div className={cn('rounded-full overflow-hidden', className)}>
+        <img
+          src={config.logoUrl}
+          alt={config.name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
 
-function JustEatLogo({ className }: { className?: string }) {
+  // Fallback to styled SVG for platforms without logos (Google Ads)
   return (
-    <div className={cn('flex items-center justify-center rounded-lg', className)}>
+    <div className={cn('flex items-center justify-center rounded-full overflow-hidden', className)}>
       <svg viewBox="0 0 40 40" className="w-full h-full">
-        <rect width="40" height="40" rx="8" fill="#FF8000" />
+        <circle cx="20" cy="20" r="20" fill={config.color} />
         <text
           x="50%"
           y="55%"
           dominantBaseline="middle"
           textAnchor="middle"
           fill="#FFF"
-          fontSize="20"
+          fontSize="14"
           fontWeight="bold"
           fontFamily="system-ui"
         >
-          JE
+          {platform === 'google_ads' ? 'Ads' : config.name.charAt(0)}
         </text>
       </svg>
     </div>
   );
 }
-
-function GoogleAdsLogo({ className }: { className?: string }) {
-  return (
-    <div className={cn('flex items-center justify-center rounded-lg', className)}>
-      <svg viewBox="0 0 40 40" className="w-full h-full">
-        <rect width="40" height="40" rx="8" fill="#4285F4" />
-        <text
-          x="50%"
-          y="55%"
-          dominantBaseline="middle"
-          textAnchor="middle"
-          fill="#FFF"
-          fontSize="16"
-          fontWeight="bold"
-          fontFamily="system-ui"
-        >
-          Ads
-        </text>
-      </svg>
-    </div>
-  );
-}
-
-const PLATFORM_LOGOS: Record<CampaignPlatform, React.FC<{ className?: string }>> = {
-  glovo: GlovoLogo,
-  ubereats: UberEatsLogo,
-  justeat: JustEatLogo,
-  google_ads: GoogleAdsLogo,
-};
 
 export function PlatformSelector({ selected, onSelect }: PlatformSelectorProps) {
   return (
@@ -117,7 +60,6 @@ export function PlatformSelector({ selected, onSelect }: PlatformSelectorProps) 
       {/* List format */}
       <div className="space-y-3">
         {Object.values(PLATFORMS).map(platform => {
-          const Logo = PLATFORM_LOGOS[platform.id];
           const isSelected = selected === platform.id;
 
           return (
@@ -133,7 +75,7 @@ export function PlatformSelector({ selected, onSelect }: PlatformSelectorProps) 
               )}
             >
               {/* Platform logo */}
-              <Logo className="w-12 h-12 shrink-0" />
+              <PlatformLogo platform={platform.id} className="w-12 h-12 shrink-0" />
 
               {/* Platform info */}
               <div className="flex-1 min-w-0">
@@ -164,3 +106,6 @@ export function PlatformSelector({ selected, onSelect }: PlatformSelectorProps) 
     </div>
   );
 }
+
+// Export PlatformLogo for use in other components
+export { PlatformLogo };

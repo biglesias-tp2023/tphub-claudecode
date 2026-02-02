@@ -138,6 +138,56 @@ Servicio de datos para el CRP Portal de ThinkPaladar, implementado siguiendo pri
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Multi-Portal ID Grouping (Deduplicacion por Nombre)
+
+Las tablas dimensionales (`dt_store`, `dt_address`) contienen registros duplicados para la misma marca/direccion cuando operan en multiples plataformas (Glovo, UberEats, JustEat).
+
+**Problema**: La misma marca "26KG Pasta Fresca" puede tener 4 IDs diferentes (uno por cada portal).
+
+**Solucion**: Agrupacion por nombre que mantiene todos los IDs relacionados.
+
+#### Tipos con allIds
+
+```typescript
+interface Brand {
+  id: string;           // ID primario (mas reciente)
+  allIds: string[];     // TODOS los IDs que comparten este nombre
+  // ...otros campos
+}
+
+interface Restaurant {
+  id: string;           // ID primario
+  allIds: string[];     // TODOS los IDs que comparten esta direccion
+  // ...otros campos
+}
+```
+
+#### Funciones de Agrupacion (utils.ts)
+
+| Funcion | Descripcion |
+|---------|-------------|
+| `groupByName` | Agrupa por nombre, devuelve primary + allIds |
+| `groupAddressesByName` | Agrupa direcciones con normalizacion (C/, Calle, Carrer) |
+| `normalizeAddress` | Normaliza direcciones para comparacion |
+
+#### Flujo de Filtrado
+
+1. Usuario selecciona marca "26KG Pasta Fresca" en UI
+2. UI almacena el `id` primario (ej: "123")
+3. `useControllingData` expande el ID a `allIds: ["123", "456", "789"]`
+4. La query de pedidos usa TODOS los IDs
+5. Se capturan pedidos de todas las plataformas
+
+```typescript
+// En useControllingData.ts
+const expandedBrandIds = useMemo(
+  () => expandBrandIds(brandIds, brands),
+  [brandIds, brands]
+);
+
+// expandBrandIds busca la marca y devuelve brand.allIds
+```
+
 ### Orders Service (Datos de Ventas Reales)
 
 El modulo `orders.ts` proporciona acceso a datos de ventas reales desde la tabla `crp_portal__ft_order_head`.
@@ -836,23 +886,73 @@ const {
 - `features/audits/components/index.ts` - Re-exporta desde common
 - `features/strategic/components/StrategicObjectiveEditor.tsx` - Usa EntityScopeSelector
 
-### Calendario - Migracion a Supabase
+### Calendario - Migracion a Supabase (SOLUCIONADO)
 
-La tabla `promotional_campaigns` existe pero tiene un problema de esquema:
-- Referencia `restaurant_id UUID` → `public.restaurants(id)`
-- Los restaurantes vienen de CRP Portal con IDs numericos
+**Solucion aplicada**: Migracion `013_calendar_campaigns_crp_refs.sql` añade columnas CRP:
 
-**Solucion pendiente**: Modificar migracion para usar `TEXT` en lugar de `UUID`:
+- `crp_restaurant_id TEXT` - ID del restaurante en CRP Portal
+- `crp_company_id TEXT` - ID de la compañía en CRP Portal
+- `crp_brand_id TEXT` - ID de la marca en CRP Portal
 
-```sql
--- Cambiar en 007_calendar_campaigns.sql
-restaurant_id TEXT NOT NULL,  -- En lugar de UUID con FK
-```
+El hook `useCampaigns.ts` ahora soporta ambos modos (localStorage y Supabase).
+Para activar Supabase:
 
-Una vez aplicada la migracion, cambiar en `useCampaigns.ts`:
 ```typescript
+// En useCampaigns.ts
 const USE_LOCAL_STORAGE = false;  // Activar Supabase
 ```
+
+### Sistema de Invitaciones de Usuarios (NUEVO)
+
+**Archivos creados:**
+
+| Archivo | Descripción |
+|---------|-------------|
+| `supabase/migrations/012_user_invitations.sql` | Tabla `user_invitations` + trigger |
+| `src/services/invitations.ts` | CRUD invitaciones + Magic Link |
+| `src/features/admin/hooks/useInvitations.ts` | React Query hooks |
+| `src/features/admin/components/InviteUserModal.tsx` | Modal para invitar usuarios |
+| `src/features/admin/components/PendingInvitations.tsx` | Lista de invitaciones |
+
+**Flujo de invitación:**
+
+1. Admin va a `/admin` → "Invitar usuario"
+2. Introduce email, rol y compañías pre-asignadas
+3. Se crea registro en `user_invitations` con config
+4. Se envía Magic Link via `supabase.auth.signInWithOtp`
+5. Usuario hace click → crea cuenta automáticamente
+6. Trigger `on_profile_created_apply_invitation` aplica rol/compañías
+
+**Activar en producción:**
+
+1. Ejecutar `012_user_invitations.sql` en Supabase SQL Editor
+2. Ejecutar `013_calendar_campaigns_crp_refs.sql` en Supabase SQL Editor
+
+**Tipos añadidos a `models.ts`:**
+
+- `InvitationStatus`: 'pending' | 'accepted' | 'expired' | 'cancelled'
+- `UserInvitation`: Interfaz completa de invitación
+- `DbUserInvitation`: Tipo de base de datos
+
+### Multi-Portal ID Grouping (COMPLETADO)
+
+**Problema resuelto**: Las marcas/direcciones tenian IDs duplicados por portal (Glovo, Uber, JustEat).
+
+**Solucion implementada**:
+
+- `Brand` y `Restaurant` ahora tienen campo `allIds: string[]`
+- `groupByName` y `groupAddressesByName` en `utils.ts` para agrupar por nombre
+- `useControllingData` expande IDs seleccionados a todos los IDs relacionados
+- Los filtros de pedidos ahora capturan datos de todas las plataformas
+
+**Archivos modificados:**
+
+- `src/types/models.ts` - Agregado `allIds` a Brand y Restaurant
+- `src/services/crp-portal/utils.ts` - Funciones de agrupacion
+- `src/services/crp-portal/mappers.ts` - Mappers con allIds parameter
+- `src/services/crp-portal/brands.ts` - Usa `groupByName`
+- `src/services/crp-portal/restaurants.ts` - Usa `groupAddressesByName`
+- `src/features/controlling/hooks/useControllingData.ts` - Expansion de IDs
 
 ### Filtros de Fecha
 
@@ -861,4 +961,4 @@ const USE_LOCAL_STORAGE = false;  // Activar Supabase
 
 ---
 
-*Enero 2026 - Sistema de Objetivos Estrategicos con CRP Portal*
+*Enero 2026 - Sistema de Invitaciones de Usuarios y Tracking de Acciones*

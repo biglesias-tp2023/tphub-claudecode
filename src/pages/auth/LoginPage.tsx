@@ -52,8 +52,9 @@ export function LoginPage() {
       setLocalError('El correo electrónico es requerido');
       return false;
     }
-    if (!emailToValidate.toLowerCase().endsWith('@thinkpaladar.com')) {
-      setLocalError('Solo se permite acceso con email @thinkpaladar.com');
+    // Validar formato básico de email
+    if (!emailToValidate.includes('@')) {
+      setLocalError('Introduce un correo electrónico válido');
       return false;
     }
     return true;
@@ -123,7 +124,7 @@ export function LoginPage() {
                 'placeholder:text-gray-400',
                 displayError ? 'border-red-300' : 'border-gray-200'
               )}
-              placeholder="tu@thinkpaladar.com"
+              placeholder="tu@email.com"
               autoComplete="email"
               autoFocus
             />
@@ -274,6 +275,9 @@ export function LoginPage() {
           </svg>
           Iniciar sesión con Google
         </button>
+        <p className="text-xs text-gray-500 text-center mt-2">
+          Empleados ThinkPaladar: inicia sesión con tu cuenta de Google
+        </p>
       </div>
 
       {/* Security Warning */}

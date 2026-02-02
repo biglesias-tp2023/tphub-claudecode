@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/components/layout';
 import { ProtectedRoute } from '@/components/common';
 import { ControllingPage } from '@/pages/controlling';
+import { CustomersPage } from '@/pages/customers';
 import { ReputationPage } from '@/pages/reputation';
 import { StrategicPage } from '@/pages/strategic';
 import { CalendarPage } from '@/pages/calendar';
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/controlling" replace /> },
       { path: 'controlling', element: <ControllingPage /> },
+      { path: 'customers', element: <CustomersPage /> },
       { path: 'operations', element: <PlaceholderPage title="Operaciones" /> },
       { path: 'clients', element: <PlaceholderPage title="Clientes" /> },
       { path: 'reputation', element: <ReputationPage /> },
@@ -42,8 +44,10 @@ export const router = createBrowserRouter([
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'audits', element: <AuditsPage /> },
       { path: 'maps', element: <MapsPage /> },
-      { path: 'market', element: <PlaceholderPage title="Mercado" /> },
       { path: 'admin', element: <AdminPage /> },
+      { path: 'admin/users', element: <AdminPage /> },
+      // Consultant portal - unified page
+      { path: 'my-clients', element: <PlaceholderPage title="Mis Clientes" /> },
     ],
   },
   // Public routes (no authentication required)

@@ -109,6 +109,17 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
       .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
   }, [companyIds, sortedCompanies]);
 
+  // Auto-clean invalid company IDs from store
+  useEffect(() => {
+    if (sortedCompanies.length > 0 && companyIds.length > 0) {
+      const validIds = new Set(sortedCompanies.map((c) => c.id));
+      const cleanedIds = companyIds.filter((id) => validIds.has(id));
+      if (cleanedIds.length !== companyIds.length) {
+        setCompanyIds(cleanedIds);
+      }
+    }
+  }, [sortedCompanies, companyIds, setCompanyIds]);
+
   // Handle company selection
   const handleToggleCompany = useCallback(
     (company: Company) => {
@@ -352,7 +363,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                       : 'text-gray-600 hover:bg-gray-100'
                   )}
                 >
-                  Seleccionados ({companyIds.length})
+                  Seleccionados ({selectedCompanies.length})
                 </button>
 
                 <div className="flex-1" />

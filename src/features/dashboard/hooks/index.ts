@@ -4,3 +4,5 @@ export { useRestaurants, useRestaurant, useRestaurantWithDetails, useRestaurants
 export { useRestaurantKpis, useAggregatedKpis, useRestaurantKpisById } from './useRestaurantKpis';
 export { useDashboardData } from './useDashboardData';
 export type { DailyRevenue, ChannelStats, RecentOrder, DashboardMetrics, DashboardData } from './useDashboardData';
+export { useBrandChannels } from './useBrandChannels';
+export { useRestaurantChannels } from './useRestaurantChannels';

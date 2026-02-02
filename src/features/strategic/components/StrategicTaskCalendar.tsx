@@ -122,9 +122,10 @@ export function StrategicTaskCalendar({
         <h2 className="text-sm font-semibold text-gray-900">Tareas</h2>
         <button
           onClick={onAddTask}
-          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
+          Crear
         </button>
       </div>
 
@@ -170,7 +171,7 @@ export function StrategicTaskCalendar({
             </p>
             <button
               onClick={onAddTask}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
             >
               <Plus className="w-3 h-3" />
               Crear tarea

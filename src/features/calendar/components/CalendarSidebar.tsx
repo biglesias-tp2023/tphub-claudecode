@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Plus, ChevronLeft, ChevronRight, ChevronDown, Calendar, Flag, Trophy, Tv, ShoppingBag, MapPin } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, Calendar, Flag, Trophy, ShoppingBag, MapPin } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { PLATFORMS } from '../config/platforms';
-import type { CampaignPlatform, EventCategory } from '@/types';
+import { PlatformLogo } from './CampaignEditor';
+import type { CampaignPlatform, EventCategory, PromotionalCampaign } from '@/types';
 
 interface CalendarSidebarProps {
   selectedDate: Date;
@@ -16,6 +17,7 @@ interface CalendarSidebarProps {
   onEventCategoriesChange: (categories: EventCategory[]) => void;
   selectedRegion: string;
   onRegionChange: (region: string) => void;
+  campaigns?: PromotionalCampaign[];
 }
 
 const STATUSES = [
@@ -28,29 +30,16 @@ const STATUSES = [
 const EVENT_CATEGORIES: { id: EventCategory; label: string; icon: typeof Flag; color: string }[] = [
   { id: 'holiday', label: 'Festivos', icon: Flag, color: 'text-red-500' },
   { id: 'sports', label: 'Deportes', icon: Trophy, color: 'text-green-500' },
-  { id: 'entertainment', label: 'Entretenimiento', icon: Tv, color: 'text-purple-500' },
   { id: 'commercial', label: 'Comercial', icon: ShoppingBag, color: 'text-amber-500' },
 ];
 
 const SPANISH_REGIONS = [
   { id: 'ES', label: 'Nacional (España)' },
-  { id: 'ES-AN', label: 'Andalucía' },
-  { id: 'ES-AR', label: 'Aragón' },
-  { id: 'ES-AS', label: 'Asturias' },
-  { id: 'ES-IB', label: 'Islas Baleares' },
-  { id: 'ES-CN', label: 'Canarias' },
-  { id: 'ES-CB', label: 'Cantabria' },
-  { id: 'ES-CL', label: 'Castilla y León' },
-  { id: 'ES-CM', label: 'Castilla-La Mancha' },
   { id: 'ES-CT', label: 'Cataluña' },
-  { id: 'ES-EX', label: 'Extremadura' },
-  { id: 'ES-GA', label: 'Galicia' },
   { id: 'ES-MD', label: 'Madrid' },
-  { id: 'ES-MC', label: 'Murcia' },
-  { id: 'ES-NC', label: 'Navarra' },
-  { id: 'ES-PV', label: 'País Vasco' },
-  { id: 'ES-RI', label: 'La Rioja' },
   { id: 'ES-VC', label: 'Comunidad Valenciana' },
+  { id: 'ES-PV', label: 'País Vasco' },
+  { id: 'ES-AN', label: 'Andalucía' },
 ];
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -58,6 +47,21 @@ const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
+
+// Helper to format date as YYYY-MM-DD using local timezone
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Helper to check if two dates are the same day (ignoring time)
+function isSameDay(date1: Date, date2: Date): boolean {
+  return date1.getFullYear() === date2.getFullYear() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getDate() === date2.getDate();
+}
 
 export function CalendarSidebar({
   selectedDate,
@@ -71,8 +75,25 @@ export function CalendarSidebar({
   onEventCategoriesChange,
   selectedRegion,
   onRegionChange,
+  campaigns = [],
 }: CalendarSidebarProps) {
   const [miniCalendarDate, setMiniCalendarDate] = useState(selectedDate);
+
+  // Get campaigns for a specific date
+  const getCampaignsForDate = (date: Date): CampaignPlatform[] => {
+    const dateStr = formatLocalDate(date);
+    const platformsOnDate = new Set<CampaignPlatform>();
+
+    campaigns.forEach(campaign => {
+      const startDate = campaign.startDate;
+      const endDate = campaign.endDate;
+      if (dateStr >= startDate && dateStr <= endDate) {
+        platformsOnDate.add(campaign.platform);
+      }
+    });
+
+    return Array.from(platformsOnDate);
+  };
   const [expandedSections, setExpandedSections] = useState({
     events: true,
     platforms: true,
@@ -102,11 +123,12 @@ export function CalendarSidebar({
     const prevMonthLastDay = new Date(year, month, 0);
     for (let i = startDay - 1; i >= 0; i--) {
       const date = new Date(year, month - 1, prevMonthLastDay.getDate() - i);
+      date.setHours(0, 0, 0, 0);
       days.push({
         date,
         isCurrentMonth: false,
-        isToday: date.getTime() === today.getTime(),
-        isSelected: date.toDateString() === selectedDate.toDateString(),
+        isToday: isSameDay(date, today),
+        isSelected: isSameDay(date, selectedDate),
         isPast: date < today,
       });
     }
@@ -114,11 +136,12 @@ export function CalendarSidebar({
     // Current month days
     for (let day = 1; day <= lastDay.getDate(); day++) {
       const date = new Date(year, month, day);
+      date.setHours(0, 0, 0, 0);
       days.push({
         date,
         isCurrentMonth: true,
-        isToday: date.getTime() === today.getTime(),
-        isSelected: date.toDateString() === selectedDate.toDateString(),
+        isToday: isSameDay(date, today),
+        isSelected: isSameDay(date, selectedDate),
         isPast: date < today,
       });
     }
@@ -127,11 +150,12 @@ export function CalendarSidebar({
     const remainingDays = 42 - days.length;
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(year, month + 1, day);
+      date.setHours(0, 0, 0, 0);
       days.push({
         date,
         isCurrentMonth: false,
-        isToday: date.getTime() === today.getTime(),
-        isSelected: date.toDateString() === selectedDate.toDateString(),
+        isToday: isSameDay(date, today),
+        isSelected: isSameDay(date, selectedDate),
         isPast: date < today,
       });
     }
@@ -218,23 +242,38 @@ export function CalendarSidebar({
 
           {/* Calendar days */}
           <div className="grid grid-cols-7 gap-0.5">
-            {miniCalendarDays.map((day, index) => (
-              <button
-                key={index}
-                onClick={() => onDateSelect(day.date)}
-                className={cn(
-                  'aspect-square flex items-center justify-center text-xs rounded-full transition-colors',
-                  !day.isCurrentMonth && 'text-gray-400',
-                  day.isCurrentMonth && !day.isPast && 'text-gray-900',
-                  day.isCurrentMonth && day.isPast && 'text-gray-400',
-                  day.isToday && 'bg-gray-900 text-white font-medium',
-                  day.isSelected && !day.isToday && 'bg-primary-100 text-primary-700 font-medium',
-                  !day.isToday && !day.isSelected && 'hover:bg-gray-200'
-                )}
-              >
-                {day.date.getDate()}
-              </button>
-            ))}
+            {miniCalendarDays.map((day, index) => {
+              const platformsOnDay = getCampaignsForDate(day.date);
+              return (
+                <button
+                  key={index}
+                  onClick={() => onDateSelect(day.date)}
+                  className={cn(
+                    'aspect-square flex flex-col items-center justify-center text-xs rounded-full transition-colors relative',
+                    !day.isCurrentMonth && 'text-gray-400',
+                    day.isCurrentMonth && !day.isPast && 'text-gray-900',
+                    day.isCurrentMonth && day.isPast && 'text-gray-400',
+                    day.isToday && 'bg-primary-600 text-white font-medium',
+                    day.isSelected && !day.isToday && 'bg-primary-100 text-primary-700 font-medium',
+                    !day.isToday && !day.isSelected && 'hover:bg-gray-200'
+                  )}
+                >
+                  {day.date.getDate()}
+                  {/* Campaign platform indicators */}
+                  {platformsOnDay.length > 0 && (
+                    <div className="absolute -bottom-0.5 flex gap-0.5">
+                      {platformsOnDay.slice(0, 3).map((platformId) => (
+                        <span
+                          key={platformId}
+                          className="w-1 h-1 rounded-full"
+                          style={{ backgroundColor: PLATFORMS[platformId].color }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -322,10 +361,7 @@ export function CalendarSidebar({
                     onChange={() => togglePlatform(platform.id)}
                     className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
                   />
-                  <div
-                    className="w-3 h-3 rounded-sm"
-                    style={{ backgroundColor: platform.color }}
-                  />
+                  <PlatformLogo platform={platform.id} className="w-5 h-5" />
                   <span className="text-sm text-gray-700">{platform.name}</span>
                 </label>
               ))}

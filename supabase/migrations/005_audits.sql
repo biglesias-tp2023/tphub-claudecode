@@ -3,7 +3,7 @@
 -- ============================================
 
 -- Tabla de tipos de auditoría
-CREATE TABLE public.audit_types (
+CREATE TABLE IF NOT EXISTS public.audit_types (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug TEXT UNIQUE NOT NULL,           -- 'delivery', 'google_ads', 'mystery_shopper'
   name TEXT NOT NULL,                   -- 'Plataformas Delivery'
@@ -17,7 +17,7 @@ CREATE TABLE public.audit_types (
 );
 
 -- Tabla principal de auditorías
-CREATE TABLE public.audits (
+CREATE TABLE IF NOT EXISTS public.audits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Referencia secuencial legible
@@ -53,15 +53,15 @@ CREATE TABLE public.audits (
 );
 
 -- Índices para búsquedas eficientes
-CREATE INDEX idx_audits_company ON public.audits(company_id);
-CREATE INDEX idx_audits_restaurant ON public.audits(restaurant_id);
-CREATE INDEX idx_audits_type ON public.audits(audit_type_id);
-CREATE INDEX idx_audits_status ON public.audits(status);
-CREATE INDEX idx_audits_number ON public.audits(audit_number);
-CREATE INDEX idx_audits_created_at ON public.audits(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audits_company ON public.audits(company_id);
+CREATE INDEX IF NOT EXISTS idx_audits_restaurant ON public.audits(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_audits_type ON public.audits(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_audits_status ON public.audits(status);
+CREATE INDEX IF NOT EXISTS idx_audits_number ON public.audits(audit_number);
+CREATE INDEX IF NOT EXISTS idx_audits_created_at ON public.audits(created_at DESC);
 
 -- Índice para audit_types
-CREATE INDEX idx_audit_types_slug ON public.audit_types(slug);
+CREATE INDEX IF NOT EXISTS idx_audit_types_slug ON public.audit_types(slug);
 
 -- ============================================
 -- FUNCIÓN: Generar número de auditoría
@@ -100,6 +100,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_set_audit_number ON public.audits;
 CREATE TRIGGER trigger_set_audit_number
   BEFORE INSERT ON public.audits
   FOR EACH ROW
@@ -117,11 +118,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_audits_updated_at ON public.audits;
 CREATE TRIGGER trigger_update_audits_updated_at
   BEFORE UPDATE ON public.audits
   FOR EACH ROW
   EXECUTE FUNCTION update_audit_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_update_audit_types_updated_at ON public.audit_types;
 CREATE TRIGGER trigger_update_audit_types_updated_at
   BEFORE UPDATE ON public.audit_types
   FOR EACH ROW
@@ -135,12 +138,14 @@ ALTER TABLE public.audit_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audits ENABLE ROW LEVEL SECURITY;
 
 -- audit_types: lectura pública para usuarios autenticados
+DROP POLICY IF EXISTS "Authenticated users can read audit types" ON public.audit_types;
 CREATE POLICY "Authenticated users can read audit types"
 ON public.audit_types FOR SELECT
 TO authenticated
 USING (is_active = true);
 
 -- audit_types: solo admins pueden modificar
+DROP POLICY IF EXISTS "Only admins can manage audit types" ON public.audit_types;
 CREATE POLICY "Only admins can manage audit types"
 ON public.audit_types FOR ALL
 USING (
@@ -151,6 +156,7 @@ USING (
 );
 
 -- audits: usuarios ven auditorías de sus compañías asignadas
+DROP POLICY IF EXISTS "Users view audits of assigned companies" ON public.audits;
 CREATE POLICY "Users view audits of assigned companies"
 ON public.audits FOR SELECT
 USING (
@@ -170,6 +176,7 @@ USING (
 );
 
 -- audits: admin y consultant pueden crear/modificar
+DROP POLICY IF EXISTS "Admins and consultants can create audits" ON public.audits;
 CREATE POLICY "Admins and consultants can create audits"
 ON public.audits FOR INSERT
 WITH CHECK (
@@ -179,6 +186,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Admins and consultants can update audits" ON public.audits;
 CREATE POLICY "Admins and consultants can update audits"
 ON public.audits FOR UPDATE
 USING (
@@ -188,6 +196,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Admins and consultants can delete audits" ON public.audits;
 CREATE POLICY "Admins and consultants can delete audits"
 ON public.audits FOR DELETE
 USING (
@@ -479,4 +488,5 @@ INSERT INTO public.audit_types (slug, name, description, icon, display_order, fi
       }
     ]
   }'::jsonb
-);
+)
+ON CONFLICT (slug) DO NOTHING;

@@ -41,20 +41,37 @@ async function fetchEventsByMonth(
   month: number,
   countryCode: string = 'ES'
 ): Promise<CalendarEvent[]> {
-  // Calculate first and last day of month
+  // Calculate first and last day of month for the requested year
   const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
   const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
+  // Pad month for string comparison (e.g., "01", "02", ..., "12")
+  const monthStr = String(month).padStart(2, '0');
+
+  // Fetch events: exact date match OR recurring events for this month (any year)
   const { data, error } = await supabase
     .from('calendar_events')
     .select('*')
     .eq('country_code', countryCode)
-    .gte('event_date', startDate)
-    .lte('event_date', endDate)
-    .order('event_date', { ascending: true });
+    .or(`and(event_date.gte.${startDate},event_date.lte.${endDate}),and(is_recurring.eq.true,event_date.like.%-${monthStr}-%)`);
 
   if (error) throw new Error(`Error fetching calendar events: ${error.message}`);
-  return (data as DbCalendarEvent[]).map(mapDbEventToEvent);
+
+  // Map events and adjust dates for recurring events to the requested year
+  return (data as DbCalendarEvent[]).map(db => {
+    const event = mapDbEventToEvent(db);
+
+    // If recurring and from a different year, adjust the date to requested year
+    if (event.isRecurring && event.eventDate) {
+      const eventYear = parseInt(event.eventDate.split('-')[0], 10);
+      if (eventYear !== year) {
+        // Replace year in event date (YYYY-MM-DD)
+        event.eventDate = `${year}-${event.eventDate.slice(5)}`;
+      }
+    }
+
+    return event;
+  }).sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
 }
 
 async function fetchEventsByDateRange(
@@ -62,34 +79,83 @@ async function fetchEventsByDateRange(
   endDate: string,
   countryCode: string = 'ES'
 ): Promise<CalendarEvent[]> {
+  const requestedYear = parseInt(startDate.split('-')[0], 10);
+
+  // Fetch exact matches + all recurring events
   const { data, error } = await supabase
     .from('calendar_events')
     .select('*')
     .eq('country_code', countryCode)
-    .gte('event_date', startDate)
-    .lte('event_date', endDate)
-    .order('event_date', { ascending: true });
+    .or(`and(event_date.gte.${startDate},event_date.lte.${endDate}),is_recurring.eq.true`);
 
   if (error) throw new Error(`Error fetching calendar events: ${error.message}`);
-  return (data as DbCalendarEvent[]).map(mapDbEventToEvent);
+
+  // Map events and filter recurring ones to the date range
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+
+  return (data as DbCalendarEvent[])
+    .map(db => {
+      const event = mapDbEventToEvent(db);
+
+      // Adjust recurring events to requested year
+      if (event.isRecurring && event.eventDate) {
+        const eventYear = parseInt(event.eventDate.split('-')[0], 10);
+        if (eventYear !== requestedYear) {
+          event.eventDate = `${requestedYear}-${event.eventDate.slice(5)}`;
+        }
+      }
+
+      return event;
+    })
+    .filter(event => {
+      // Filter to only include events within the date range
+      if (!event.eventDate) return false;
+      const eventDateObj = new Date(event.eventDate);
+      return eventDateObj >= startDateObj && eventDateObj <= endDateObj;
+    })
+    .sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
 }
 
 async function fetchUpcomingEvents(
   countryCode: string = 'ES',
   limit: number = 5
 ): Promise<CalendarEvent[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const currentYear = today.getFullYear();
 
+  // Fetch upcoming exact matches + all recurring events
   const { data, error } = await supabase
     .from('calendar_events')
     .select('*')
     .eq('country_code', countryCode)
-    .gte('event_date', today)
-    .order('event_date', { ascending: true })
-    .limit(limit);
+    .or(`event_date.gte.${todayStr},is_recurring.eq.true`);
 
   if (error) throw new Error(`Error fetching upcoming events: ${error.message}`);
-  return (data as DbCalendarEvent[]).map(mapDbEventToEvent);
+
+  // Map and adjust recurring events, then filter to upcoming only
+  return (data as DbCalendarEvent[])
+    .map(db => {
+      const event = mapDbEventToEvent(db);
+
+      // Adjust recurring events to current year (or next year if already passed)
+      if (event.isRecurring && event.eventDate) {
+        const monthDay = event.eventDate.slice(5); // MM-DD
+        let adjustedDate = `${currentYear}-${monthDay}`;
+
+        // If the date has already passed this year, use next year
+        if (adjustedDate < todayStr) {
+          adjustedDate = `${currentYear + 1}-${monthDay}`;
+        }
+        event.eventDate = adjustedDate;
+      }
+
+      return event;
+    })
+    .filter(event => event.eventDate && event.eventDate >= todayStr)
+    .sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''))
+    .slice(0, limit);
 }
 
 async function fetchEventsByCategory(

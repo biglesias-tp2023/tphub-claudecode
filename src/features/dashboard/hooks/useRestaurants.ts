@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
 import {
-  fetchRestaurantCoordinates,
-  fetchRestaurantCoordinateById,
+  fetchCrpRestaurants,
+  fetchCrpRestaurantById,
   fetchRestaurantsForMap,
 } from '@/services/crp-portal';
 import { useBrands } from './useBrands';
@@ -12,8 +12,8 @@ import { useAreas } from './useAreas';
 import type { Restaurant, RestaurantWithDetails } from '@/types';
 
 /**
- * Fetches restaurants from tphub_restaurant_coordinates (deduplicated + geocoded).
- * Replaces the old CRP Portal crp_portal__dt_address with deduplicated data.
+ * Fetches restaurants from CRP Portal (crp_portal__dt_address table).
+ * Deduplicates addresses by name to handle multi-portal scenarios.
  *
  * @returns React Query result with restaurants array filtered by selected filters
  *
@@ -46,9 +46,8 @@ export function useRestaurants() {
   return useQuery({
     queryKey: queryKeys.restaurants.list({ brandIds, areaIds, companyIds: effectiveCompanyIds }),
     queryFn: () =>
-      fetchRestaurantCoordinates({
+      fetchCrpRestaurants({
         companyIds: effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined,
-        brandIds: brandIds.length > 0 ? brandIds : undefined,
         areaIds: areaIds.length > 0 ? areaIds : undefined,
       }),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -56,18 +55,18 @@ export function useRestaurants() {
 }
 
 /**
- * Fetches a single restaurant by ID from tphub_restaurant_coordinates.
+ * Fetches a single restaurant by ID from CRP Portal.
  *
- * @param restaurantId - The restaurant coordinate UUID
+ * @param restaurantId - The restaurant ID (pk_id_address as string)
  * @returns React Query result with restaurant object
  *
  * @example
- * const { data: restaurant } = useRestaurant('uuid-here');
+ * const { data: restaurant } = useRestaurant('12345');
  */
 export function useRestaurant(restaurantId: string) {
   return useQuery({
     queryKey: queryKeys.restaurants.detail(restaurantId),
-    queryFn: () => fetchRestaurantCoordinateById(restaurantId),
+    queryFn: () => fetchCrpRestaurantById(restaurantId),
     enabled: !!restaurantId,
   });
 }
@@ -79,7 +78,7 @@ export function useRestaurant(restaurantId: string) {
  * @returns Restaurant object with brandName and areaName, or null if not found
  *
  * @example
- * const restaurant = useRestaurantWithDetails('uuid-here');
+ * const restaurant = useRestaurantWithDetails('12345');
  * // { ...restaurant, brandName: 'VICIO', areaName: 'Madrid' }
  */
 export function useRestaurantWithDetails(restaurantId: string): RestaurantWithDetails | null {
@@ -123,6 +122,7 @@ export function useRestaurantsWithDetails(): RestaurantWithDetails[] {
 
 /**
  * Fetches restaurants with valid coordinates for mapping (geocode_confidence >= 0.5).
+ * Uses the tphub_restaurant_coordinates table for geocoded data.
  * Use this hook for map features that require reliable coordinates.
  *
  * @returns React Query result with restaurants that have high-confidence coordinates

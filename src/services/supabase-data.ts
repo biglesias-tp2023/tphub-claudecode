@@ -82,6 +82,7 @@ function mapDbCompanyToCompany(db: DbCompany): Company {
 function mapDbBrandToBrand(db: DbBrand): Brand {
   return {
     id: db.id,
+    allIds: [db.id],
     externalId: db.external_id,
     companyId: db.company_id,
     name: db.name,
@@ -108,6 +109,7 @@ function mapDbAreaToArea(db: DbArea): Area {
 function mapDbRestaurantToRestaurant(db: DbRestaurant): Restaurant {
   return {
     id: db.id,
+    allIds: [db.id],
     externalId: db.external_id,
     companyId: db.company_id,
     brandId: db.brand_id,

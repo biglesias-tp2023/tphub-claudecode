@@ -1,5 +1,6 @@
 import { Check, Calendar, Tag, Settings, Package } from 'lucide-react';
 import { PLATFORMS, getCampaignTypeConfig } from '../../config/platforms';
+import { PlatformLogo } from './PlatformSelector';
 import type { CampaignPlatform, CampaignConfig } from '@/types';
 
 interface ReviewStepProps {
@@ -56,11 +57,7 @@ export function ReviewStep({
           style={{ backgroundColor: platformConfig.color }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-              <span className="text-lg font-bold">
-                {platformConfig.name.charAt(0)}
-              </span>
-            </div>
+            <PlatformLogo platform={platform} className="w-10 h-10" />
             <div>
               <h4 className="font-semibold">{campaignName || typeConfig?.label || campaignType}</h4>
               <p className="text-sm opacity-90">{platformConfig.name}</p>

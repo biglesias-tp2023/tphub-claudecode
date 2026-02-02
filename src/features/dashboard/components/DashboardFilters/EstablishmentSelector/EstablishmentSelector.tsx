@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Store } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useRestaurants } from '../../../hooks';
+import { useRestaurants, useRestaurantChannels } from '../../../hooks';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import { CheckboxItem } from './CheckboxItem';
 
@@ -14,19 +14,43 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: restaurants = [], isLoading } = useRestaurants();
+  const { data: restaurantChannels } = useRestaurantChannels();
   const {
     restaurantIds,
     setRestaurantIds,
     toggleRestaurantId,
     clearRestaurants,
-    brandIds,
-    areaIds
+    channelIds
   } = useDashboardFiltersStore();
+
+  // Filter restaurants by selected channels
+  const filteredRestaurants = useMemo(() => {
+    if (channelIds.length === 0 || !restaurantChannels) return restaurants;
+
+    return restaurants.filter((restaurant) => {
+      // Check all IDs for this restaurant (multi-portal dedup)
+      return restaurant.allIds.some((id) => {
+        const channels = restaurantChannels.get(id) || [];
+        return channelIds.some((ch) => channels.includes(ch));
+      });
+    });
+  }, [restaurants, restaurantChannels, channelIds]);
+
+  // Auto-clear invalid selections when channel filter changes
+  useEffect(() => {
+    if (restaurantIds.length > 0 && channelIds.length > 0 && restaurantChannels) {
+      const validIds = new Set(filteredRestaurants.map((r) => r.id));
+      const newRestaurantIds = restaurantIds.filter((id) => validIds.has(id));
+      if (newRestaurantIds.length !== restaurantIds.length) {
+        setRestaurantIds(newRestaurantIds);
+      }
+    }
+  }, [filteredRestaurants, restaurantIds, channelIds, restaurantChannels, setRestaurantIds]);
 
   // Sort restaurants alphabetically
   const sortedRestaurants = useMemo(() => {
-    return [...restaurants].sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  }, [restaurants]);
+    return [...filteredRestaurants].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [filteredRestaurants]);
 
   // When restaurantIds is empty, treat as "all selected"
   const isEmptyMeansAll = restaurantIds.length === 0;
@@ -62,9 +86,8 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
     }
   };
 
-  // Disable if no brands or areas selected and no restaurants available
-  const isDisabled = (brandIds.length === 0 && areaIds.length === 0) &&
-    sortedRestaurants.length === 0 && !isLoading;
+  // Only disable if there are truly no restaurants to show (and not loading)
+  const isDisabled = restaurants.length === 0 && !isLoading;
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>

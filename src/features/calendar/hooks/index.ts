@@ -28,3 +28,4 @@
 export * from './useCampaigns';
 export * from './useCalendarEvents';
 export * from './useWeather';
+export * from './useProducts';

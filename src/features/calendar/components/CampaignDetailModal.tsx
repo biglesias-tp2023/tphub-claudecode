@@ -1,6 +1,7 @@
-import { X, Clock, Calendar, Package, Target, Plus, Pencil, Flag, Trophy, Tv, ShoppingBag, MapPin, Users, type LucideIcon } from 'lucide-react';
+import { X, Clock, Calendar, Package, Target, Plus, Pencil, Trash2, Flag, Trophy, Tv, ShoppingBag, MapPin, Users, type LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { PLATFORMS, getCampaignTypeConfig } from '../config/platforms';
+import { PlatformLogo } from './CampaignEditor';
 import type { PromotionalCampaign, CalendarEvent, EventCategory } from '@/types';
 
 interface CampaignDetailModalProps {
@@ -11,6 +12,7 @@ interface CampaignDetailModalProps {
   events: CalendarEvent[];
   onAddCampaign: () => void;
   onEditCampaign?: (campaign: PromotionalCampaign) => void;
+  onDeleteCampaign?: (campaign: PromotionalCampaign) => void;
 }
 
 // Event category config
@@ -29,6 +31,7 @@ export function CampaignDetailModal({
   events,
   onAddCampaign,
   onEditCampaign,
+  onDeleteCampaign,
 }: CampaignDetailModalProps) {
   if (!isOpen || !date) return null;
 
@@ -158,9 +161,7 @@ export function CampaignDetailModal({
                           style={{ backgroundColor: platformConfig.color }}
                         >
                           <div className="flex items-center gap-2 text-white">
-                            <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
-                              {platformConfig.name.charAt(0)}
-                            </span>
+                            <PlatformLogo platform={campaign.platform} className="w-6 h-6" />
                             <div>
                               <p className="font-medium text-sm">
                                 {campaign.name || typeConfig?.label || campaign.campaignType}
@@ -168,15 +169,34 @@ export function CampaignDetailModal({
                               <p className="text-xs opacity-80">{platformConfig.name}</p>
                             </div>
                           </div>
-                          {onEditCampaign && (
-                            <button
-                              onClick={() => onEditCampaign(campaign)}
-                              className="p-1.5 hover:bg-white/20 rounded transition-colors"
-                              title="Editar campaña"
-                            >
-                              <Pencil className="w-4 h-4 text-white" />
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {onEditCampaign && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditCampaign(campaign);
+                                }}
+                                className="p-1.5 hover:bg-white/20 rounded transition-colors"
+                                title="Editar campaña"
+                              >
+                                <Pencil className="w-4 h-4 text-white" />
+                              </button>
+                            )}
+                            {onDeleteCampaign && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('¿Estás seguro de que quieres eliminar esta campaña?')) {
+                                    onDeleteCampaign(campaign);
+                                  }
+                                }}
+                                className="p-1.5 hover:bg-white/20 rounded transition-colors"
+                                title="Eliminar campaña"
+                              >
+                                <Trash2 className="w-4 h-4 text-white" />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Campaign details */}
@@ -265,7 +285,7 @@ export function CampaignDetailModal({
                 <p className="text-gray-500 mb-4">No hay campañas ni eventos para este día</p>
                 <button
                   onClick={onAddCampaign}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Crear campaña
@@ -279,7 +299,7 @@ export function CampaignDetailModal({
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
               <button
                 onClick={onAddCampaign}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
               >
                 <Plus className="w-4 h-4" />
                 Añadir campaña

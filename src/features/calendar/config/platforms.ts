@@ -19,6 +19,7 @@ export interface PlatformConfig {
   bgColor: string;
   borderColor: string;
   icon: string;
+  logoUrl?: string;
 }
 
 export const PLATFORMS: Record<CampaignPlatform, PlatformConfig> = {
@@ -29,6 +30,7 @@ export const PLATFORMS: Record<CampaignPlatform, PlatformConfig> = {
     bgColor: 'bg-amber-100',
     borderColor: 'border-amber-400',
     icon: 'glovo',
+    logoUrl: '/images/platforms/glovo.png',
   },
   ubereats: {
     id: 'ubereats',
@@ -37,6 +39,7 @@ export const PLATFORMS: Record<CampaignPlatform, PlatformConfig> = {
     bgColor: 'bg-green-100',
     borderColor: 'border-green-500',
     icon: 'ubereats',
+    logoUrl: '/images/platforms/ubereats.png',
   },
   justeat: {
     id: 'justeat',
@@ -45,6 +48,7 @@ export const PLATFORMS: Record<CampaignPlatform, PlatformConfig> = {
     bgColor: 'bg-orange-100',
     borderColor: 'border-orange-500',
     icon: 'justeat',
+    logoUrl: '/images/platforms/justeat.webp',
   },
   google_ads: {
     id: 'google_ads',
@@ -53,6 +57,7 @@ export const PLATFORMS: Record<CampaignPlatform, PlatformConfig> = {
     bgColor: 'bg-blue-100',
     borderColor: 'border-blue-500',
     icon: 'google',
+    logoUrl: '/images/platforms/google-ads.webp',
   },
 };
 
@@ -72,7 +77,7 @@ export interface CampaignTypeConfig {
 export interface CampaignFieldConfig {
   key: string;
   label: string;
-  type: 'number' | 'percent' | 'currency' | 'text' | 'product' | 'products' | 'time' | 'keywords';
+  type: 'number' | 'percent' | 'currency' | 'text' | 'product' | 'products' | 'time' | 'keywords' | 'target_customers';
   required?: boolean;
   min?: number;
   max?: number;
@@ -88,13 +93,11 @@ export const GLOVO_PROMOTION_TYPES: Record<GlovoPromotionType, CampaignTypeConfi
   flash_offer: {
     id: 'flash_offer',
     label: 'Oferta Flash',
-    description: 'Descuento por tiempo limitado',
+    description: '30% de descuento para nuevos clientes',
     icon: 'Zap',
     isPromotion: true,
     fields: [
-      { key: 'discountPercent', label: 'Descuento', type: 'percent', required: true, min: 5, max: 50 },
-      { key: 'duration', label: 'Duracion', type: 'number', required: true, min: 30, max: 180, suffix: 'min' },
-      { key: 'startTime', label: 'Hora inicio', type: 'time', required: true },
+      { key: 'targetNewCustomers', label: 'Target nuevos clientes/dia', type: 'target_customers', required: true, min: 3, max: 15 },
     ],
   },
   menu_discount: {
@@ -105,6 +108,7 @@ export const GLOVO_PROMOTION_TYPES: Record<GlovoPromotionType, CampaignTypeConfi
     isPromotion: true,
     fields: [
       { key: 'discountPercent', label: 'Descuento', type: 'percent', required: true, min: 5, max: 30 },
+      { key: 'minimumOrder', label: 'Pedido minimo', type: 'currency', min: 0, placeholder: '0 = sin minimo' },
     ],
   },
   selected_products: {

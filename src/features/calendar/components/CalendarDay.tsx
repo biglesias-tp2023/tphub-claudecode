@@ -96,7 +96,7 @@ export function CalendarDay({
               // Not current month
               !isCurrentMonth && !isPast && 'text-gray-400',
               // Today
-              isToday && 'bg-gray-900 text-white',
+              isToday && 'bg-primary-600 text-white',
               // Current month, not past, not today
               isCurrentMonth && !isPast && !isToday && 'text-gray-900',
             )}

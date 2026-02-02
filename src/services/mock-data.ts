@@ -70,6 +70,7 @@ export const mockBrands: Brand[] = [
   // Restalia brands
   {
     id: 'brand-001',
+    allIds: ['brand-001'],
     externalId: 101,
     companyId: 'company-001',
     name: '100 Montaditos',
@@ -81,6 +82,7 @@ export const mockBrands: Brand[] = [
   },
   {
     id: 'brand-002',
+    allIds: ['brand-002'],
     externalId: 102,
     companyId: 'company-001',
     name: 'Cervecería La Sureña',
@@ -92,6 +94,7 @@ export const mockBrands: Brand[] = [
   },
   {
     id: 'brand-003',
+    allIds: ['brand-003'],
     externalId: 103,
     companyId: 'company-001',
     name: 'The Good Burger',
@@ -104,6 +107,7 @@ export const mockBrands: Brand[] = [
   // Foodbox brands
   {
     id: 'brand-004',
+    allIds: ['brand-004'],
     externalId: 201,
     companyId: 'company-002',
     name: 'Foodbox Kitchen',
@@ -116,6 +120,7 @@ export const mockBrands: Brand[] = [
   // La Tagliatella
   {
     id: 'brand-005',
+    allIds: ['brand-005'],
     externalId: 301,
     companyId: 'company-003',
     name: 'La Tagliatella',
@@ -128,6 +133,7 @@ export const mockBrands: Brand[] = [
   // Goiko
   {
     id: 'brand-006',
+    allIds: ['brand-006'],
     externalId: 401,
     companyId: 'company-004',
     name: 'Goiko',
@@ -140,6 +146,7 @@ export const mockBrands: Brand[] = [
   // Lateral
   {
     id: 'brand-007',
+    allIds: ['brand-007'],
     externalId: 501,
     companyId: 'company-005',
     name: 'Lateral',
@@ -200,6 +207,7 @@ export const mockRestaurants: Restaurant[] = [
   // 100 Montaditos - Madrid
   {
     id: 'rest-001',
+    allIds: ['rest-001'],
     externalId: 1001,
     companyId: 'company-001',
     brandId: 'brand-001',
@@ -216,6 +224,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-002',
+    allIds: ['rest-002'],
     externalId: 1002,
     companyId: 'company-001',
     brandId: 'brand-001',
@@ -232,6 +241,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-003',
+    allIds: ['rest-003'],
     externalId: 1003,
     companyId: 'company-001',
     brandId: 'brand-001',
@@ -249,6 +259,7 @@ export const mockRestaurants: Restaurant[] = [
   // 100 Montaditos - Barcelona
   {
     id: 'rest-004',
+    allIds: ['rest-004'],
     externalId: 1004,
     companyId: 'company-001',
     brandId: 'brand-001',
@@ -265,6 +276,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-004b',
+    allIds: ['rest-004b'],
     externalId: 1005,
     companyId: 'company-001',
     brandId: 'brand-001',
@@ -282,6 +294,7 @@ export const mockRestaurants: Restaurant[] = [
   // 100 Montaditos - Valencia
   {
     id: 'rest-004c',
+    allIds: ['rest-004c'],
     externalId: 1006,
     companyId: 'company-001',
     brandId: 'brand-001',
@@ -299,6 +312,7 @@ export const mockRestaurants: Restaurant[] = [
   // The Good Burger - Madrid
   {
     id: 'rest-005',
+    allIds: ['rest-005'],
     externalId: 2001,
     companyId: 'company-001',
     brandId: 'brand-003',
@@ -316,6 +330,7 @@ export const mockRestaurants: Restaurant[] = [
   // The Good Burger - Barcelona
   {
     id: 'rest-005b',
+    allIds: ['rest-005b'],
     externalId: 2002,
     companyId: 'company-001',
     brandId: 'brand-003',
@@ -333,6 +348,7 @@ export const mockRestaurants: Restaurant[] = [
   // Goiko - Madrid
   {
     id: 'rest-006',
+    allIds: ['rest-006'],
     externalId: 3001,
     companyId: 'company-004',
     brandId: 'brand-006',
@@ -349,6 +365,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-006b',
+    allIds: ['rest-006b'],
     externalId: 3003,
     companyId: 'company-004',
     brandId: 'brand-006',
@@ -366,6 +383,7 @@ export const mockRestaurants: Restaurant[] = [
   // Goiko - Barcelona
   {
     id: 'rest-007',
+    allIds: ['rest-007'],
     externalId: 3002,
     companyId: 'company-004',
     brandId: 'brand-006',
@@ -382,6 +400,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-007b',
+    allIds: ['rest-007b'],
     externalId: 3004,
     companyId: 'company-004',
     brandId: 'brand-006',
@@ -399,6 +418,7 @@ export const mockRestaurants: Restaurant[] = [
   // La Tagliatella - Madrid
   {
     id: 'rest-008',
+    allIds: ['rest-008'],
     externalId: 4001,
     companyId: 'company-003',
     brandId: 'brand-005',
@@ -415,6 +435,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-008b',
+    allIds: ['rest-008b'],
     externalId: 4002,
     companyId: 'company-003',
     brandId: 'brand-005',
@@ -432,6 +453,7 @@ export const mockRestaurants: Restaurant[] = [
   // La Tagliatella - Barcelona
   {
     id: 'rest-008c',
+    allIds: ['rest-008c'],
     externalId: 4003,
     companyId: 'company-003',
     brandId: 'brand-005',
@@ -448,6 +470,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-008d',
+    allIds: ['rest-008d'],
     externalId: 4004,
     companyId: 'company-003',
     brandId: 'brand-005',
@@ -465,6 +488,7 @@ export const mockRestaurants: Restaurant[] = [
   // La Tagliatella - Valencia
   {
     id: 'rest-008e',
+    allIds: ['rest-008e'],
     externalId: 4005,
     companyId: 'company-003',
     brandId: 'brand-005',
@@ -482,6 +506,7 @@ export const mockRestaurants: Restaurant[] = [
   // Lateral - Madrid
   {
     id: 'rest-009',
+    allIds: ['rest-009'],
     externalId: 5001,
     companyId: 'company-005',
     brandId: 'brand-007',
@@ -498,6 +523,7 @@ export const mockRestaurants: Restaurant[] = [
   },
   {
     id: 'rest-009b',
+    allIds: ['rest-009b'],
     externalId: 5002,
     companyId: 'company-005',
     brandId: 'brand-007',
@@ -515,6 +541,7 @@ export const mockRestaurants: Restaurant[] = [
   // Foodbox - Madrid
   {
     id: 'rest-010',
+    allIds: ['rest-010'],
     externalId: 6001,
     companyId: 'company-002',
     brandId: 'brand-004',
@@ -532,6 +559,7 @@ export const mockRestaurants: Restaurant[] = [
   // Foodbox - Barcelona
   {
     id: 'rest-010b',
+    allIds: ['rest-010b'],
     externalId: 6002,
     companyId: 'company-002',
     brandId: 'brand-004',

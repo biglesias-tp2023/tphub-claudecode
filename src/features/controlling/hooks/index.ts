@@ -8,3 +8,5 @@ export type {
 
 export { useOrdersData } from './useOrdersData';
 export type { UseOrdersDataParams, OrdersDataResult } from './useOrdersData';
+
+export { useHierarchyData } from './useHierarchyData';
