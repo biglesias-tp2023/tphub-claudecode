@@ -829,6 +829,7 @@ export function StrategicPage() {
         onDelete={handleDeleteObjective}
         objective={selectedObjective}
         defaultCompanyId={companyIds[0]}
+        defaultCategory={selectedCategory !== 'all' ? selectedCategory : undefined}
         isLoading={createObjective.isPending || updateObjective.isPending}
         isDeleting={deleteObjective.isPending}
       />

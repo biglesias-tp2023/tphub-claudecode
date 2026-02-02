@@ -37,6 +37,7 @@ interface StrategicObjectiveEditorProps {
   onDelete?: () => Promise<void>;
   objective?: StrategicObjective;
   defaultCompanyId?: string;
+  defaultCategory?: ObjectiveCategory;
   isLoading?: boolean;
   isDeleting?: boolean;
 }
@@ -383,6 +384,7 @@ export function StrategicObjectiveEditor({
   onDelete,
   objective,
   defaultCompanyId,
+  defaultCategory: propDefaultCategory,
   isLoading = false,
   isDeleting = false,
 }: StrategicObjectiveEditorProps) {
@@ -390,7 +392,7 @@ export function StrategicObjectiveEditor({
 
   // Default form data
   const getDefaultData = (): FormData => {
-    const defaultCategory: ObjectiveCategory = (objective?.category as ObjectiveCategory) || 'finanzas';
+    const defaultCategory: ObjectiveCategory = (objective?.category as ObjectiveCategory) || propDefaultCategory || 'finanzas';
     const defaultType = getDefaultObjectiveType(defaultCategory);
 
     return {
