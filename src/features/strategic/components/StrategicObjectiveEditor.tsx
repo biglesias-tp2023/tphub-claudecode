@@ -53,6 +53,48 @@ interface FormData {
   responsible: ObjectiveResponsible;
   deadline: string; // YYYY-MM-DD
   fieldData: ObjectiveFieldData;
+  // KPI fields
+  linkedKpiId: string | null;
+  kpiTargetValue: number | null;
+}
+
+// ============================================
+// KPI CONFIGURATION
+// ============================================
+
+interface KpiConfig {
+  id: string;
+  label: string;
+  unit: string;
+  description: string;
+  category: ObjectiveCategory[];
+}
+
+const AVAILABLE_KPIS: KpiConfig[] = [
+  // Finanzas
+  { id: 'revenue', label: 'Ventas', unit: '€', description: 'Facturación total', category: ['finanzas'] },
+  { id: 'orders', label: 'Pedidos', unit: '', description: 'Número de pedidos', category: ['finanzas', 'operaciones'] },
+  { id: 'avg_ticket', label: 'Ticket Medio', unit: '€', description: 'Valor medio por pedido', category: ['finanzas'] },
+  { id: 'net_revenue', label: 'Ventas Netas', unit: '€', description: 'Ventas - Reembolsos', category: ['finanzas'] },
+  // Clientes
+  { id: 'new_customers', label: 'Clientes Nuevos', unit: '', description: 'Nuevos clientes en el periodo', category: ['clientes'] },
+  { id: 'new_customers_pct', label: '% Clientes Nuevos', unit: '%', description: 'Porcentaje de nuevos vs total', category: ['clientes'] },
+  { id: 'unique_customers', label: 'Clientes Únicos', unit: '', description: 'Clientes únicos en el periodo', category: ['clientes'] },
+  { id: 'orders_per_customer', label: 'Pedidos/Cliente', unit: '', description: 'Frecuencia de compra', category: ['clientes'] },
+  // Operaciones
+  { id: 'refund_rate', label: '% Reembolsos', unit: '%', description: 'Tasa de reembolsos', category: ['operaciones'] },
+  { id: 'promo_rate', label: '% Promociones', unit: '%', description: 'Tasa de descuentos', category: ['operaciones', 'finanzas'] },
+  // Reputación
+  { id: 'rating', label: 'Valoración', unit: '⭐', description: 'Rating medio', category: ['reputacion'] },
+  { id: 'reviews_count', label: 'Nº Reseñas', unit: '', description: 'Cantidad de reseñas', category: ['reputacion'] },
+];
+
+function getKpisForCategory(category: ObjectiveCategory): KpiConfig[] {
+  return AVAILABLE_KPIS.filter((kpi) => kpi.category.includes(category));
+}
+
+function getKpiConfig(kpiId: string): KpiConfig | undefined {
+  return AVAILABLE_KPIS.find((kpi) => kpi.id === kpiId);
 }
 
 // ============================================
@@ -145,6 +187,8 @@ function ObjectiveForm({
       objectiveTypeId: defaultType?.id || '',
       responsible: defaultResponsible,
       fieldData: {}, // Reset field data
+      linkedKpiId: null, // Reset KPI when category changes
+      kpiTargetValue: null,
     }));
   };
 
@@ -236,6 +280,59 @@ function ObjectiveForm({
           onChange={(e) => handleTypeChange(e.target.value)}
           options={objectiveTypes.map((t) => ({ value: t.id, label: t.label }))}
         />
+
+        {/* KPI selector - show KPIs relevant to category */}
+        {getKpisForCategory(formData.category).length > 0 && (
+          <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                Vincular a KPI (opcional)
+              </label>
+              {formData.linkedKpiId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateField('linkedKpiId', null);
+                    updateField('kpiTargetValue', null);
+                  }}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Quitar
+                </button>
+              )}
+            </div>
+            <Select
+              value={formData.linkedKpiId || ''}
+              onChange={(e) => {
+                updateField('linkedKpiId', e.target.value || null);
+                if (!e.target.value) updateField('kpiTargetValue', null);
+              }}
+              options={[
+                { value: '', label: 'Sin vincular a KPI' },
+                ...getKpisForCategory(formData.category).map((kpi) => ({
+                  value: kpi.id,
+                  label: `${kpi.label}${kpi.unit ? ` (${kpi.unit})` : ''}`,
+                })),
+              ]}
+            />
+            {formData.linkedKpiId && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Objetivo a alcanzar ({getKpiConfig(formData.linkedKpiId)?.unit || ''})
+                </label>
+                <Input
+                  type="number"
+                  value={formData.kpiTargetValue?.toString() || ''}
+                  onChange={(e) => updateField('kpiTargetValue', e.target.value ? Number(e.target.value) : null)}
+                  placeholder={`Ej: ${formData.linkedKpiId === 'revenue' ? '50000' : formData.linkedKpiId === 'rating' ? '4.5' : '100'}`}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  {getKpiConfig(formData.linkedKpiId)?.description}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dynamic field based on objective type */}
         {currentTypeConfig && (
@@ -406,12 +503,17 @@ export function StrategicObjectiveEditor({
       responsible: (objective?.responsible as ObjectiveResponsible) || defaultType?.defaultResponsible || 'thinkpaladar',
       deadline: objective?.evaluationDate ? objective.evaluationDate.split('T')[0] : '',
       fieldData: objective?.fieldData || {},
+      linkedKpiId: objective?.kpiType || null,
+      kpiTargetValue: objective?.kpiTargetValue || null,
     };
   };
 
   // Handle form save
   const handleFormSave = async (formData: FormData, calculatedHorizon: ObjectiveHorizon) => {
     if (!formData.companyId) return;
+
+    // Get KPI config for unit
+    const kpiConfig = formData.linkedKpiId ? getKpiConfig(formData.linkedKpiId) : undefined;
 
     const input: StrategicObjectiveInput = {
       companyId: formData.companyId,
@@ -426,6 +528,10 @@ export function StrategicObjectiveEditor({
       responsible: formData.responsible,
       fieldData: formData.fieldData,
       evaluationDate: formData.deadline || undefined,
+      // KPI fields
+      kpiType: formData.linkedKpiId || undefined,
+      kpiTargetValue: formData.kpiTargetValue || undefined,
+      kpiUnit: kpiConfig?.unit || undefined,
     };
 
     await onSave(input);
