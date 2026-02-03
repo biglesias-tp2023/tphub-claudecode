@@ -11,7 +11,6 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import {
   fetchShareLinkByObjectiveId,
   fetchShareLinkByToken,
@@ -78,11 +77,9 @@ export function useCreateShareLink() {
     mutationFn: (params: CreateShareLinkParams) => createShareLink(params),
     onSuccess: (data) => {
       queryClient.setQueryData(shareLinkKeys.byObjective(data.objectiveId), data);
-      toast.success('Enlace de compartir creado');
     },
     onError: (error: Error) => {
       console.error('Error creating share link:', error);
-      toast.error('Error al crear el enlace');
     },
   });
 }
@@ -98,11 +95,9 @@ export function useUpdateShareLink() {
       updateShareLink(id, params),
     onSuccess: (data) => {
       queryClient.setQueryData(shareLinkKeys.byObjective(data.objectiveId), data);
-      toast.success('Enlace actualizado');
     },
     onError: (error: Error) => {
       console.error('Error updating share link:', error);
-      toast.error('Error al actualizar el enlace');
     },
   });
 }
@@ -118,11 +113,9 @@ export function useDeleteShareLink() {
       deleteShareLink(id).then(() => objectiveId),
     onSuccess: (objectiveId) => {
       queryClient.setQueryData(shareLinkKeys.byObjective(objectiveId), null);
-      toast.success('Enlace eliminado');
     },
     onError: (error: Error) => {
       console.error('Error deleting share link:', error);
-      toast.error('Error al eliminar el enlace');
     },
   });
 }
@@ -137,11 +130,9 @@ export function useRegenerateToken() {
     mutationFn: (id: string) => regenerateShareLinkToken(id),
     onSuccess: (data) => {
       queryClient.setQueryData(shareLinkKeys.byObjective(data.objectiveId), data);
-      toast.success('Token regenerado');
     },
     onError: (error: Error) => {
       console.error('Error regenerating token:', error);
-      toast.error('Error al regenerar el token');
     },
   });
 }
@@ -219,10 +210,9 @@ export function useShareLinkManager(objectiveId: string | undefined) {
     try {
       const url = getShareLinkUrl(shareLink.token);
       await navigator.clipboard.writeText(url);
-      toast.success('Enlace copiado al portapapeles');
       return true;
     } catch {
-      toast.error('Error al copiar el enlace');
+      console.error('Error copying to clipboard');
       return false;
     }
   };

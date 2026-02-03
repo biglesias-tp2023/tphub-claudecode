@@ -47,6 +47,7 @@ import type {
   ObjectiveStatus,
   ObjectiveCategory,
   ObjectiveResponsible,
+  ObjectivePriority,
   DbCompany,
   DbBrand,
   DbArea,
@@ -691,6 +692,20 @@ export async function deleteRestaurantObjective(id: string): Promise<void> {
 // STRATEGIC OBJECTIVES (OKRs)
 // ============================================
 
+// Priority mapping: DB uses integers, TypeScript uses strings
+const PRIORITY_DB_TO_TS: Record<number, ObjectivePriority> = {
+  1: 'high',
+  2: 'medium',
+  3: 'low',
+};
+
+const PRIORITY_TS_TO_DB: Record<ObjectivePriority, number> = {
+  critical: 1,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
 function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObjective {
   // Parse fieldData from JSON string
   let fieldData = null;
@@ -722,8 +737,8 @@ function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObjective {
     baselineValue: db.baseline_value,
     baselineDate: db.baseline_date,
     targetDirection: (db.target_direction as 'increase' | 'decrease' | 'maintain') || 'increase',
-    // Priority and archiving
-    priority: (db.priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
+    // Priority and archiving (DB integer → TS string)
+    priority: PRIORITY_DB_TO_TS[db.priority as number] || 'medium',
     isArchived: db.is_archived || false,
     fieldData,
     evaluationDate: db.evaluation_date,
@@ -885,8 +900,8 @@ export async function createStrategicObjective(
     baseline_value: input.baselineValue || null,
     baseline_date: input.baselineDate || new Date().toISOString().split('T')[0],
     target_direction: input.targetDirection || 'increase',
-    // Priority and archiving
-    priority: input.priority || 'medium',
+    // Priority and archiving (TS string → DB integer)
+    priority: PRIORITY_TS_TO_DB[input.priority || 'medium'] || 2,
     is_archived: input.isArchived || false,
     field_data: input.fieldData ? JSON.stringify(input.fieldData) : null,
     evaluation_date: input.evaluationDate || null,
@@ -974,8 +989,8 @@ export async function updateStrategicObjective(
   if (updates.baselineValue !== undefined) dbUpdates.baseline_value = updates.baselineValue;
   if (updates.baselineDate !== undefined) dbUpdates.baseline_date = updates.baselineDate;
   if (updates.targetDirection !== undefined) dbUpdates.target_direction = updates.targetDirection;
-  // Priority and archiving
-  if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+  // Priority and archiving (TS string → DB integer)
+  if (updates.priority !== undefined) dbUpdates.priority = PRIORITY_TS_TO_DB[updates.priority] || 2;
   if (updates.isArchived !== undefined) dbUpdates.is_archived = updates.isArchived;
   if (updates.evaluationDate !== undefined) dbUpdates.evaluation_date = updates.evaluationDate;
   if (updates.displayOrder !== undefined) dbUpdates.display_order = updates.displayOrder;

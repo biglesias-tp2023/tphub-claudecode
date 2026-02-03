@@ -11,7 +11,7 @@
  * - Enable/disable sharing
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from './supabase';
 import type { ObjectiveShareLink } from '@/types';
 
 // ============================================
