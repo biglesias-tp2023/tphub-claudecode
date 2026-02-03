@@ -518,6 +518,18 @@ export interface ObjectiveRowData {
 export type ObjectiveHorizon = 'short' | 'medium' | 'long';
 export type ObjectiveStatus = 'pending' | 'in_progress' | 'completed';
 
+// Health status for objective progress tracking
+export type HealthStatus = 'on_track' | 'at_risk' | 'off_track' | 'completed' | 'exceeded';
+
+// Direction for KPI targets
+export type TargetDirection = 'increase' | 'decrease' | 'maintain';
+
+// Trend direction for velocity
+export type TrendDirection = 'up' | 'down' | 'stable';
+
+// Priority levels
+export type ObjectivePriority = 'low' | 'medium' | 'high' | 'critical';
+
 // 7 Categorías de objetivos
 export type ObjectiveCategory =
   | 'finanzas'
@@ -744,11 +756,18 @@ export interface StrategicObjective {
   horizon: ObjectiveHorizon;
   status: ObjectiveStatus;
   responsible: ObjectiveResponsible;
-  // KPI fields (legacy, mantener compatibilidad)
+  // KPI fields
   kpiType: string | null;
   kpiCurrentValue: number | null;
   kpiTargetValue: number | null;
   kpiUnit: string | null;
+  // Progress tracking fields (new)
+  baselineValue: number | null;         // Starting point value
+  baselineDate: string | null;          // When baseline was captured
+  targetDirection: TargetDirection;     // increase | decrease | maintain
+  // Priority and archiving
+  priority: ObjectivePriority;          // low | medium | high | critical
+  isArchived: boolean;                  // Soft delete / hide from main view
   // Dynamic field data (JSON stored in DB)
   fieldData: ObjectiveFieldData | null;
   evaluationDate: string | null;
@@ -774,11 +793,18 @@ export interface StrategicObjectiveInput {
   horizon: ObjectiveHorizon;
   status?: ObjectiveStatus;
   responsible?: ObjectiveResponsible;
-  // KPI fields (legacy)
+  // KPI fields
   kpiType?: string;
   kpiCurrentValue?: number;
   kpiTargetValue?: number;
   kpiUnit?: string;
+  // Progress tracking fields
+  baselineValue?: number;
+  baselineDate?: string;
+  targetDirection?: TargetDirection;
+  // Priority and archiving
+  priority?: ObjectivePriority;
+  isArchived?: boolean;
   // Dynamic field data
   fieldData?: ObjectiveFieldData;
   evaluationDate?: string;
@@ -804,6 +830,14 @@ export interface DbStrategicObjective {
   kpi_current_value: number | null;
   kpi_target_value: number | null;
   kpi_unit: string | null;
+  // Progress tracking fields
+  baseline_value: number | null;
+  baseline_date: string | null;
+  target_direction: string;
+  // Priority and archiving
+  priority: string;
+  is_archived: boolean;
+  // Other fields
   field_data: string | null;            // JSON string
   evaluation_date: string | null;
   completed_at: string | null;
@@ -812,6 +846,146 @@ export interface DbStrategicObjective {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================
+// OBJECTIVE SNAPSHOTS (Historical Progress)
+// ============================================
+
+/**
+ * Snapshot of objective progress at a point in time
+ * Used for tracking velocity and projections
+ */
+export interface ObjectiveSnapshot {
+  id: string;
+  objectiveId: string;
+  snapshotDate: string;               // Date when snapshot was taken
+  kpiValue: number;                   // KPI value at snapshot time
+  progressPercentage: number;         // Progress % at snapshot time
+  daysRemaining: number;              // Days until deadline
+  velocity: number | null;            // Change per day (calculated)
+  projectedValue: number | null;      // Projected final value
+  healthStatus: HealthStatus;         // Status at snapshot time
+  createdAt: string;
+}
+
+export interface DbObjectiveSnapshot {
+  id: string;
+  objective_id: string;
+  snapshot_date: string;
+  kpi_value: number;
+  progress_percentage: number;
+  days_remaining: number;
+  velocity: number | null;
+  projected_value: number | null;
+  health_status: string;
+  created_at: string;
+}
+
+// ============================================
+// OBJECTIVE SHARE LINKS
+// ============================================
+
+/**
+ * Share link for clients to view objectives
+ */
+export interface ObjectiveShareLink {
+  id: string;
+  companyId: string;                  // Company whose objectives are shared
+  token: string;                      // Unique URL token
+  name: string | null;                // Optional name for the link
+  // Permissions
+  canViewObjectives: boolean;
+  canViewTasks: boolean;
+  canViewKpiValues: boolean;
+  canViewProjections: boolean;
+  allowedCategories: ObjectiveCategory[] | null;  // null = all categories
+  // Access limits
+  maxViews: number | null;            // null = unlimited
+  currentViews: number;
+  expiresAt: string | null;           // null = never expires
+  password: string | null;            // Optional password protection
+  // Status
+  isActive: boolean;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DbObjectiveShareLink {
+  id: string;
+  company_id: string;
+  token: string;
+  name: string | null;
+  can_view_objectives: boolean;
+  can_view_tasks: boolean;
+  can_view_kpi_values: boolean;
+  can_view_projections: boolean;
+  allowed_categories: string[] | null;
+  max_views: number | null;
+  current_views: number;
+  expires_at: string | null;
+  password: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Record of share link views
+ */
+export interface ShareLinkView {
+  id: string;
+  shareLinkId: string;
+  viewedAt: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
+export interface DbShareLinkView {
+  id: string;
+  share_link_id: string;
+  viewed_at: string;
+  ip_address: string | null;
+  user_agent: string | null;
+}
+
+// ============================================
+// OBJECTIVE PROGRESS (Calculated, not stored)
+// ============================================
+
+/**
+ * Calculated progress data for an objective
+ * This is computed by useObjectiveProgress hook, not stored in DB
+ */
+export interface ObjectiveProgressData {
+  /** Current KPI value from real-time data */
+  currentValue: number | null;
+  /** Progress percentage (0-100+) */
+  progressPercentage: number | null;
+  /** Expected progress based on time elapsed */
+  expectedProgress: number | null;
+  /** Health status based on actual vs expected progress */
+  healthStatus: HealthStatus;
+  /** Change per day based on historical snapshots */
+  velocity: number | null;
+  /** Projected final value at current velocity */
+  projectedValue: number | null;
+  /** Whether objective will be met at current pace */
+  willComplete: boolean;
+  /** Trend direction based on recent velocity */
+  trend: TrendDirection;
+  /** Days elapsed since baseline */
+  daysElapsed: number;
+  /** Days remaining until deadline */
+  daysRemaining: number;
+  /** Total days from baseline to deadline */
+  totalDays: number;
+  /** Month label for current data (e.g., "Enero 2026") */
+  monthLabel: string;
+  /** Is data loading */
+  isLoading: boolean;
 }
 
 // ============================================

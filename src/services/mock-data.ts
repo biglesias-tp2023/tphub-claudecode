@@ -636,11 +636,21 @@ const OBJECTIVE_COUNTER_KEY = 'tphub_mock_obj_counter';
 const TASK_COUNTER_KEY = 'tphub_mock_task_counter';
 
 // Load from localStorage or initialize empty
+// Adds default values for new fields (migration for existing data)
 function loadMockObjectives(): StrategicObjective[] {
   try {
     const stored = localStorage.getItem(OBJECTIVES_STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as StrategicObjective[];
+      // Add default values for new fields if missing (migration)
+      return parsed.map((obj) => ({
+        ...obj,
+        baselineValue: obj.baselineValue ?? null,
+        baselineDate: obj.baselineDate ?? obj.createdAt?.split('T')[0] ?? null,
+        targetDirection: obj.targetDirection ?? 'increase',
+        priority: obj.priority ?? 'medium',
+        isArchived: obj.isArchived ?? false,
+      }));
     }
   } catch {
     console.warn('Failed to load mock objectives from localStorage');

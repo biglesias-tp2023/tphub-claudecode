@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { MainLayout, AuthLayout } from '@/components/layout';
 import { ProtectedRoute } from '@/components/common';
 import { ControllingPage } from '@/pages/controlling';
@@ -10,6 +11,9 @@ import { MapsPage } from '@/pages/maps';
 import { LoginPage } from '@/pages/auth';
 import { AdminPage } from '@/pages/admin/AdminPage';
 import { AuditsPage } from '@/pages/audits';
+
+// Lazy load public pages
+const SharedObjectivePage = lazy(() => import('@/pages/shared/SharedObjectivePage'));
 
 // Placeholder pages - will be replaced with real implementations
 // eslint-disable-next-line react-refresh/only-export-components
@@ -57,6 +61,21 @@ export const router = createBrowserRouter([
     children: [
       { path: 'login', element: <LoginPage /> },
     ],
+  },
+  // Shared objectives (public, no auth)
+  {
+    path: '/shared/:token',
+    element: (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }
+      >
+        <SharedObjectivePage />
+      </Suspense>
+    ),
   },
   // 404
   { path: '*', element: <Navigate to="/controlling" replace /> },

@@ -31,3 +31,23 @@ export {
   calculateProgress,
   formatKpiValue,
 } from './useStrategicData';
+
+// KPI real-time value
+export { useObjectiveKpiValue } from './useObjectiveKpiValue';
+
+// Objective progress calculation (health status, velocity, projections)
+export { useObjectiveProgress } from './useObjectiveProgress';
+
+// Share links for objectives
+export {
+  useShareLink,
+  useShareLinkByToken,
+  useCreateShareLink,
+  useUpdateShareLink,
+  useDeleteShareLink,
+  useRegenerateToken,
+  useShareLinkManager,
+  useRecordAccess,
+  shareLinkKeys,
+  formatShareUrl,
+} from './useShareLinks';

@@ -661,6 +661,119 @@ import {
 const { objectives, objectivesByHorizon, stats, isLoading } = useStrategicObjectives();
 ```
 
+### Sistema de Progreso y Health Status
+
+El sistema de progreso calcula automaticamente el estado de salud de cada objetivo basado en:
+
+| Metrica | Descripcion |
+|---------|-------------|
+| `progressPercentage` | Progreso actual hacia el objetivo |
+| `expectedProgress` | Progreso esperado basado en tiempo transcurrido |
+| `healthStatus` | on_track, at_risk, off_track, completed, exceeded |
+| `velocity` | Velocidad de cambio (unidades/dia) |
+| `projectedValue` | Valor proyectado al llegar a la fecha limite |
+| `willComplete` | Si alcanzara el objetivo al ritmo actual |
+| `trend` | up, down, stable |
+
+#### Calculo de Progreso
+
+```typescript
+// Para objetivos de INCREMENTO:
+progress = (current - baseline) / (target - baseline) * 100
+
+// Para objetivos de DECREMENTO:
+progress = (baseline - current) / (baseline - target) * 100
+```
+
+#### Calculo de Health Status
+
+```typescript
+ratio = actualProgress / expectedProgress
+
+if (ratio >= 0.9) return 'on_track';    // Verde
+if (ratio >= 0.7) return 'at_risk';     // Amarillo
+return 'off_track';                      // Rojo
+```
+
+#### Hook useObjectiveProgress
+
+```typescript
+import { useObjectiveProgress } from '@/features/strategic/hooks';
+
+const progress = useObjectiveProgress({ objective });
+
+// Devuelve:
+// progress.currentValue - Valor actual del KPI
+// progress.progressPercentage - % de progreso
+// progress.healthStatus - 'on_track' | 'at_risk' | 'off_track' | 'completed' | 'exceeded'
+// progress.velocity - Cambio por dia
+// progress.projectedValue - Proyeccion al deadline
+// progress.willComplete - true/false
+// progress.trend - 'up' | 'down' | 'stable'
+// progress.daysRemaining - Dias hasta deadline
+```
+
+### Componentes Visuales
+
+| Componente | Descripcion | Props |
+|------------|-------------|-------|
+| `ProgressCircle` | Circulo SVG con porcentaje | value, size, color |
+| `HealthBadge` | Badge con icono y estado | status, size, showLabel |
+| `TrendIndicator` | Flecha con velocidad | trend, velocity, unit |
+| `TaskEmptyState` | Estado vacio con sugerencias inteligentes | objective, onAddTask |
+
+```typescript
+import {
+  ProgressCircle,
+  HealthBadge,
+  TrendIndicator,
+  TaskEmptyState
+} from '@/features/strategic/components';
+```
+
+### Sistema de Compartir Objetivos
+
+Permite compartir objetivos con clientes via URL publica sin autenticacion.
+
+#### Servicio shareLinks.ts
+
+```typescript
+import {
+  createShareLink,
+  updateShareLink,
+  deleteShareLink,
+  regenerateShareLinkToken,
+  getShareLinkUrl,
+  isShareLinkValid,
+} from '@/services/shareLinks';
+```
+
+#### Hook useShareLinkManager
+
+```typescript
+import { useShareLinkManager } from '@/features/strategic/hooks';
+
+const {
+  shareLink,       // Datos del enlace
+  hasLink,         // Si existe enlace
+  url,             // URL completa
+  isActive,        // Si esta activo
+  viewCount,       // Veces visto
+  create,          // Crear nuevo enlace
+  toggleActive,    // Activar/desactivar
+  setExpiration,   // Poner fecha limite
+  regenerate,      // Regenerar token
+  remove,          // Eliminar
+  copyToClipboard, // Copiar al portapapeles
+} = useShareLinkManager(objectiveId);
+```
+
+#### Ruta Publica
+
+| Ruta | Componente | Descripcion |
+|------|------------|-------------|
+| `/shared/:token` | `SharedObjectivePage` | Vista publica de objetivo |
+
 ### Migracion Supabase
 
 **Archivo**: `supabase/migrations/011_strategic_objectives_standalone.sql`

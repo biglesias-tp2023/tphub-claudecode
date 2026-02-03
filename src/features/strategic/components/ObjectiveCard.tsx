@@ -1,8 +1,31 @@
+/**
+ * ObjectiveCard Component
+ *
+ * Displays a strategic objective with progress visualization, health status,
+ * and projection alerts. Uses useObjectiveProgress for calculated metrics.
+ *
+ * Layout:
+ * ┌─────────────────────────────────────────┐
+ * │ ┌─────┐  CATEGORÍA      [HealthBadge]  │
+ * │ │ 78% │  Título del objetivo            │
+ * │ │ ◐   │                    TrendIndicator│
+ * │ └─────┘  Actual: X  →  Obj: Y           │
+ * │ ════════════════════════════════════════│
+ * │ ⚠️ Proyección: Llegarás a ~Z            │
+ * │ ─────────────────────────────────────── │
+ * │ ⏰ 15d    📋 3/5 tareas    👤 Responsable│
+ * └─────────────────────────────────────────┘
+ */
+
 import { useState, useRef, useEffect } from 'react';
-import { Clock, ChevronDown, User, Building2, Users, Briefcase } from 'lucide-react';
+import { Clock, ChevronDown, User, Building2, Users, Briefcase, AlertTriangle, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { calculateProgress, formatKpiValue } from '../hooks/useStrategicData';
-import { getCategoryConfig, getObjectiveTypeConfig } from '../config';
+import { formatKpiValue } from '../hooks/useStrategicData';
+import { useObjectiveProgress } from '../hooks/useObjectiveProgress';
+import { getCategoryConfig } from '../config';
+import { ProgressCircle, getProgressCircleColor } from './ProgressCircle';
+import { HealthBadge } from './HealthBadge';
+import { TrendIndicator } from './TrendIndicator';
 import type { StrategicObjective, ObjectiveStatus, ObjectiveCategory } from '@/types';
 
 // ============================================
@@ -14,7 +37,8 @@ interface ObjectiveCardProps {
   onClick?: () => void;
   onStatusChange?: (id: string, status: ObjectiveStatus) => void;
   isDragging?: boolean;
-  dragHandleProps?: Record<string, unknown>;
+  /** Task count for this objective (passed from parent) */
+  taskCount?: { completed: number; total: number };
 }
 
 // ============================================
@@ -38,25 +62,19 @@ const RESPONSIBLE_LABELS: Record<string, { label: string; icon: React.ElementTyp
 // HELPERS
 // ============================================
 
-function calculateDaysRemaining(deadline: string | null): number | null {
-  if (!deadline) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const deadlineDate = new Date(deadline);
-  deadlineDate.setHours(0, 0, 0, 0);
-  const diffTime = deadlineDate.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
-
-function formatDaysRemaining(days: number | null): string {
-  if (days === null) return '';
-  if (days < 0) return `${Math.abs(days)}d`;
+function formatDaysRemaining(days: number): string {
+  if (days < 0) return `${Math.abs(days)}d atrasado`;
   if (days === 0) return 'Hoy';
   return `${days}d`;
 }
 
+function formatProjectedValue(value: number | null, unit: string | null): string {
+  if (value === null) return '-';
+  return formatKpiValue(value, unit);
+}
+
 // ============================================
-// STATUS DROPDOWN COMPONENT (Minimal)
+// STATUS DROPDOWN COMPONENT
 // ============================================
 
 interface StatusDropdownProps {
@@ -85,7 +103,6 @@ function StatusDropdown({ currentStatus, onStatusChange, isOpen, onToggle, onClo
 
   return (
     <div ref={dropdownRef} className="relative">
-      {/* Trigger */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -109,7 +126,6 @@ function StatusDropdown({ currentStatus, onStatusChange, isOpen, onToggle, onClo
         <ChevronDown className="w-3 h-3 opacity-50" />
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] py-1 bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden">
           {STATUS_OPTIONS.map((option) => (
@@ -147,15 +163,15 @@ export function ObjectiveCard({
   onClick,
   onStatusChange,
   isDragging = false,
+  taskCount,
 }: ObjectiveCardProps) {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
 
   const categoryConfig = getCategoryConfig(objective.category as ObjectiveCategory);
-  const objectiveTypeConfig = getObjectiveTypeConfig(objective.objectiveTypeId);
 
-  const progress = calculateProgress(objective);
-  const daysRemaining = calculateDaysRemaining(objective.evaluationDate);
-  const daysText = formatDaysRemaining(daysRemaining);
+  // Get comprehensive progress data
+  const progress = useObjectiveProgress({ objective });
+
   const responsibleInfo = RESPONSIBLE_LABELS[objective.responsible] || RESPONSIBLE_LABELS.thinkpaladar;
   const ResponsibleIcon = responsibleInfo.icon;
 
@@ -165,108 +181,196 @@ export function ObjectiveCard({
     }
   };
 
-  const isOverdue = daysRemaining !== null && daysRemaining < 0;
-  const isUrgent = daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 7;
+  // Determine if we should show KPI data (has KPI configured)
+  const hasKpi = !!objective.kpiType && !!objective.kpiTargetValue;
+
+  // Circle color based on health status
+  const circleColor = getProgressCircleColor(progress.healthStatus);
+
+  // Show projection alert if at_risk or off_track and not going to complete
+  const showProjectionAlert =
+    hasKpi &&
+    !progress.willComplete &&
+    progress.projectedValue !== null &&
+    (progress.healthStatus === 'at_risk' || progress.healthStatus === 'off_track');
+
+  // Days display
+  const isOverdue = progress.daysRemaining < 0;
+  const isUrgent = progress.daysRemaining >= 0 && progress.daysRemaining <= 7;
 
   return (
     <div
       className={cn(
-        'group relative bg-white rounded-lg border transition-all cursor-pointer',
-        'hover:shadow-sm hover:border-gray-200',
+        'group relative bg-white rounded-xl border transition-all cursor-pointer',
+        'hover:shadow-md hover:border-gray-200',
         isDragging && 'shadow-lg ring-2 ring-primary-500',
-        objective.status === 'completed' ? 'border-gray-100 opacity-75' : 'border-gray-100'
+        objective.status === 'completed' ? 'border-gray-100 opacity-80' : 'border-gray-100'
       )}
       onClick={onClick}
     >
       {/* Category accent line */}
       <div
         className={cn(
-          'absolute left-0 top-3 bottom-3 w-0.5 rounded-full',
+          'absolute left-0 top-3 bottom-3 w-1 rounded-full',
           categoryConfig?.bgColor || 'bg-gray-200'
         )}
       />
 
-      <div className="p-3 pl-4">
-        {/* Top row: Category + Status */}
-        <div className="flex items-center justify-between mb-2">
+      <div className="p-4 pl-5">
+        {/* Top row: Category + Health Badge */}
+        <div className="flex items-center justify-between mb-3">
           <span className={cn(
             'text-[10px] font-semibold uppercase tracking-wider',
             categoryConfig?.textColor || 'text-gray-500'
           )}>
             {categoryConfig?.label || objective.category}
           </span>
-          <StatusDropdown
-            currentStatus={objective.status}
-            onStatusChange={handleStatusChange}
-            isOpen={isStatusOpen}
-            onToggle={() => setIsStatusOpen(!isStatusOpen)}
-            onClose={() => setIsStatusOpen(false)}
-          />
+          {hasKpi && !progress.isLoading && (
+            <HealthBadge status={progress.healthStatus} size="sm" />
+          )}
         </div>
 
-        {/* Title */}
-        <h3 className={cn(
-          'text-sm font-medium text-gray-900 mb-1 line-clamp-2 leading-snug',
-          objective.status === 'completed' && 'line-through text-gray-400'
-        )}>
-          {objective.title}
-        </h3>
-
-        {/* Objective type (if different from title) */}
-        {objectiveTypeConfig && objectiveTypeConfig.label !== objective.title && (
-          <p className="text-[11px] text-gray-400 mb-2 truncate">
-            {objectiveTypeConfig.label}
-          </p>
-        )}
-
-        {/* KPI Progress (if available) */}
-        {objective.kpiTargetValue && (
-          <div className="mb-3">
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="text-lg font-semibold text-gray-900 tabular-nums">
-                {formatKpiValue(objective.kpiCurrentValue, objective.kpiUnit)}
-              </span>
-              <span className="text-xs text-gray-400">
-                / {formatKpiValue(objective.kpiTargetValue, objective.kpiUnit)}
-              </span>
+        {/* Main content: Circle + Info */}
+        <div className="flex gap-4">
+          {/* Progress Circle */}
+          {hasKpi && (
+            <div className="flex-shrink-0">
+              {progress.isLoading ? (
+                <div className="w-14 h-14 rounded-full bg-gray-100 animate-pulse" />
+              ) : (
+                <ProgressCircle
+                  value={progress.progressPercentage}
+                  size={56}
+                  strokeWidth={5}
+                  color={circleColor}
+                />
+              )}
             </div>
-            {/* Progress bar */}
-            <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-all',
-                  progress >= 100 ? 'bg-emerald-500' :
-                  progress >= 75 ? 'bg-primary-500' :
-                  progress >= 50 ? 'bg-amber-500' : 'bg-red-400'
-                )}
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
+          )}
+
+          {/* Title and values */}
+          <div className="flex-1 min-w-0">
+            {/* Title */}
+            <h3 className={cn(
+              'text-sm font-semibold text-gray-900 line-clamp-2 leading-snug mb-1',
+              objective.status === 'completed' && 'line-through text-gray-400'
+            )}>
+              {objective.title}
+            </h3>
+
+            {/* Trend indicator (if has velocity data) */}
+            {hasKpi && !progress.isLoading && progress.velocity !== null && (
+              <div className="mb-2">
+                <TrendIndicator
+                  trend={progress.trend}
+                  velocity={progress.velocity}
+                  unit={objective.kpiUnit || undefined}
+                  size="sm"
+                />
+              </div>
+            )}
+
+            {/* KPI Values: Actual → Objetivo */}
+            {hasKpi && !progress.isLoading && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-gray-500">
+                  Actual:{' '}
+                  <span className="font-medium text-gray-700">
+                    {progress.currentValue !== null
+                      ? formatKpiValue(progress.currentValue, objective.kpiUnit)
+                      : '-'}
+                  </span>
+                </span>
+                <span className="text-gray-300">→</span>
+                <span className="text-gray-500">
+                  Obj:{' '}
+                  <span className="font-medium text-gray-700">
+                    {formatKpiValue(objective.kpiTargetValue!, objective.kpiUnit)}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Projection Alert (if at risk and won't complete) */}
+        {showProjectionAlert && (
+          <div className={cn(
+            'mt-3 px-3 py-2 rounded-lg flex items-start gap-2',
+            progress.healthStatus === 'off_track'
+              ? 'bg-red-50 border border-red-100'
+              : 'bg-amber-50 border border-amber-100'
+          )}>
+            <AlertTriangle className={cn(
+              'w-4 h-4 flex-shrink-0 mt-0.5',
+              progress.healthStatus === 'off_track' ? 'text-red-500' : 'text-amber-500'
+            )} />
+            <div>
+              <p className={cn(
+                'text-xs font-medium',
+                progress.healthStatus === 'off_track' ? 'text-red-700' : 'text-amber-700'
+              )}>
+                Proyección: {formatProjectedValue(progress.projectedValue, objective.kpiUnit)}
+              </p>
+              <p className={cn(
+                'text-[10px]',
+                progress.healthStatus === 'off_track' ? 'text-red-600' : 'text-amber-600'
+              )}>
+                {progress.healthStatus === 'off_track'
+                  ? 'No alcanzarás el objetivo al ritmo actual'
+                  : 'Riesgo de no alcanzar el objetivo'}
+              </p>
             </div>
           </div>
         )}
 
-        {/* Footer: Days + Responsible */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-50">
-          {daysText ? (
-            <div className={cn(
-              'flex items-center gap-1 text-[11px] font-medium',
-              isOverdue && 'text-red-500',
-              isUrgent && !isOverdue && 'text-amber-500',
-              !isOverdue && !isUrgent && 'text-gray-400'
-            )}>
-              <Clock className="w-3 h-3" />
-              {isOverdue ? (
-                <span>{daysText} atrasado</span>
-              ) : (
-                <span>{daysText}</span>
+        {/* Divider */}
+        <div className="border-t border-gray-100 mt-3 pt-3">
+          {/* Footer: Days + Tasks + Status + Responsible */}
+          <div className="flex items-center justify-between">
+            {/* Left side: Days + Tasks */}
+            <div className="flex items-center gap-3">
+              {/* Days remaining */}
+              {objective.evaluationDate && (
+                <div className={cn(
+                  'flex items-center gap-1 text-[11px] font-medium',
+                  isOverdue && 'text-red-500',
+                  isUrgent && !isOverdue && 'text-amber-500',
+                  !isOverdue && !isUrgent && 'text-gray-400'
+                )}>
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDaysRemaining(progress.daysRemaining)}</span>
+                </div>
+              )}
+
+              {/* Task count */}
+              {taskCount && taskCount.total > 0 && (
+                <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <CheckSquare className="w-3 h-3" />
+                  <span className="tabular-nums">
+                    {taskCount.completed}/{taskCount.total}
+                  </span>
+                </div>
               )}
             </div>
-          ) : (
-            <div />
-          )}
-          <div className="flex items-center gap-1 text-[11px] text-gray-400">
-            <ResponsibleIcon className="w-3 h-3" />
-            <span>{responsibleInfo.label}</span>
+
+            {/* Right side: Status + Responsible */}
+            <div className="flex items-center gap-2">
+              {/* Status dropdown */}
+              <StatusDropdown
+                currentStatus={objective.status}
+                onStatusChange={handleStatusChange}
+                isOpen={isStatusOpen}
+                onToggle={() => setIsStatusOpen(!isStatusOpen)}
+                onClose={() => setIsStatusOpen(false)}
+              />
+
+              {/* Responsible */}
+              <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                <ResponsibleIcon className="w-3 h-3" />
+                <span>{responsibleInfo.label}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -275,7 +379,7 @@ export function ObjectiveCard({
 }
 
 // ============================================
-// ADD OBJECTIVE CARD (Minimal)
+// ADD OBJECTIVE CARD
 // ============================================
 
 interface AddObjectiveCardProps {
@@ -288,13 +392,13 @@ export function AddObjectiveCard({ onClick }: AddObjectiveCardProps) {
     <button
       onClick={onClick}
       className={cn(
-        'w-full h-full min-h-[100px] rounded-lg border border-dashed border-gray-200',
+        'w-full h-full min-h-[140px] rounded-xl border border-dashed border-gray-200',
         'flex items-center justify-center',
         'text-gray-400 hover:text-gray-500 hover:border-gray-300 hover:bg-gray-50/50',
         'transition-all cursor-pointer'
       )}
     >
-      <span className="text-xl font-light">+</span>
+      <span className="text-2xl font-light">+</span>
     </button>
   );
 }

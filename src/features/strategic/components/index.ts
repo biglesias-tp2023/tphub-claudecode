@@ -1,6 +1,18 @@
 export { ObjectiveCard, AddObjectiveCard } from './ObjectiveCard';
 export { TaskItem } from './TaskItem';
 export { TaskList } from './TaskList';
+
+// Progress visualization components
+export { ProgressCircle, getProgressCircleColor } from './ProgressCircle';
+export type { ProgressCircleColor } from './ProgressCircle';
+export { HealthBadge, getHealthStatusLabel, getHealthStatusConfig } from './HealthBadge';
+export { TrendIndicator, TrendIcon } from './TrendIndicator';
+
+// Task components
+export { TaskEmptyState, TaskSuggestionsInline } from './TaskEmptyState';
+
+// Sharing
+export { ShareLinkModal } from './ShareLinkModal';
 export { StrategicObjectiveEditor } from './StrategicObjectiveEditor';
 export { TaskEditor } from './TaskEditor';
 

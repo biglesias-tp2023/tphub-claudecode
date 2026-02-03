@@ -718,6 +718,13 @@ function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObjective {
     kpiCurrentValue: db.kpi_current_value,
     kpiTargetValue: db.kpi_target_value,
     kpiUnit: db.kpi_unit,
+    // Progress tracking fields
+    baselineValue: db.baseline_value,
+    baselineDate: db.baseline_date,
+    targetDirection: (db.target_direction as 'increase' | 'decrease' | 'maintain') || 'increase',
+    // Priority and archiving
+    priority: (db.priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
+    isArchived: db.is_archived || false,
     fieldData,
     evaluationDate: db.evaluation_date,
     completedAt: db.completed_at,
@@ -792,6 +799,32 @@ export async function fetchStrategicObjectives(
 }
 
 /**
+ * Fetch a single strategic objective by ID
+ */
+export async function fetchStrategicObjectiveById(
+  id: string
+): Promise<StrategicObjective | null> {
+  // Return mock data in dev mode
+  if (isDevMode) {
+    const objective = mockStrategicObjectives.find((o) => o.id === id);
+    return objective || null;
+  }
+
+  const { data, error } = await supabase
+    .from('strategic_objectives')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw new Error(`Error fetching strategic objective: ${error.message}`);
+  }
+
+  return mapDbStrategicObjective(data as DbStrategicObjective);
+}
+
+/**
  * Create a strategic objective
  */
 export async function createStrategicObjective(
@@ -814,6 +847,13 @@ export async function createStrategicObjective(
       kpiCurrentValue: input.kpiCurrentValue || null,
       kpiTargetValue: input.kpiTargetValue || null,
       kpiUnit: input.kpiUnit || null,
+      // Progress tracking fields
+      baselineValue: input.baselineValue || null,
+      baselineDate: input.baselineDate || new Date().toISOString().split('T')[0],
+      targetDirection: input.targetDirection || 'increase',
+      // Priority and archiving
+      priority: input.priority || 'medium',
+      isArchived: input.isArchived || false,
       fieldData: input.fieldData || null,
       evaluationDate: input.evaluationDate || null,
       completedAt: null,
@@ -841,6 +881,13 @@ export async function createStrategicObjective(
     kpi_current_value: input.kpiCurrentValue || null,
     kpi_target_value: input.kpiTargetValue || null,
     kpi_unit: input.kpiUnit || null,
+    // Progress tracking fields
+    baseline_value: input.baselineValue || null,
+    baseline_date: input.baselineDate || new Date().toISOString().split('T')[0],
+    target_direction: input.targetDirection || 'increase',
+    // Priority and archiving
+    priority: input.priority || 'medium',
+    is_archived: input.isArchived || false,
     field_data: input.fieldData ? JSON.stringify(input.fieldData) : null,
     evaluation_date: input.evaluationDate || null,
     display_order: input.displayOrder || 0,
@@ -882,6 +929,13 @@ export async function updateStrategicObjective(
     if (updates.kpiCurrentValue !== undefined) mockUpdates.kpiCurrentValue = updates.kpiCurrentValue;
     if (updates.kpiTargetValue !== undefined) mockUpdates.kpiTargetValue = updates.kpiTargetValue;
     if (updates.kpiUnit !== undefined) mockUpdates.kpiUnit = updates.kpiUnit;
+    // Progress tracking fields
+    if (updates.baselineValue !== undefined) mockUpdates.baselineValue = updates.baselineValue;
+    if (updates.baselineDate !== undefined) mockUpdates.baselineDate = updates.baselineDate;
+    if (updates.targetDirection !== undefined) mockUpdates.targetDirection = updates.targetDirection;
+    // Priority and archiving
+    if (updates.priority !== undefined) mockUpdates.priority = updates.priority;
+    if (updates.isArchived !== undefined) mockUpdates.isArchived = updates.isArchived;
     if (updates.evaluationDate !== undefined) mockUpdates.evaluationDate = updates.evaluationDate;
     if (updates.displayOrder !== undefined) mockUpdates.displayOrder = updates.displayOrder;
     if (updates.responsible !== undefined) mockUpdates.responsible = updates.responsible;
@@ -916,6 +970,13 @@ export async function updateStrategicObjective(
   if (updates.kpiCurrentValue !== undefined) dbUpdates.kpi_current_value = updates.kpiCurrentValue;
   if (updates.kpiTargetValue !== undefined) dbUpdates.kpi_target_value = updates.kpiTargetValue;
   if (updates.kpiUnit !== undefined) dbUpdates.kpi_unit = updates.kpiUnit;
+  // Progress tracking fields
+  if (updates.baselineValue !== undefined) dbUpdates.baseline_value = updates.baselineValue;
+  if (updates.baselineDate !== undefined) dbUpdates.baseline_date = updates.baselineDate;
+  if (updates.targetDirection !== undefined) dbUpdates.target_direction = updates.targetDirection;
+  // Priority and archiving
+  if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+  if (updates.isArchived !== undefined) dbUpdates.is_archived = updates.isArchived;
   if (updates.evaluationDate !== undefined) dbUpdates.evaluation_date = updates.evaluationDate;
   if (updates.displayOrder !== undefined) dbUpdates.display_order = updates.displayOrder;
 
