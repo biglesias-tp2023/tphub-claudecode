@@ -125,14 +125,37 @@ Company (nivel 1) → Suma de todos sus Stores
 
 **IMPORTANTE**: `ticketMedio` y `porcentajeNuevos` se calculan DESPUÉS de sumar, no se suman directamente.
 
-## Snapshots Mensuales
+## ⚠️ REGLA FUNDAMENTAL: Filtrado de Dimensiones
 
-Las tablas dimensionales tienen múltiples snapshots por entidad (uno por mes).
+**TODAS** las tablas de dimensiones (dt_company, dt_store, dt_address, dt_portal) tienen snapshots mensuales (`pk_ts_month`) y campo `flg_deleted`.
 
-**Deduplicación**:
-```sql
-ORDER BY pk_ts_month DESC
--- Mantener solo el primer registro (más reciente) por ID
+### Patrón OBLIGATORIO
+
+```
+1. Fetch SIN filtrar flg_deleted, ORDER BY pk_ts_month DESC
+2. Deduplicar por PK (primer registro = snapshot más reciente)
+3. Filtrar flg_deleted !== 0
+```
+
+**NUNCA usar `.eq('flg_deleted', 0)` en la query de Supabase directamente.**
+
+### ¿Por qué este orden?
+
+Un registro puede tener `flg_deleted=0` en Enero y `flg_deleted=1` en Febrero. Si filtras antes de deduplicar, coges el de Enero (activo pero obsoleto). **El snapshot más reciente es la verdad.**
+
+### Uso
+
+```typescript
+import { deduplicateAndFilterDeleted } from '@/services/crp-portal/utils';
+
+// Fetch sin filtrar flg_deleted
+const { data } = await supabase
+  .from('crp_portal__dt_store')
+  .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
+  .order('pk_ts_month', { ascending: false });
+
+// Deduplicar y filtrar
+const activeStores = deduplicateAndFilterDeleted(data, s => s.pk_id_store);
 ```
 
 ## Portal IDs

@@ -11,6 +11,65 @@
  */
 
 /**
+ * FUNDAMENTAL RULE: Dimension Filtering Pattern
+ *
+ * All CRP Portal dimension tables (dt_company, dt_store, dt_address, dt_portal)
+ * have monthly snapshots (pk_ts_month) and a flg_deleted field.
+ *
+ * CRITICAL: Always deduplicate FIRST by PK, then filter deleted records.
+ *
+ * Why this order matters:
+ * - A record can have flg_deleted=0 in January and flg_deleted=1 in February
+ * - If you filter before dedup, you keep the January record (active but stale)
+ * - The most recent snapshot is the source of truth
+ *
+ * Pattern:
+ * 1. Fetch WITHOUT filtering flg_deleted, ORDER BY pk_ts_month DESC
+ * 2. Deduplicate by PK (first occurrence = most recent snapshot)
+ * 3. Filter out records where flg_deleted !== 0
+ *
+ * NEVER use .eq('flg_deleted', 0) in Supabase queries for dimension tables.
+ * Always use this function after fetching.
+ */
+
+/**
+ * Standard dimension fetch pattern for CRP Portal.
+ * Deduplicates by key (keeping first/most recent), then filters deleted records.
+ *
+ * IMPORTANT: Data MUST be pre-sorted by pk_ts_month DESC before calling this function.
+ *
+ * @template T - Type of items (must have flg_deleted field)
+ * @param data - Array of items sorted by pk_ts_month DESC
+ * @param getKey - Function to extract the unique key (PK) from each item
+ * @returns Deduplicated array with deleted records filtered out
+ *
+ * @example
+ * // Fetch stores ordered by pk_ts_month DESC (most recent first)
+ * const { data } = await supabase
+ *   .from('crp_portal__dt_store')
+ *   .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
+ *   .order('pk_ts_month', { ascending: false });
+ *
+ * // Deduplicate and filter deleted
+ * const activeStores = deduplicateAndFilterDeleted(data, s => s.pk_id_store);
+ */
+export function deduplicateAndFilterDeleted<T extends { flg_deleted: number }>(
+  data: T[],
+  getKey: (item: T) => string | number
+): T[] {
+  // Step 1: Deduplicate by key (first occurrence = most recent due to ORDER BY pk_ts_month DESC)
+  const map = new Map<string | number, T>();
+  for (const item of data) {
+    const key = getKey(item);
+    if (!map.has(key)) {
+      map.set(key, item);
+    }
+  }
+  // Step 2: Filter out deleted records
+  return Array.from(map.values()).filter(item => item.flg_deleted === 0);
+}
+
+/**
  * Deduplicate an array of items by a key extractor function.
  * Keeps the first occurrence of each unique key.
  *
@@ -60,6 +119,28 @@ export function parseNumericIds(ids: string[]): number[] {
  */
 export function generateSlug(text: string): string {
   return text.toLowerCase().replace(/\s+/g, '-');
+}
+
+/**
+ * Normalize a name for deduplication comparison.
+ * Handles variations in brand/restaurant names like:
+ * - "26KG - Pasta Fresca Italiana" vs "26KG Pasta Fresca Italiana"
+ * - Names with accents vs without
+ *
+ * @param name - Name to normalize
+ * @returns Normalized name for comparison
+ *
+ * @example
+ * normalizeName('26KG - Pasta Fresca Italiana') // '26kg pasta fresca italiana'
+ * normalizeName('Café Müller') // 'cafe muller'
+ */
+export function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/[-_.]/g, ' ')  // Replace hyphens/dots/underscores with spaces
+    .replace(/\s+/g, ' ')    // Normalize multiple spaces
+    .trim();
 }
 
 /**
@@ -201,20 +282,25 @@ export function groupByName<T extends { pk_ts_month: string }>(
  * normalizeAddress('Calle de Sancho de Ávila 175') // 'sancho avila 175'
  * normalizeAddress('Calle de Mozart 5, 28008 Madrid, Spain') // 'mozart 5'
  * normalizeAddress('Calle Mozart 5') // 'mozart 5'
+ * normalizeAddress('C. de San Enrique, 16, Tetuán, 28020') // 'san enrique 16'
+ * normalizeAddress('Calle de San Enrique 16, 28020 Madrid') // 'san enrique 16'
  */
 export function normalizeAddress(address: string): string {
-  // First, extract only the street part (before first comma or postal code)
+  // Extract street number pattern before splitting (handles "16", "14 Local 3", etc.)
+  const numberMatch = address.match(/\b(\d+(?:\s*(?:local|piso|bajo|ático|[a-z])?\s*\d*)?)\b/i);
+  const streetNumber = numberMatch ? numberMatch[1] : '';
+
+  // Remove postal code and everything after (5 digits followed by city)
   let streetPart = address
-    // Remove everything after first comma (city, country, etc.)
-    .split(',')[0]
-    // Also remove postal codes that might be without comma (5 digits)
-    .replace(/\s+\d{5}\s*.*$/, '')
+    .replace(/,?\s*\d{5}\s*.*/i, '')  // Remove postal code and city
+    .replace(/,?\s*(madrid|barcelona|valencia|sevilla|zaragoza|málaga|murcia|palma|bilbao|alicante|córdoba|valladolid|vigo|gijón|tetuán|chamberí|salamanca|retiro|moncloa|arganzuela|carabanchel|usera|latina|puente de vallecas|moratalaz|ciudad lineal|hortaleza|villaverde|villa de vallecas|vicálvaro|san blas|barajas)\b.*/i, '')  // Remove city/district names
+    .split(',')[0]  // Take first part
     .trim();
 
-  return streetPart
+  const normalized = streetPart
     .toLowerCase()
-    // Remove common street prefixes (Spanish/Catalan)
-    .replace(/^(c\/|calle|carrer|carretera|avenida|avinguda|av\.|avda\.|paseo|passeig|plaza|plaça|pl\.|ronda|travesía|travessera)\s*/i, '')
+    // Remove common street prefixes (Spanish/Catalan) - includes c.
+    .replace(/^(c\.|c\/|calle|carrer|carretera|avenida|avinguda|av\.|avda\.|paseo|passeig|plaza|plaça|pl\.|ronda|travesía|travessera)\s*/i, '')
     // Remove prepositions
     .replace(/\b(de|del|dels|de la|de les|d')\b/gi, '')
     // Remove accents
@@ -223,6 +309,13 @@ export function normalizeAddress(address: string): string {
     .replace(/[,.\-\/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // If we lost the number in the normalization, append it
+  if (streetNumber && !normalized.match(/\d/)) {
+    return `${normalized} ${streetNumber}`.replace(/\s+/g, ' ').trim();
+  }
+
+  return normalized;
 }
 
 /**

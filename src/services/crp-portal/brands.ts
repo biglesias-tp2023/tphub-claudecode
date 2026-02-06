@@ -16,7 +16,7 @@ import { supabase } from '../supabase';
 import type { Brand } from '@/types';
 import type { DbCrpStore } from './types';
 import { mapBrand } from './mappers';
-import { groupByName, parseNumericIds } from './utils';
+import { groupByName, parseNumericIds, normalizeName, deduplicateAndFilterDeleted } from './utils';
 
 /** Table name for stores/brands in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_store';
@@ -42,7 +42,8 @@ const TABLE_NAME = 'crp_portal__dt_store';
  * const companyBrands = await fetchBrands(['1', '2', '3']);
  */
 export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
-  // Query all months, order by pk_ts_month DESC so groupByName selects most recent
+  // Query all months, order by pk_ts_month DESC for deduplication
+  // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication (see utils.ts)
   let query = supabase
     .from(TABLE_NAME)
     .select('*')
@@ -61,25 +62,24 @@ export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
     throw new Error(`Error fetching brands: ${error.message}`);
   }
 
-  // Group by NAME (des_store) case-insensitive, collecting all IDs that share the same name
-  // This handles multi-portal scenarios where the same brand has different IDs per platform
-  const grouped = groupByName(
+  // Step 1: Deduplicate by pk_id_store and filter deleted records
+  // CRITICAL: Must dedup FIRST, then filter - see deduplicateAndFilterDeleted docs
+  const activeStores = deduplicateAndFilterDeleted(
     data as DbCrpStore[],
-    (s) => s.des_store.toLowerCase(),
     (s) => String(s.pk_id_store)
   );
 
-  // DEBUG: Log grouping results
+  // Step 2: Group by normalized NAME (des_store), collecting all IDs that share the same name
+  // This handles multi-portal scenarios where the same brand has different IDs per platform
+  // Uses normalizeName to handle variations like "26KG - Pasta" vs "26KG Pasta"
+  const grouped = groupByName(
+    activeStores,
+    (s) => normalizeName(s.des_store),
+    (s) => String(s.pk_id_store)
+  );
+
   if (import.meta.env.DEV) {
-    console.log('[fetchBrands] Raw data count:', data.length);
-    console.log('[fetchBrands] Grouped count:', grouped.length);
-    const multipleIds = grouped.filter(g => g.allIds.length > 1);
-    if (multipleIds.length > 0) {
-      console.log('[fetchBrands] Brands with multiple IDs:', multipleIds.map(g => ({
-        name: g.primary.des_store,
-        allIds: g.allIds
-      })));
-    }
+    console.log('[fetchBrands] Raw:', data.length, '→ Active:', activeStores.length, '→ Grouped:', grouped.length);
   }
 
   return grouped.map(g => mapBrand(g.primary, g.allIds));
@@ -99,16 +99,23 @@ export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
  * }
  */
 export async function fetchBrandById(brandId: string): Promise<Brand | null> {
+  // Fetch most recent snapshot for this store
+  // NOTE: Do NOT filter flg_deleted here - check AFTER getting most recent
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('*')
     .eq('pk_id_store', parseInt(brandId, 10))
-    .single();
+    .order('pk_ts_month', { ascending: false })
+    .limit(1);
 
   if (error) {
-    if (error.code === 'PGRST116') return null;
     throw new Error(`Error fetching brand: ${error.message}`);
   }
 
-  return mapBrand(data as DbCrpStore);
+  // No data or store is deleted in most recent snapshot
+  if (!data || data.length === 0) return null;
+  const mostRecent = data[0] as DbCrpStore;
+  if (mostRecent.flg_deleted !== 0) return null;
+
+  return mapBrand(mostRecent);
 }

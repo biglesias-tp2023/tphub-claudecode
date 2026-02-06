@@ -139,20 +139,22 @@ interface HierarchyRow {
 
 ### Completado ✅
 
-- Jerarquía 4 niveles con agregación bottom-up
+- Jerarquía 4 niveles: Company → Store → Address → Portal
+- Filtro `flg_deleted` correcto (dedup primero, filtrar después)
+- Addresses NO mergeadas por nombre (cada pk_id_address es único)
+- Mapeo Address→Store inferido desde pedidos (ft_order_head)
 - KPIs principales con variación vs período anterior
+- Métricas: Ventas, Var, Pedidos, Ticket, Nuevos, %Nuevos, Recurrentes, %Recurrentes
 - Rendimiento por canal (Glovo, UberEats)
 - Filtros: Company, Brand, Channel, DateRange
 - Exportación PDF/Excel/CSV
 - Deduplicación de snapshots mensuales
-- Mapeo correcto address → store
-
-### En Progreso 🚧
-
-- Ordenación de columnas en tabla
-- Métricas adicionales (Open Time, ROAS)
 
 ### Pendiente 📋
 
+- Ordenación de columnas (click en header)
+- Verificar que Open y Conv. muestren datos
+- Performance: considerar RPC para queries pesadas
+- Tests unitarios para deduplicateAndFilterDeleted
 - Filtros en tabla de jerarquía
 - Drill-down a nivel de pedido individual

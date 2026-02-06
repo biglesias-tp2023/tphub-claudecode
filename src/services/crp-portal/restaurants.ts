@@ -22,7 +22,7 @@ import { supabase } from '../supabase';
 import type { Restaurant } from '@/types';
 import type { DbCrpAddress, FetchRestaurantsParams } from './types';
 import { mapRestaurant } from './mappers';
-import { groupAddressesByName, parseNumericIds } from './utils';
+import { groupAddressesByName, parseNumericIds, deduplicateAndFilterDeleted } from './utils';
 
 /** Table name for addresses/restaurants in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_address';
@@ -62,7 +62,8 @@ const TABLE_NAME = 'crp_portal__dt_address';
 export async function fetchRestaurants(
   params: FetchRestaurantsParams = {}
 ): Promise<Restaurant[]> {
-  // Query all months, order by pk_ts_month DESC so groupAddressesByName selects most recent
+  // Query all months, order by pk_ts_month DESC for deduplication
+  // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication (see utils.ts)
   let query = supabase
     .from(TABLE_NAME)
     .select('*')
@@ -92,10 +93,17 @@ export async function fetchRestaurants(
     throw new Error(`Error fetching restaurants: ${error.message}`);
   }
 
-  // Group by normalized address, collecting all IDs that share the same address
+  // Step 1: Deduplicate by pk_id_address and filter deleted records
+  // CRITICAL: Must dedup FIRST, then filter - see deduplicateAndFilterDeleted docs
+  const activeAddresses = deduplicateAndFilterDeleted(
+    data as DbCrpAddress[],
+    (a) => String(a.pk_id_address)
+  );
+
+  // Step 2: Group by normalized address, collecting all IDs that share the same address
   // This handles multi-portal scenarios where the same address has different IDs per platform
   const grouped = groupAddressesByName(
-    data as DbCrpAddress[],
+    activeAddresses,
     (a) => a.des_address,
     (a) => String(a.pk_id_address)
   );
@@ -119,16 +127,23 @@ export async function fetchRestaurants(
 export async function fetchRestaurantById(
   restaurantId: string
 ): Promise<Restaurant | null> {
+  // Fetch most recent snapshot for this address
+  // NOTE: Do NOT filter flg_deleted here - check AFTER getting most recent
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('*')
     .eq('pk_id_address', parseInt(restaurantId, 10))
-    .single();
+    .order('pk_ts_month', { ascending: false })
+    .limit(1);
 
   if (error) {
-    if (error.code === 'PGRST116') return null;
     throw new Error(`Error fetching restaurant: ${error.message}`);
   }
 
-  return mapRestaurant(data as DbCrpAddress);
+  // No data or address is deleted in most recent snapshot
+  if (!data || data.length === 0) return null;
+  const mostRecent = data[0] as DbCrpAddress;
+  if (mostRecent.flg_deleted !== 0) return null;
+
+  return mapRestaurant(mostRecent);
 }

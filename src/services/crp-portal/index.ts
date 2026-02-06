@@ -119,6 +119,8 @@ export {
   fetchCrpOrdersRaw,
   fetchCrpOrdersComparison,
   fetchHierarchyData,
+  fetchControllingMetricsRPC,
+  fetchHierarchyDataRPC,
 } from './orders';
 
 export type {
@@ -128,6 +130,7 @@ export type {
   OrdersChanges,
   HierarchyMetrics,
   HierarchyDataRow,
+  ControllingMetricsRow,
 } from './orders';
 
 // Brand Channels (active channels per brand/restaurant)
@@ -171,6 +174,7 @@ export type {
 // ============================================
 
 export {
+  deduplicateAndFilterDeleted,
   deduplicateBy,
   deduplicateByNameKeepingLatest,
   deduplicateAddressesKeepingLatest,

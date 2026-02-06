@@ -6,6 +6,7 @@
  */
 
 import { supabase } from './supabase';
+import { deduplicateAndFilterDeleted } from './crp-portal/utils';
 import {
   isDevMode,
   mockCompanies,
@@ -738,7 +739,7 @@ function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObjective {
     baselineDate: db.baseline_date,
     targetDirection: (db.target_direction as 'increase' | 'decrease' | 'maintain') || 'increase',
     // Priority and archiving (DB integer → TS string)
-    priority: PRIORITY_DB_TO_TS[db.priority as number] || 'medium',
+    priority: PRIORITY_DB_TO_TS[Number(db.priority)] || 'medium',
     isArchived: db.is_archived || false,
     fieldData,
     evaluationDate: db.evaluation_date,
@@ -1775,14 +1776,21 @@ export async function fetchAuditsWithDetails(
   }
 
   // Fetch brands from CRP Portal
+  // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication
   let brandMap = new Map<string, Brand>();
   if (brandIds.length > 0) {
     const { data: brands } = await supabase
       .from('crp_portal__dt_store')
-      .select('pk_id_store, des_store, pfk_id_company')
-      .in('pk_id_store', brandIds.map(Number));
+      .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
+      .in('pk_id_store', brandIds.map(Number))
+      .order('pk_ts_month', { ascending: false });
+    // Deduplicate by PK and filter deleted
+    const activeBrands = deduplicateAndFilterDeleted(
+      brands || [],
+      (b: { pk_id_store: number }) => String(b.pk_id_store)
+    );
     brandMap = new Map(
-      (brands || []).map((b: { pk_id_store: number; des_store: string; pfk_id_company: number }) => [
+      activeBrands.map((b: { pk_id_store: number; des_store: string; pfk_id_company: number }) => [
         String(b.pk_id_store),
         { id: String(b.pk_id_store), name: b.des_store, companyId: String(b.pfk_id_company) } as Brand,
       ])
@@ -1790,14 +1798,21 @@ export async function fetchAuditsWithDetails(
   }
 
   // Fetch addresses from CRP Portal
+  // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication
   let addressMap = new Map<string, Restaurant>();
   if (addressIds.length > 0) {
     const { data: addresses } = await supabase
       .from('crp_portal__dt_address')
-      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude')
-      .in('pk_id_address', addressIds.map(Number));
+      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted')
+      .in('pk_id_address', addressIds.map(Number))
+      .order('pk_ts_month', { ascending: false });
+    // Deduplicate by PK and filter deleted
+    const activeAddresses = deduplicateAndFilterDeleted(
+      addresses || [],
+      (a: { pk_id_address: number }) => String(a.pk_id_address)
+    );
     addressMap = new Map(
-      (addresses || []).map((a: { pk_id_address: number; des_address: string; pfk_id_company: number; pfk_id_store: number | null; pfk_id_business_area: number | null; des_latitude: number | null; des_longitude: number | null }) => [
+      activeAddresses.map((a: { pk_id_address: number; des_address: string; pfk_id_company: number; pfk_id_store: number | null; pfk_id_business_area: number | null; des_latitude: number | null; des_longitude: number | null }) => [
         String(a.pk_id_address),
         {
           id: String(a.pk_id_address),
@@ -1876,36 +1891,44 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
   if (!audit) return null;
 
   // Fetch brand from CRP Portal
+  // NOTE: Do NOT filter flg_deleted - get most recent snapshot first
   const fetchBrandById = async (brandId: string): Promise<Brand | null> => {
     const { data } = await supabase
       .from('crp_portal__dt_store')
-      .select('pk_id_store, des_store, pfk_id_company')
+      .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
       .eq('pk_id_store', Number(brandId))
-      .single();
-    if (!data) return null;
+      .order('pk_ts_month', { ascending: false })
+      .limit(1);
+    if (!data || data.length === 0) return null;
+    const mostRecent = data[0];
+    if (mostRecent.flg_deleted !== 0) return null;
     return {
-      id: String(data.pk_id_store),
-      name: data.des_store,
-      companyId: String(data.pfk_id_company),
+      id: String(mostRecent.pk_id_store),
+      name: mostRecent.des_store,
+      companyId: String(mostRecent.pfk_id_company),
     } as Brand;
   };
 
   // Fetch address from CRP Portal
+  // NOTE: Do NOT filter flg_deleted - get most recent snapshot first
   const fetchAddressById = async (addressId: string): Promise<Restaurant | null> => {
     const { data } = await supabase
       .from('crp_portal__dt_address')
-      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude')
+      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted')
       .eq('pk_id_address', Number(addressId))
-      .single();
-    if (!data) return null;
+      .order('pk_ts_month', { ascending: false })
+      .limit(1);
+    if (!data || data.length === 0) return null;
+    const mostRecent = data[0];
+    if (mostRecent.flg_deleted !== 0) return null;
     return {
-      id: String(data.pk_id_address),
-      name: data.des_address,
-      companyId: String(data.pfk_id_company),
-      brandId: data.pfk_id_store ? String(data.pfk_id_store) : null,
-      areaId: data.pfk_id_business_area ? String(data.pfk_id_business_area) : null,
-      latitude: data.des_latitude,
-      longitude: data.des_longitude,
+      id: String(mostRecent.pk_id_address),
+      name: mostRecent.des_address,
+      companyId: String(mostRecent.pfk_id_company),
+      brandId: mostRecent.pfk_id_store ? String(mostRecent.pfk_id_store) : null,
+      areaId: mostRecent.pfk_id_business_area ? String(mostRecent.pfk_id_business_area) : null,
+      latitude: mostRecent.des_latitude,
+      longitude: mostRecent.des_longitude,
     } as Restaurant;
   };
 

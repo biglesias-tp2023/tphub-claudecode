@@ -11,6 +11,7 @@ Servicio de acceso a datos del CRP Portal (ThinkPaladar).
 |---------|------|-------------|
 | `pk_id_company` | BIGINT | ID único de compañía |
 | `des_company_name` | VARCHAR | Nombre de la compañía |
+| `flg_deleted` | INTEGER | 0=activo, 1=eliminado |
 | `pk_ts_month` | DATE | Snapshot mensual |
 
 #### dt_store
@@ -19,6 +20,7 @@ Servicio de acceso a datos del CRP Portal (ThinkPaladar).
 | `pk_id_store` | VARCHAR | ID único del store (hex) |
 | `des_store` | VARCHAR | Nombre del store/marca |
 | `pfk_id_company` | BIGINT | FK a dt_company |
+| `flg_deleted` | INTEGER | 0=activo, 1=eliminado |
 | `pk_ts_month` | DATE | Snapshot mensual |
 
 #### dt_address
@@ -27,6 +29,7 @@ Servicio de acceso a datos del CRP Portal (ThinkPaladar).
 | `pk_id_address` | VARCHAR | ID único de dirección (hex) |
 | `des_address` | VARCHAR | Dirección física |
 | `pfk_id_company` | BIGINT | FK a dt_company |
+| `flg_deleted` | INTEGER | 0=activo, 1=eliminado |
 | `pk_ts_month` | DATE | Snapshot mensual |
 
 ⚠️ **IMPORTANTE**: `dt_address` NO tiene `pfk_id_store`. Las addresses pertenecen a companies, no directamente a stores.
@@ -36,6 +39,7 @@ Servicio de acceso a datos del CRP Portal (ThinkPaladar).
 |---------|------|-------------|
 | `pk_id_portal` | VARCHAR | ID único del portal |
 | `des_portal` | VARCHAR | Nombre del portal (Glovo, UberEats) |
+| `flg_deleted` | INTEGER | 0=activo, 1=eliminado |
 | `pk_ts_month` | DATE | Snapshot mensual |
 
 ### Tabla de Hechos
@@ -84,10 +88,34 @@ Servicio de acceso a datos del CRP Portal (ThinkPaladar).
 
 ## Construcción de Jerarquía
 
+### ⚠️ Regla Crítica: Filtrado de flg_deleted
+
+**NUNCA** filtrar `flg_deleted` directamente en la query de Supabase. Siempre:
+
+1. Fetch sin filtrar `flg_deleted`, ordenado por `pk_ts_month DESC`
+2. Deduplicar por PK (primer registro = snapshot más reciente)
+3. Filtrar `flg_deleted !== 0` después
+
+```typescript
+import { deduplicateAndFilterDeleted } from './utils';
+
+// ❌ MAL: Filtrar en la query
+const { data } = await supabase.from('dt_store').select('*').eq('flg_deleted', 0);
+
+// ✅ BIEN: Filtrar después de deduplicar
+const { data } = await supabase
+  .from('dt_store')
+  .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
+  .order('pk_ts_month', { ascending: false });
+const activeStores = deduplicateAndFilterDeleted(data, s => s.pk_id_store);
+```
+
+**¿Por qué?** Un store puede estar activo en Enero (`flg_deleted=0`) y eliminado en Febrero (`flg_deleted=1`). Si filtras antes de deduplicar, obtienes el de Enero (obsoleto). El snapshot más reciente es la verdad.
+
 ### 1. Obtener Dimensiones
 ```typescript
 const dimensions = await fetchAllDimensions(companyIds);
-// Deduplica por pk_ts_month DESC (más reciente primero)
+// Usa deduplicateAndFilterDeleted internamente
 ```
 
 ### 2. Construir Mapeo Address → Store
