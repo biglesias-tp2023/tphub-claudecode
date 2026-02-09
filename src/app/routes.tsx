@@ -10,7 +10,7 @@ import { CalendarPage } from '@/pages/calendar';
 import { MapsPage } from '@/pages/maps';
 import { LoginPage } from '@/pages/auth';
 import { AdminPage } from '@/pages/admin/AdminPage';
-import { AuditsPage } from '@/pages/audits';
+import { AuditsPage, AuditDetailPage } from '@/pages/audits';
 
 // Lazy load public pages
 const SharedObjectivePage = lazy(() => import('@/pages/shared/SharedObjectivePage'));
@@ -47,6 +47,7 @@ export const router = createBrowserRouter([
       { path: 'strategic', element: <StrategicPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'audits', element: <AuditsPage /> },
+      { path: 'audits/:id', element: <AuditDetailPage /> },
       { path: 'maps', element: <MapsPage /> },
       { path: 'admin', element: <AdminPage /> },
       { path: 'admin/users', element: <AdminPage /> },

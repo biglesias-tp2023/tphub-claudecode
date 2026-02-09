@@ -131,6 +131,8 @@ export interface HierarchyRow {
   ticketMedio: number;
   nuevosClientes: number;
   porcentajeNuevos: number;
+  recurrentesClientes: number;
+  porcentajeRecurrentes: number;
 
   // Operaciones (phase 2 - optional)
   openTime?: number;
@@ -167,6 +169,11 @@ export interface ControllingData {
  * Transform HierarchyDataRow from service to HierarchyRow for the component
  */
 function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
+  const recurrentesClientes = row.metrics.pedidos - row.metrics.nuevosClientes;
+  const porcentajeRecurrentes = row.metrics.pedidos > 0
+    ? (recurrentesClientes / row.metrics.pedidos) * 100
+    : 0;
+
   return {
     id: row.id,
     level: row.level,
@@ -182,6 +189,8 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     ticketMedio: row.metrics.ticketMedio,
     nuevosClientes: row.metrics.nuevosClientes,
     porcentajeNuevos: row.metrics.porcentajeNuevos,
+    recurrentesClientes,
+    porcentajeRecurrentes,
     // Phase 2 metrics (not yet available - will be undefined)
   };
 }
@@ -313,7 +322,7 @@ export function useControllingData() {
     let channels = createDefaultChannels();
 
     if (ordersQuery.data) {
-      const { current, changes } = ordersQuery.data;
+      const { current, previous, changes } = ordersQuery.data;
 
       portfolio = {
         ventas: current.totalRevenue,
@@ -364,6 +373,12 @@ export function useControllingData() {
 
       channels = channelConfig.map((cfg) => {
         const channelData = current.byChannel[cfg.id];
+        const prevChannelData = previous.byChannel[cfg.id];
+
+        // Calculate per-channel revenue change
+        const channelRevenueChange = prevChannelData.revenue > 0
+          ? ((channelData.revenue - prevChannelData.revenue) / prevChannelData.revenue) * 100
+          : 0;
 
         return {
           channel: cfg.id,
@@ -371,7 +386,7 @@ export function useControllingData() {
           color: cfg.color,
           logo: cfg.logo,
           revenue: channelData.revenue,
-          revenueChange: 0, // Not yet calculated per channel
+          revenueChange: channelRevenueChange,
           percentage: totalChannelRevenue > 0 ? (channelData.revenue / totalChannelRevenue) * 100 : 0,
           pedidos: channelData.orders,
           pedidosPercentage: totalChannelOrders > 0 ? (channelData.orders / totalChannelOrders) * 100 : 0,

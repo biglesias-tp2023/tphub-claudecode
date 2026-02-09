@@ -78,7 +78,6 @@ export function FileUploadField({
           .upload(path, file);
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
           // Si el bucket no existe, guardar localmente como base64
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -105,8 +104,7 @@ export function FileUploadField({
           type: file.type,
           size: file.size,
         });
-      } catch (err) {
-        console.error('Error uploading file:', err);
+      } catch {
         setError(`Error al subir: ${file.name}`);
       }
     }

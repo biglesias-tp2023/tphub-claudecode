@@ -1,13 +1,17 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Plus, Search, Filter, ClipboardList, Loader2, X, Download, Mail, FileText, FileSpreadsheet } from 'lucide-react';
-import { Card, Spinner } from '@/components/ui';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Search, Filter, ClipboardList, Loader2, X, Download, Mail, FileText, FileSpreadsheet, UserSearch, Rocket, BarChart3, ChevronDown, Check, ArrowLeft } from 'lucide-react';
+import { Card } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
-import { DashboardFilters } from '@/features/dashboard';
 import { cn } from '@/utils/cn';
-import { AuditCard, AuditCardSkeleton, AuditEditorModal, AuditScopeSelector } from '@/features/audits/components';
+import { AuditCard, AuditCardSkeleton, AuditEditorModal } from '@/features/audits/components';
 import { useAuditsWithDetails, useAuditTypes, useCreateAudit } from '@/features/audits/hooks';
-import { AUDIT_STATUS_CONFIG, getAuditScopeLabel, calculateTotalScore } from '@/features/audits/config';
-import { fetchAuditWithDetailsById, fetchAuditTypeById } from '@/services/supabase-data';
+import { AUDIT_STATUS_CONFIG, AUDIT_TYPE_CARDS, getAuditScopeLabel, calculateTotalScore, generateAuditNumber } from '@/features/audits/config';
+import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
+import { fetchCrpCompanies, fetchCrpBrands } from '@/services/crp-portal';
+import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useProfile } from '@/stores/authStore';
 import {
   exportAuditToPDF,
   exportAuditToExcel,
@@ -15,7 +19,7 @@ import {
   type AuditExportData,
   type AuditExportSection,
 } from '@/utils/export';
-import type { AuditStatus, AuditWithDetails, AuditType } from '@/types';
+import type { AuditStatus, AuditWithDetails, AuditType, Profile, AuditTypeSlug } from '@/types';
 
 // ============================================
 // TYPES
@@ -25,6 +29,7 @@ interface AuditFilters {
   search: string;
   type: string | null;
   status: AuditStatus | null;
+  consultantId: string | null;
 }
 
 // ============================================
@@ -109,17 +114,12 @@ function PdfPreviewModal({ open, onClose, exportData, onDownload }: PdfPreviewMo
             <h2 className="text-lg font-semibold text-gray-900">Preview PDF</h2>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={onDownload} className="gap-2">
-              <Download className="w-4 h-4" />
+            <Button onClick={onDownload} leftIcon={<Download className="w-4 h-4" />}>
               Descargar PDF
             </Button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
@@ -167,17 +167,12 @@ function ExcelPreviewModal({ open, onClose, exportData, onDownload }: ExcelPrevi
             <h2 className="text-lg font-semibold text-gray-900">Preview Excel</h2>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={onDownload} className="gap-2">
-              <Download className="w-4 h-4" />
+            <Button onClick={onDownload} leftIcon={<Download className="w-4 h-4" />}>
               Descargar Excel
             </Button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
@@ -261,17 +256,12 @@ function EmailPreviewModal({ open, onClose, exportData, onSend }: EmailPreviewMo
             <h2 className="text-lg font-semibold text-gray-900">Preview Email</h2>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={onSend} className="gap-2">
-              <Mail className="w-4 h-4" />
+            <Button onClick={onSend} leftIcon={<Mail className="w-4 h-4" />}>
               Enviar Email
             </Button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
@@ -346,6 +336,289 @@ function EmailPreviewModal({ open, onClose, exportData, onSend }: EmailPreviewMo
 }
 
 // ============================================
+// PLATFORM OPTIONS
+// ============================================
+
+const PLATFORM_OPTIONS = [
+  { id: 'glovo', name: 'Glovo' },
+  { id: 'ubereats', name: 'Uber Eats' },
+  { id: 'justeat', name: 'Just Eat' },
+];
+
+// ============================================
+// DROPDOWN COMPONENT (for selectors)
+// ============================================
+
+interface SimpleDropdownProps<T> {
+  placeholder: string;
+  value: T | null;
+  options: T[];
+  isLoading?: boolean;
+  disabled?: boolean;
+  onChange: (option: T | null) => void;
+  getOptionLabel: (option: T) => string;
+  getOptionValue: (option: T) => string;
+}
+
+function SimpleDropdown<T>({
+  placeholder,
+  value,
+  options,
+  isLoading = false,
+  disabled = false,
+  onChange,
+  getOptionLabel,
+  getOptionValue,
+}: SimpleDropdownProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredOptions = useMemo(() => {
+    if (!search) return options;
+    const searchLower = search.toLowerCase();
+    return options.filter((opt) =>
+      getOptionLabel(opt).toLowerCase().includes(searchLower)
+    );
+  }, [options, search, getOptionLabel]);
+
+  const selectedLabel = value ? getOptionLabel(value) : null;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={cn(
+          'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border text-left transition-colors',
+          disabled
+            ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+            : 'bg-white border-gray-300 hover:border-gray-400',
+          isOpen && 'border-primary-500 ring-1 ring-primary-500'
+        )}
+      >
+        <span className={cn('flex-1 truncate', !selectedLabel && 'text-gray-400')}>
+          {isLoading ? 'Cargando...' : selectedLabel || placeholder}
+        </span>
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+        ) : (
+          <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', isOpen && 'rotate-180')} />
+        )}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-50 w-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-64 overflow-hidden">
+            {options.length > 5 && (
+              <div className="p-2 border-b border-gray-100">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-primary-500"
+                  autoFocus
+                />
+              </div>
+            )}
+            <div className="max-h-48 overflow-y-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                  No se encontraron resultados
+                </div>
+              ) : (
+                filteredOptions.map((option) => {
+                  const label = getOptionLabel(option);
+                  const optionValue = getOptionValue(option);
+                  const isSelected = value ? getOptionValue(value) === optionValue : false;
+
+                  return (
+                    <button
+                      key={optionValue}
+                      type="button"
+                      onClick={() => {
+                        onChange(option);
+                        setIsOpen(false);
+                        setSearch('');
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
+                        isSelected && 'bg-primary-50 text-primary-700'
+                      )}
+                    >
+                      <span className="flex-1 truncate">{label}</span>
+                      {isSelected && <Check className="w-4 h-4 text-primary-500" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// MULTI-SELECT DROPDOWN COMPONENT
+// ============================================
+
+interface MultiSelectDropdownProps<T> {
+  placeholder: string;
+  values: T[];
+  options: T[];
+  isLoading?: boolean;
+  disabled?: boolean;
+  onChange: (options: T[]) => void;
+  getOptionLabel: (option: T) => string;
+  getOptionValue: (option: T) => string;
+}
+
+function MultiSelectDropdown<T>({
+  placeholder,
+  values,
+  options,
+  isLoading = false,
+  disabled = false,
+  onChange,
+  getOptionLabel,
+  getOptionValue,
+}: MultiSelectDropdownProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filteredOptions = useMemo(() => {
+    if (!search) return options;
+    const searchLower = search.toLowerCase();
+    return options.filter((opt) =>
+      getOptionLabel(opt).toLowerCase().includes(searchLower)
+    );
+  }, [options, search, getOptionLabel]);
+
+  const selectedValues = useMemo(() => {
+    return new Set(values.map(getOptionValue));
+  }, [values, getOptionValue]);
+
+  const toggleOption = (option: T) => {
+    const optionValue = getOptionValue(option);
+    if (selectedValues.has(optionValue)) {
+      onChange(values.filter((v) => getOptionValue(v) !== optionValue));
+    } else {
+      onChange([...values, option]);
+    }
+  };
+
+  const displayLabel = useMemo(() => {
+    if (values.length === 0) return null;
+    if (values.length === 1) return getOptionLabel(values[0]);
+    return `${values.length} seleccionados`;
+  }, [values, getOptionLabel]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={cn(
+          'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border text-left transition-colors',
+          disabled
+            ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+            : 'bg-white border-gray-300 hover:border-gray-400',
+          isOpen && 'border-primary-500 ring-1 ring-primary-500'
+        )}
+      >
+        <span className={cn('flex-1 truncate', !displayLabel && 'text-gray-400')}>
+          {isLoading ? 'Cargando...' : displayLabel || placeholder}
+        </span>
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+        ) : (
+          <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', isOpen && 'rotate-180')} />
+        )}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-50 w-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-64 overflow-hidden">
+            {options.length > 5 && (
+              <div className="p-2 border-b border-gray-100">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar..."
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-primary-500"
+                  autoFocus
+                />
+              </div>
+            )}
+            <div className="max-h-48 overflow-y-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                  No se encontraron resultados
+                </div>
+              ) : (
+                filteredOptions.map((option) => {
+                  const label = getOptionLabel(option);
+                  const optionValue = getOptionValue(option);
+                  const isSelected = selectedValues.has(optionValue);
+
+                  return (
+                    <button
+                      key={optionValue}
+                      type="button"
+                      onClick={() => toggleOption(option)}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
+                        isSelected && 'bg-primary-50'
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'w-4 h-4 rounded border flex items-center justify-center',
+                          isSelected
+                            ? 'bg-primary-500 border-primary-500'
+                            : 'border-gray-300'
+                        )}
+                      >
+                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className="flex-1 truncate">{label}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// TYPE CARD ICON COMPONENT
+// ============================================
+
+function TypeCardIcon({ slug, className }: { slug: string; className?: string }) {
+  switch (slug) {
+    case 'mystery_shopper':
+      return <UserSearch className={className} />;
+    case 'onboarding':
+      return <Rocket className={className} />;
+    case 'google_ads':
+      return <BarChart3 className={className} />;
+    default:
+      return <ClipboardList className={className} />;
+  }
+}
+
+// ============================================
 // NEW AUDIT MODAL
 // ============================================
 
@@ -356,55 +629,165 @@ interface NewAuditModalProps {
 }
 
 function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
-  const { data: auditTypes = [], isLoading: typesLoading } = useAuditTypes();
+  const navigate = useNavigate();
+  const { data: auditTypes = [] } = useAuditTypes();
   const createAudit = useCreateAudit();
 
-  const [step, setStep] = useState<'type' | 'scope'>('type');
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [brandId, setBrandId] = useState<string | null>(null);
-  const [addressId, setAddressId] = useState<string | null>(null);
+  // Global filters and current user profile
+  const globalCompanyIds = useGlobalFiltersStore((s) => s.companyIds);
+  const currentUserProfile = useProfile();
+
+  const [step, setStep] = useState<'type' | 'form'>('type');
+  const [selectedTypeSlug, setSelectedTypeSlug] = useState<AuditTypeSlug | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<{ id: string; name: string } | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState<{ id: string; name: string; companyId: string } | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<{ id: string; name: string } | null>(null);
+  const [selectedConsultants, setSelectedConsultants] = useState<Profile[]>([]);
+  const [selectedKam, setSelectedKam] = useState<Profile | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Fetch companies
+  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+    queryKey: ['crp', 'companies'],
+    queryFn: fetchCrpCompanies,
+    enabled: open && step === 'form',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch all brands (stores) for all companies
+  const { data: allBrands = [], isLoading: brandsLoading } = useQuery({
+    queryKey: ['crp', 'brands', 'all'],
+    queryFn: () => fetchCrpBrands(),
+    enabled: open && step === 'form',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch all profiles for consultant/KAM selection
+  const { data: fetchedProfiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: ['profiles', 'all'],
+    queryFn: fetchAllProfiles,
+    enabled: open && step === 'form',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Ensure profiles always include at least the current user as fallback
+  const profiles = useMemo(() => {
+    if (fetchedProfiles.length > 0) {
+      return fetchedProfiles;
+    }
+    // Fallback: if no profiles loaded, use current user
+    if (currentUserProfile) {
+      return [currentUserProfile];
+    }
+    return [];
+  }, [fetchedProfiles, currentUserProfile]);
+
+  // Filter companies based on global filter
+  const availableCompanies = useMemo(() => {
+    if (globalCompanyIds.length === 0) {
+      // Empty = all companies
+      return companies;
+    }
+    return companies.filter((c) => globalCompanyIds.includes(c.id));
+  }, [companies, globalCompanyIds]);
+
+  // Lock company selector if only one company selected globally
+  const isCompanyLocked = globalCompanyIds.length === 1;
+  const lockedCompany = useMemo(() => {
+    if (!isCompanyLocked) return null;
+    return companies.find((c) => c.id === globalCompanyIds[0]) || null;
+  }, [isCompanyLocked, companies, globalCompanyIds]);
+
+  // Filter brands by selected company
+  const filteredBrands = useMemo(() => {
+    if (!selectedCompany) return [];
+    return allBrands
+      .filter((b) => b.companyId === selectedCompany.id)
+      .map((brand) => ({
+        id: brand.id,
+        name: brand.name,
+        companyId: brand.companyId,
+        displayName: brand.name,
+      }));
+  }, [allBrands, selectedCompany]);
 
   // Reset state when modal closes
   useEffect(() => {
     if (!open) {
       setStep('type');
-      setSelectedTypeId(null);
-      setCompanyId(null);
-      setBrandId(null);
-      setAddressId(null);
+      setSelectedTypeSlug(null);
+      setSelectedCompany(null);
+      setSelectedBrand(null);
+      setSelectedPlatform(null);
+      setSelectedConsultants([]);
+      setSelectedKam(null);
     }
   }, [open]);
 
-  const handleTypeSelect = (typeId: string) => {
-    setSelectedTypeId(typeId);
-    setStep('scope');
+  // Auto-fill KAM with logged-in user when entering form step
+  useEffect(() => {
+    if (open && step === 'form' && currentUserProfile && !selectedKam) {
+      setSelectedKam(currentUserProfile);
+    }
+  }, [open, step, currentUserProfile, selectedKam]);
+
+  // Auto-set locked company when entering form step
+  useEffect(() => {
+    if (open && step === 'form' && lockedCompany && !selectedCompany) {
+      setSelectedCompany({ id: lockedCompany.id, name: lockedCompany.name });
+    }
+  }, [open, step, lockedCompany, selectedCompany]);
+
+  const handleTypeSelect = (slug: AuditTypeSlug) => {
+    // Only Mystery Shopper is active for now
+    if (slug !== 'mystery_shopper') return;
+    setSelectedTypeSlug(slug);
+    setStep('form');
   };
 
   const handleBack = () => {
     setStep('type');
+    setSelectedCompany(null);
+    setSelectedBrand(null);
+    setSelectedPlatform(null);
+    setSelectedConsultants([]);
+    setSelectedKam(null);
   };
 
   const handleCreate = async () => {
-    if (!selectedTypeId || !companyId) return;
+    if (!selectedTypeSlug || !selectedCompany || !selectedBrand || !selectedPlatform || selectedConsultants.length === 0 || !selectedKam) return;
+
+    // Find the audit type ID by slug
+    const auditType = auditTypes.find((t) => t.slug === selectedTypeSlug);
+    if (!auditType) return;
 
     setIsCreating(true);
     try {
+      // Generate audit number: MS-YYYYMMDD-BrandName
+      const auditNumber = generateAuditNumber(selectedTypeSlug, selectedBrand.name);
+
       const newAudit = await createAudit.mutateAsync({
-        auditTypeId: selectedTypeId,
-        companyId,
-        brandId: brandId || undefined,
-        addressId: addressId || undefined,
+        auditTypeId: auditType.id,
+        companyId: selectedCompany.id,
+        brandId: selectedBrand.id,
+        storeId: selectedBrand.id,
+        portalId: selectedPlatform.id,
+        consultantUserId: selectedConsultants[0].id, // Primary consultant
+        kamUserId: selectedKam.id,
+        auditNumber,
       });
-      onCreated(newAudit.id);
+
       onClose();
-    } catch (error) {
-      console.error('Error creating audit:', error);
+      // Navigate to the audit detail page
+      navigate(`/audits/${newAudit.id}`);
+    } catch {
+      // Error handled by React Query
     } finally {
       setIsCreating(false);
     }
   };
+
+  const isFormValid = selectedCompany && selectedBrand && selectedPlatform && selectedConsultants.length > 0 && selectedKam;
 
   if (!open) return null;
 
@@ -412,49 +795,54 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Nueva Auditoría {step === 'scope' && '- Alcance'}
-        </h2>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          {step === 'form' && (
+            <Button variant="ghost" size="sm" iconOnly onClick={handleBack}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <h2 className="text-lg font-semibold text-gray-900">
+            {step === 'type' ? 'Nueva Auditoría' : 'Mystery Shopper'}
+          </h2>
+        </div>
 
-        {typesLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Spinner size="md" />
-          </div>
-        ) : step === 'type' ? (
+        {step === 'type' ? (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Selecciona el tipo de auditoría que deseas crear:
+              Selecciona el tipo de auditoría:
             </p>
 
-            <div className="grid gap-3">
-              {auditTypes.filter((t) => t.isActive).map((auditType) => (
+            {/* Type Cards Grid */}
+            <div className="grid grid-cols-3 gap-3">
+              {AUDIT_TYPE_CARDS.map((typeCard) => (
                 <button
-                  key={auditType.id}
+                  key={typeCard.slug}
                   type="button"
-                  onClick={() => handleTypeSelect(auditType.id)}
+                  onClick={() => handleTypeSelect(typeCard.slug as AuditTypeSlug)}
+                  disabled={!typeCard.isActive}
                   className={cn(
-                    'flex items-center gap-3 p-4 rounded-lg border text-left transition-all',
-                    selectedTypeId === auditType.id
-                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    'flex flex-col items-center p-4 rounded-xl border-2 text-center transition-all',
+                    typeCard.isActive
+                      ? 'border-gray-200 hover:border-purple-300 hover:bg-purple-50 cursor-pointer'
+                      : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
                   )}
                 >
                   <div
                     className={cn(
-                      'w-10 h-10 rounded-lg flex items-center justify-center',
-                      selectedTypeId === auditType.id
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-gray-100 text-gray-500'
+                      'w-12 h-12 rounded-xl flex items-center justify-center mb-3',
+                      typeCard.bgColor
                     )}
                   >
-                    <ClipboardList className="w-5 h-5" />
+                    <TypeCardIcon slug={typeCard.slug} className={cn('w-6 h-6', typeCard.color)} />
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{auditType.name}</p>
-                    {auditType.description && (
-                      <p className="text-sm text-gray-500">{auditType.description}</p>
-                    )}
-                  </div>
+                  <p className="font-medium text-gray-900 text-sm mb-1">{typeCard.name}</p>
+                  <p className="text-xs text-gray-500 mb-2 leading-tight">{typeCard.description}</p>
+                  {typeCard.isActive ? (
+                    <span className="text-xs text-green-600 font-medium">Listo</span>
+                  ) : (
+                    <span className="text-xs text-gray-400 font-medium">Próximamente</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -466,38 +854,109 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Selecciona la compañía, marca y dirección para esta auditoría:
-            </p>
+          <div className="space-y-5">
+            {/* Company Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Compañía <span className="text-red-500">*</span>
+              </label>
+              {isCompanyLocked && lockedCompany ? (
+                <div className="px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700">
+                  {lockedCompany.name}
+                </div>
+              ) : (
+                <SimpleDropdown
+                  placeholder="Seleccionar compañía"
+                  value={selectedCompany}
+                  options={availableCompanies.map((c) => ({ id: c.id, name: c.name }))}
+                  isLoading={companiesLoading}
+                  onChange={(company) => {
+                    setSelectedCompany(company);
+                    // Reset brand when company changes
+                    setSelectedBrand(null);
+                  }}
+                  getOptionLabel={(c) => c.name}
+                  getOptionValue={(c) => c.id}
+                />
+              )}
+            </div>
 
-            <AuditScopeSelector
-              companyId={companyId}
-              brandId={brandId}
-              addressId={addressId}
-              onCompanyChange={setCompanyId}
-              onBrandChange={setBrandId}
-              onAddressChange={setAddressId}
-              required
-            />
+            {/* Brand/Store Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Marca <span className="text-red-500">*</span>
+              </label>
+              <SimpleDropdown
+                placeholder={selectedCompany ? 'Seleccionar marca' : 'Primero selecciona una compañía'}
+                value={selectedBrand}
+                options={filteredBrands}
+                isLoading={brandsLoading}
+                disabled={!selectedCompany}
+                onChange={setSelectedBrand}
+                getOptionLabel={(b) => b.displayName}
+                getOptionValue={(b) => b.id}
+              />
+            </div>
 
-            <div className="flex justify-between gap-3 pt-4 border-t border-gray-100">
-              <Button variant="outline" onClick={handleBack}>
-                Atrás
+            {/* Platform Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Plataforma <span className="text-red-500">*</span>
+              </label>
+              <SimpleDropdown
+                placeholder="Seleccionar plataforma"
+                value={selectedPlatform}
+                options={PLATFORM_OPTIONS}
+                onChange={setSelectedPlatform}
+                getOptionLabel={(p) => p.name}
+                getOptionValue={(p) => p.id}
+              />
+            </div>
+
+            {/* Consultant Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Consultor que gestiona la cuenta <span className="text-red-500">*</span>
+              </label>
+              <MultiSelectDropdown
+                placeholder="Seleccionar consultor"
+                values={selectedConsultants}
+                options={profiles}
+                isLoading={profilesLoading}
+                onChange={setSelectedConsultants}
+                getOptionLabel={(p) => p.fullName || p.email}
+                getOptionValue={(p) => p.id}
+              />
+            </div>
+
+            {/* KAM Evaluator Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                KAM evaluador <span className="text-red-500">*</span>
+              </label>
+              <SimpleDropdown
+                placeholder="Seleccionar KAM evaluador"
+                value={selectedKam}
+                options={profiles}
+                isLoading={profilesLoading}
+                onChange={setSelectedKam}
+                getOptionLabel={(p) => p.fullName || p.email}
+                getOptionValue={(p) => p.id}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <Button variant="outline" onClick={onClose}>
+                Cancelar
               </Button>
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={onClose}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleCreate}
-                  disabled={!companyId || isCreating}
-                  className="gap-2"
-                >
-                  {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Crear auditoría
-                </Button>
-              </div>
+              <Button
+                onClick={handleCreate}
+                disabled={!isFormValid || isCreating}
+                className="gap-2"
+              >
+                {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
+                Crear Auditoría
+              </Button>
             </div>
           </div>
         )}
@@ -542,9 +1001,10 @@ interface FilterBarProps {
   filters: AuditFilters;
   onFiltersChange: (filters: AuditFilters) => void;
   auditTypes: Array<{ id: string; name: string; slug: string }>;
+  consultants: Profile[];
 }
 
-function FilterBar({ filters, onFiltersChange, auditTypes }: FilterBarProps) {
+function FilterBar({ filters, onFiltersChange, auditTypes, consultants }: FilterBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Search */}
@@ -566,7 +1026,7 @@ function FilterBar({ filters, onFiltersChange, auditTypes }: FilterBarProps) {
           onChange={(e) => onFiltersChange({ ...filters, type: e.target.value || null })}
           className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
         >
-          <option value="">Todos los tipos</option>
+          <option value="">Tipo: Todos</option>
           {auditTypes.map((type) => (
             <option key={type.id} value={type.id}>
               {type.name}
@@ -585,10 +1045,29 @@ function FilterBar({ filters, onFiltersChange, auditTypes }: FilterBarProps) {
           }
           className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
         >
-          <option value="">Todos los estados</option>
+          <option value="">Estado: Todos</option>
           {Object.entries(AUDIT_STATUS_CONFIG).map(([status, config]) => (
             <option key={status} value={status}>
               {config.label}
+            </option>
+          ))}
+        </select>
+        <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+      </div>
+
+      {/* Consultant filter */}
+      <div className="relative">
+        <select
+          value={filters.consultantId || ''}
+          onChange={(e) =>
+            onFiltersChange({ ...filters, consultantId: e.target.value || null })
+          }
+          className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        >
+          <option value="">Consultor: Todos</option>
+          {consultants.map((consultant) => (
+            <option key={consultant.id} value={consultant.id}>
+              {consultant.fullName || consultant.email}
             </option>
           ))}
         </select>
@@ -663,6 +1142,7 @@ export function AuditsPage() {
     search: '',
     type: null,
     status: null,
+    consultantId: null,
   });
   const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
   const [editingAuditId, setEditingAuditId] = useState<string | null>(null);
@@ -676,6 +1156,13 @@ export function AuditsPage() {
   // Data
   const { data: audits = [], isLoading: auditsLoading } = useAuditsWithDetails();
   const { data: auditTypes = [] } = useAuditTypes();
+
+  // Fetch profiles for consultant filter
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['profiles', 'all'],
+    queryFn: fetchAllProfiles,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Filter audits
   const filteredAudits = useMemo(() => {
@@ -705,13 +1192,19 @@ export function AuditsPage() {
         return false;
       }
 
+      // Consultant filter
+      if (filters.consultantId && audit.consultantUserId !== filters.consultantId) {
+        return false;
+      }
+
       return true;
     });
   }, [audits, filters]);
 
   // Handlers
-  const handleAuditCreated = useCallback((auditId: string) => {
-    setEditingAuditId(auditId);
+  const handleAuditCreated = useCallback((_auditId: string) => {
+    // The modal now handles navigation internally
+    // This callback is kept for potential future use
   }, []);
 
   const handleEditAudit = useCallback((auditId: string) => {
@@ -726,8 +1219,7 @@ export function AuditsPage() {
       const auditType = await fetchAuditTypeById(audit.auditTypeId);
       if (!auditType) return null;
       return buildAuditExportData(audit, auditType);
-    } catch (error) {
-      console.error('Error loading export data:', error);
+    } catch {
       return null;
     }
   }, []);
@@ -788,9 +1280,6 @@ export function AuditsPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <DashboardFilters />
-
       {/* Content */}
       {!hasAudits && !auditsLoading ? (
         <Card padding="none" className="border-gray-100">
@@ -804,6 +1293,7 @@ export function AuditsPage() {
               filters={filters}
               onFiltersChange={setFilters}
               auditTypes={auditTypes}
+              consultants={profiles}
             />
           </div>
 
