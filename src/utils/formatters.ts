@@ -1,4 +1,14 @@
-import { endOfDay, startOfDay, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import {
+  endOfDay,
+  startOfDay,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  startOfWeek,
+  endOfWeek,
+  subWeeks,
+} from 'date-fns';
 import type { DateRange, DatePreset } from '@/types';
 
 // ============================================
@@ -94,6 +104,12 @@ export function formatPercentage(
 // DATE RANGES
 // ============================================
 
+// Helper to get today's date at start of day
+const today = () => startOfDay(new Date());
+
+// Helper to get yesterday (last complete day)
+const yesterday = () => subDays(today(), 1);
+
 /**
  * Converts a date preset to an actual date range.
  *
@@ -101,40 +117,85 @@ export function formatPercentage(
  * @returns DateRange object with start and end dates
  *
  * @example
- * getDateRangeFromPreset('7d') // { start: 7 days ago, end: today }
- * getDateRangeFromPreset('today') // { start: today 00:00, end: today 23:59 }
+ * getDateRangeFromPreset('last_7_days') // { start: 7 days ago, end: yesterday }
+ * getDateRangeFromPreset('this_week') // { start: Monday of current week, end: today }
  */
 export function getDateRangeFromPreset(preset: DatePreset): DateRange {
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const yesterdayEnd = endOfDay(subDays(now, 1));
-
   switch (preset) {
-    case 'today':
-      return { start: todayStart, end: endOfDay(now) };
-    case 'yesterday': {
-      const yesterday = subDays(now, 1);
-      return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+    case 'this_week':
+      // From Monday of current week to today
+      return {
+        start: startOfWeek(today(), { weekStartsOn: 1 }),
+        end: endOfDay(new Date()),
+      };
+
+    case 'this_month':
+      // From day 1 of current month to today
+      return {
+        start: startOfMonth(today()),
+        end: endOfDay(new Date()),
+      };
+
+    case 'last_week': {
+      // Complete previous week: Monday to Sunday
+      const lastWeek = subWeeks(today(), 1);
+      return {
+        start: startOfWeek(lastWeek, { weekStartsOn: 1 }),
+        end: endOfDay(endOfWeek(lastWeek, { weekStartsOn: 1 })),
+      };
     }
-    case '7d':
+
+    case 'last_month': {
+      // Complete previous month: day 1 to last day
+      const lastMonth = subMonths(today(), 1);
+      return {
+        start: startOfMonth(lastMonth),
+        end: endOfDay(endOfMonth(lastMonth)),
+      };
+    }
+
+    case 'last_7_days':
       // Last 7 COMPLETE days (not including today)
       // Example: if today is Jan 26, returns Jan 19-25
-      return { start: startOfDay(subDays(todayStart, 7)), end: yesterdayEnd };
-    case '30d':
+      return {
+        start: startOfDay(subDays(today(), 7)),
+        end: endOfDay(yesterday()),
+      };
+
+    case 'last_30_days':
       // Last 30 COMPLETE days (not including today)
-      return { start: startOfDay(subDays(todayStart, 30)), end: yesterdayEnd };
-    case '90d':
-      // Last 90 COMPLETE days (not including today)
-      return { start: startOfDay(subDays(todayStart, 90)), end: yesterdayEnd };
-    case 'year':
-      // Last 12 COMPLETE months (not including current month)
-      const lastMonth = subMonths(todayStart, 1);
-      const twelveMonthsAgo = subMonths(todayStart, 12);
-      return { start: startOfMonth(twelveMonthsAgo), end: endOfDay(endOfMonth(lastMonth)) };
+      return {
+        start: startOfDay(subDays(today(), 30)),
+        end: endOfDay(yesterday()),
+      };
+
+    case 'last_12_weeks': {
+      // Last 12 COMPLETE weeks (Mon-Sun), not including current week
+      const endOfLastWeek = endOfWeek(subWeeks(today(), 1), { weekStartsOn: 1 });
+      const startOf12WeeksAgo = startOfWeek(subWeeks(today(), 12), { weekStartsOn: 1 });
+      return {
+        start: startOf12WeeksAgo,
+        end: endOfDay(endOfLastWeek),
+      };
+    }
+
+    case 'last_12_months': {
+      // Last 12 COMPLETE months, not including current month
+      const lastMonth = subMonths(today(), 1);
+      const twelveMonthsAgo = subMonths(today(), 12);
+      return {
+        start: startOfMonth(twelveMonthsAgo),
+        end: endOfDay(endOfMonth(lastMonth)),
+      };
+    }
+
     case 'custom':
     default:
-      // Default to last 30 complete days
-      return { start: startOfDay(subDays(todayStart, 30)), end: yesterdayEnd };
+      // Default to last 7 complete days
+      return {
+        start: startOfDay(subDays(today(), 7)),
+        end: endOfDay(yesterday()),
+      };
   }
 }
 
@@ -143,12 +204,14 @@ export function getDateRangeFromPreset(preset: DatePreset): DateRange {
 // ============================================
 
 const PRESET_LABELS: Record<DatePreset, string> = {
-  today: 'Hoy',
-  yesterday: 'Ayer',
-  '7d': 'Últimos 7 días',
-  '30d': 'Últimos 30 días',
-  '90d': 'Últimos 90 días',
-  year: 'Último año',
+  this_week: 'Esta semana',
+  this_month: 'Este mes',
+  last_week: 'La semana pasada',
+  last_month: 'El mes pasado',
+  last_7_days: 'Los últimos 7 días',
+  last_30_days: 'Los últimos 30 días',
+  last_12_weeks: 'Últimas 12 semanas',
+  last_12_months: 'Últimos 12 meses',
   custom: 'Personalizado',
 };
 
@@ -168,100 +231,17 @@ export function getPresetLabel(preset: DatePreset): string {
 
 /**
  * Gets the current analysis period and comparison period labels.
+ * Uses getPeriodLabelsFromRange internally for consistency.
  *
  * @param preset - The date preset identifier
  * @returns Object with current period and comparison period labels
  *
  * @example
- * getPeriodLabels('7d') // { current: "15-21 Ene", comparison: "8-14 Ene" }
+ * getPeriodLabels('last_7_days') // { current: "19-25 Ene", comparison: "12-18 Ene" }
  */
 export function getPeriodLabels(preset: DatePreset): { current: string; comparison: string } {
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const yesterday = subDays(now, 1);
-  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-  const formatShortDate = (date: Date) => `${date.getDate()} ${monthNames[date.getMonth()]}`;
-  const formatDateRange = (start: Date, end: Date) => {
-    if (start.getMonth() === end.getMonth()) {
-      return `${start.getDate()}-${end.getDate()} ${monthNames[start.getMonth()]}`;
-    }
-    return `${formatShortDate(start)} - ${formatShortDate(end)}`;
-  };
-
-  switch (preset) {
-    case 'today': {
-      return {
-        current: formatShortDate(now),
-        comparison: formatShortDate(yesterday),
-      };
-    }
-    case 'yesterday': {
-      const dayBefore = subDays(now, 2);
-      return {
-        current: formatShortDate(yesterday),
-        comparison: formatShortDate(dayBefore),
-      };
-    }
-    case '7d': {
-      // Last 7 COMPLETE days (not including today)
-      // Current: days -7 to -1 (yesterday)
-      // Comparison: days -14 to -8
-      const currentStart = subDays(todayStart, 7);
-      const currentEnd = yesterday;
-      const compStart = subDays(todayStart, 14);
-      const compEnd = subDays(todayStart, 8);
-      return {
-        current: formatDateRange(currentStart, currentEnd),
-        comparison: formatDateRange(compStart, compEnd),
-      };
-    }
-    case '30d': {
-      // Last 30 COMPLETE days (not including today)
-      const currentStart = subDays(todayStart, 30);
-      const currentEnd = yesterday;
-      const compStart = subDays(todayStart, 60);
-      const compEnd = subDays(todayStart, 31);
-      return {
-        current: formatDateRange(currentStart, currentEnd),
-        comparison: formatDateRange(compStart, compEnd),
-      };
-    }
-    case '90d': {
-      // Last 90 COMPLETE days (not including today)
-      const currentStart = subDays(todayStart, 90);
-      const currentEnd = yesterday;
-      const compStart = subDays(todayStart, 180);
-      const compEnd = subDays(todayStart, 91);
-      return {
-        current: formatDateRange(currentStart, currentEnd),
-        comparison: formatDateRange(compStart, compEnd),
-      };
-    }
-    case 'year': {
-      // Last 12 COMPLETE months (not including current month)
-      const lastMonth = subMonths(todayStart, 1);
-      const twelveMonthsAgo = subMonths(todayStart, 12);
-      const compEnd = subMonths(todayStart, 13);
-      const compStart = subMonths(todayStart, 24);
-      return {
-        current: formatDateRange(startOfMonth(twelveMonthsAgo), endOfMonth(lastMonth)),
-        comparison: formatDateRange(startOfMonth(compStart), endOfMonth(compEnd)),
-      };
-    }
-    case 'custom':
-    default: {
-      // Default to last 30 complete days
-      const currentStart = subDays(todayStart, 30);
-      const currentEnd = yesterday;
-      const compStart = subDays(todayStart, 60);
-      const compEnd = subDays(todayStart, 31);
-      return {
-        current: formatDateRange(currentStart, currentEnd),
-        comparison: formatDateRange(compStart, compEnd),
-      };
-    }
-  }
+  const range = getDateRangeFromPreset(preset);
+  return getPeriodLabelsFromRange(range);
 }
 
 /**
@@ -290,9 +270,13 @@ export function getPeriodLabelsFromRange(dateRange: DateRange): { current: strin
   const start = dateRange.start instanceof Date ? dateRange.start : new Date(dateRange.start);
   const end = dateRange.end instanceof Date ? dateRange.end : new Date(dateRange.end);
 
-  // Calculate comparison period (same duration, immediately before)
-  const durationMs = end.getTime() - start.getTime();
-  const compEnd = new Date(start.getTime() - 86400000); // Day before start
+  // Calculate duration in full days (ignoring time component)
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const durationMs = endDay.getTime() - startDay.getTime();
+
+  // Previous period ends the day before current period starts
+  const compEnd = new Date(startDay.getTime() - 86400000);
   const compStart = new Date(compEnd.getTime() - durationMs);
 
   return {

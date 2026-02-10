@@ -13,7 +13,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import { fetchHierarchyData } from '@/services/crp-portal';
+import { fetchHierarchyDataRPC } from '@/services/crp-portal';
 import type { HierarchyDataRow } from '@/services/crp-portal';
 import type { DateRange, DatePreset, Brand, Restaurant } from '@/types';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
@@ -46,11 +46,15 @@ function formatDate(date: Date | string): string {
 
 /**
  * Calculate the previous period date range based on preset.
+ *
+ * For a current period of Feb 2-8 (7 days inclusive):
+ * - Previous should be Jan 26 - Feb 1 (7 days inclusive)
+ * - previousEnd = day before current start = Feb 1
+ * - previousStart = previousEnd - duration = Jan 26
  */
 function getPreviousPeriodRange(dateRange: DateRange, preset: DatePreset): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
-  const durationMs = end.getTime() - start.getTime();
 
   if (preset === 'year') {
     return {
@@ -59,9 +63,19 @@ function getPreviousPeriodRange(dateRange: DateRange, preset: DatePreset): { sta
     };
   }
 
+  // Calculate duration in full days (ignoring time component)
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const durationMs = endDay.getTime() - startDay.getTime();
+
+  // Previous period ends the day before current period starts
+  const previousEnd = new Date(startDay.getTime() - 86400000);
+  // Previous period has the same duration
+  const previousStart = new Date(previousEnd.getTime() - durationMs);
+
   return {
-    start: new Date(start.getTime() - durationMs - 86400000),
-    end: new Date(start.getTime() - 86400000),
+    start: previousStart,
+    end: previousEnd,
   };
 }
 
@@ -183,45 +197,16 @@ export function useHierarchyData() {
       channelIds?.sort().join(',') || '',
     ],
     queryFn: async () => {
-      const currentParams = {
-        companyIds: numericCompanyIds.length > 0 ? numericCompanyIds : undefined,
-        brandIds: numericBrandIds && numericBrandIds.length > 0 ? numericBrandIds : undefined,
-        addressIds: numericAddressIds && numericAddressIds.length > 0 ? numericAddressIds : undefined,
-        channelIds: channelIds.length > 0 ? channelIds : undefined,
+      // Convert numeric IDs to strings for RPC
+      const stringCompanyIds = numericCompanyIds.map(id => String(id));
+
+      const result = await fetchHierarchyDataRPC(
+        stringCompanyIds,
         startDate,
         endDate,
-      };
-
-      const previousParams = {
-        companyIds: numericCompanyIds.length > 0 ? numericCompanyIds : undefined,
-        brandIds: numericBrandIds && numericBrandIds.length > 0 ? numericBrandIds : undefined,
-        addressIds: numericAddressIds && numericAddressIds.length > 0 ? numericAddressIds : undefined,
-        channelIds: channelIds.length > 0 ? channelIds : undefined,
-        startDate: previousStartDate,
-        endDate: previousEndDate,
-      };
-
-      if (import.meta.env.DEV) {
-        console.log('[useHierarchyData] Fetching with params:', {
-          current: { startDate, endDate },
-          previous: { startDate: previousStartDate, endDate: previousEndDate },
-          companyIds: numericCompanyIds,
-        });
-      }
-
-      const result = await fetchHierarchyData(currentParams, previousParams);
-
-      if (import.meta.env.DEV) {
-        console.log('[useHierarchyData] Result:', {
-          rowCount: result.length,
-          levels: {
-            company: result.filter(r => r.level === 'company').length,
-            brand: result.filter(r => r.level === 'brand').length,
-            address: result.filter(r => r.level === 'address').length,
-            channel: result.filter(r => r.level === 'channel').length,
-          },
-        });
-      }
+        previousStartDate,
+        previousEndDate
+      );
 
       return result;
     },

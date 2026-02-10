@@ -95,14 +95,17 @@ function formatDate(date: Date | string): string {
 
 /**
  * Calculate the previous period date range based on preset.
+ *
+ * For a current period of Feb 2-8 (7 days inclusive):
+ * - Previous should be Jan 26 - Feb 1 (7 days inclusive)
+ * - previousEnd = day before current start = Feb 1
+ * - previousStart = previousEnd - duration = Jan 26
  */
 function getPreviousPeriodRange(dateRange: DateRange, preset: DatePreset): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
-  const durationMs = end.getTime() - start.getTime();
 
-  // For most presets, compare with the same duration in the past
-  // For 'year', compare with last year same period
+  // For 'year' preset, compare with same period last year
   if (preset === 'year') {
     return {
       start: new Date(start.getFullYear() - 1, start.getMonth(), start.getDate()),
@@ -110,10 +113,19 @@ function getPreviousPeriodRange(dateRange: DateRange, preset: DatePreset): { sta
     };
   }
 
-  // For other presets, use the preceding period
+  // Calculate duration in full days (ignoring time component)
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const durationMs = endDay.getTime() - startDay.getTime();
+
+  // Previous period ends the day before current period starts
+  const previousEnd = new Date(startDay.getTime() - 86400000);
+  // Previous period has the same duration
+  const previousStart = new Date(previousEnd.getTime() - durationMs);
+
   return {
-    start: new Date(start.getTime() - durationMs - 86400000), // Start of previous period
-    end: new Date(start.getTime() - 86400000), // Day before current period
+    start: previousStart,
+    end: previousEnd,
   };
 }
 
@@ -160,18 +172,6 @@ export function useOrdersData(params: UseOrdersDataParams) {
   const previousStartDate = formatDate(previousRange.start);
   const previousEndDate = formatDate(previousRange.end);
 
-  // Debug logging for development
-  if (import.meta.env.DEV) {
-    console.log('[useOrdersData] Query params:', {
-      datePreset,
-      startDate,
-      endDate,
-      previousStartDate,
-      previousEndDate,
-      companyIds: numericCompanyIds,
-    });
-  }
-
   return useQuery<OrdersDataResult>({
     // Include all relevant params in query key to ensure refetch on changes
     queryKey: [
@@ -203,14 +203,6 @@ export function useOrdersData(params: UseOrdersDataParams) {
           endDate: previousEndDate,
         }
       );
-
-      if (import.meta.env.DEV) {
-        console.log('[useOrdersData] Query result:', {
-          totalRevenue: result.current.totalRevenue,
-          totalOrders: result.current.totalOrders,
-          changes: result.changes,
-        });
-      }
 
       return result;
     },
