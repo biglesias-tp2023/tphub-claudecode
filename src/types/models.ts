@@ -287,7 +287,16 @@ export interface DateRange {
   end: Date;
 }
 
-export type DatePreset = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'year' | 'custom';
+export type DatePreset =
+  | 'this_week'
+  | 'this_month'
+  | 'last_week'
+  | 'last_month'
+  | 'last_7_days'
+  | 'last_30_days'
+  | 'last_12_weeks'
+  | 'last_12_months'
+  | 'custom';
 
 // FILTRO GLOBAL (Navbar - persiste en todas las páginas)
 export interface GlobalFilters {
@@ -887,49 +896,31 @@ export interface DbObjectiveSnapshot {
 // ============================================
 
 /**
- * Share link for clients to view objectives
+ * Share link for clients to view a single objective
+ * Allows consultants to share individual objectives with clients via public URLs
  */
 export interface ObjectiveShareLink {
   id: string;
-  companyId: string;                  // Company whose objectives are shared
-  token: string;                      // Unique URL token
-  name: string | null;                // Optional name for the link
-  // Permissions
-  canViewObjectives: boolean;
-  canViewTasks: boolean;
-  canViewKpiValues: boolean;
-  canViewProjections: boolean;
-  allowedCategories: ObjectiveCategory[] | null;  // null = all categories
-  // Access limits
-  maxViews: number | null;            // null = unlimited
-  currentViews: number;
-  expiresAt: string | null;           // null = never expires
-  password: string | null;            // Optional password protection
-  // Status
-  isActive: boolean;
-  createdBy: string | null;
+  objectiveId: string;                // The objective being shared
+  token: string;                      // Unique URL token for public access
+  isActive: boolean;                  // Whether the link is active
+  expiresAt: string | null;           // Expiration date (null = never expires)
+  viewCount: number;                  // Number of times the link has been accessed
+  allowedEmails: string[];            // Email whitelist (empty = public access)
   createdAt: string;
-  updatedAt: string;
+  lastAccessedAt: string | null;      // Last time the link was accessed
 }
 
 export interface DbObjectiveShareLink {
   id: string;
-  company_id: string;
+  objective_id: string;
   token: string;
-  name: string | null;
-  can_view_objectives: boolean;
-  can_view_tasks: boolean;
-  can_view_kpi_values: boolean;
-  can_view_projections: boolean;
-  allowed_categories: string[] | null;
-  max_views: number | null;
-  current_views: number;
-  expires_at: string | null;
-  password: string | null;
   is_active: boolean;
-  created_by: string | null;
+  expires_at: string | null;
+  view_count: number;
+  allowed_emails: string[] | null;
   created_at: string;
-  updated_at: string;
+  last_accessed_at: string | null;
 }
 
 /**
@@ -1200,7 +1191,9 @@ export interface DbStrategicTask {
 // AUDITS (Sistema de Auditorías)
 // ============================================
 
-export type AuditStatus = 'draft' | 'in_progress' | 'completed';
+export type AuditStatus = 'draft' | 'in_progress' | 'completed' | 'delivered';
+
+export type AuditTypeSlug = 'mystery_shopper' | 'onboarding' | 'google_ads';
 
 export type AuditFieldType =
   | 'checkbox'
@@ -1260,28 +1253,64 @@ export interface AuditType {
   isActive: boolean;
   displayOrder: number;
   createdAt: string;
-  updatedAt: string;
 }
 
 /**
- * Main audit record
+ * Main audit record - CRP nomenclature
  */
 export interface Audit {
-  id: string;
-  auditNumber: string;          // AUD-2026-001
-  companyId: string | null;     // CRP Portal: pk_id_company
-  brandId: string | null;       // CRP Portal: pk_id_store
-  addressId: string | null;     // CRP Portal: pk_id_address
-  areaId: string | null;        // CRP Portal: pk_id_business_area
-  auditTypeId: string;
-  fieldData: Record<string, unknown> | null;
-  status: AuditStatus;
-  scheduledDate: string | null;
-  completedAt: string | null;
-  createdBy: string | null;
-  updatedBy: string | null;
-  createdAt: string;
-  updatedAt: string;
+  pkIdAudit: string;            // Primary key
+  pfkIdCompany: string | null;  // Company ID (CRP Portal)
+  pfkIdStore: string | null;    // Brand/Store ID (CRP Portal)
+  pfkIdPortal: string | null;   // Platform (glovo, ubereats, justeat)
+  pfkIdAuditType: string;       // Audit type FK
+  desAuditNumber: string;       // Audit reference number (MS-YYYYMMDD-Client)
+  desStatus: AuditStatus;       // Status (draft, in_progress, completed, delivered)
+  desTitle: string | null;      // Title
+  desNotes: string | null;      // Notes
+  desConsultant: string | null; // Consultant name (text)
+  desKamEvaluator: string | null; // KAM name (text)
+  desFieldData: Record<string, unknown> | null; // Form field data
+  amtScoreTotal: number | null; // Total score
+  tdCreatedAt: string;          // Created timestamp
+  tdUpdatedAt: string;          // Updated timestamp
+  tdScheduledDate: string | null; // Scheduled date
+  tdCompletedAt: string | null; // Completed timestamp
+  tdDeliveredAt: string | null; // Delivered timestamp
+  pfkCreatedBy: string | null;  // Created by user
+  pfkUpdatedBy: string | null;  // Updated by user
+}
+
+/**
+ * Individual field response in an audit - CRP nomenclature
+ */
+export type AuditResponseFieldType = 'rating' | 'text' | 'select' | 'multi_select' | 'number' | 'date' | 'time' | 'image';
+
+export interface AuditResponse {
+  pkIdResponse: string;         // Primary key
+  pfkIdAudit: string;           // Audit FK
+  desSection: string;           // Section name
+  desFieldKey: string;          // Field key
+  desFieldType: AuditResponseFieldType; // Field type
+  desValueText: string | null;  // Text value
+  amtValueNumber: number | null; // Number value
+  tdCreatedAt: string;          // Created timestamp
+  tdUpdatedAt: string;          // Updated timestamp
+}
+
+/**
+ * Image uploaded in an audit - CRP nomenclature
+ */
+export interface AuditImage {
+  pkIdImage: string;            // Primary key
+  pfkIdAudit: string;           // Audit FK
+  desFieldKey: string;          // Field key
+  desStoragePath: string;       // Storage path
+  desFileName: string;          // File name
+  desMimeType: string | null;   // MIME type
+  numFileSize: number | null;   // File size in bytes
+  numSortOrder: number;         // Sort order
+  tdCreatedAt: string;          // Created timestamp
 }
 
 /**
@@ -1293,22 +1322,26 @@ export interface AuditWithDetails extends Audit {
   brand?: Brand;
   address?: Restaurant;  // Using Restaurant type for address data
   area?: Area;
+  portal?: { id: string; name: string };
   createdByProfile?: { fullName: string; avatarUrl: string | null };
 }
 
 /**
- * Input type for creating/updating audits
+ * Input type for creating/updating audits - CRP nomenclature
  */
 export interface AuditInput {
-  companyId?: string;           // CRP Portal: pk_id_company
-  brandId?: string;             // CRP Portal: pk_id_store
-  addressId?: string;           // CRP Portal: pk_id_address
-  areaId?: string;              // CRP Portal: pk_id_business_area
-  auditTypeId: string;
-  auditNumber?: string; // Optional - will be generated if not provided
-  fieldData?: Record<string, unknown>;
-  status?: AuditStatus;
-  scheduledDate?: string;
+  pfkIdCompany?: string;        // Company ID (CRP Portal)
+  pfkIdStore?: string;          // Brand/Store ID (CRP Portal)
+  pfkIdPortal?: string;         // Platform (glovo, ubereats, justeat)
+  pfkIdAuditType: string;       // Audit type FK
+  desAuditNumber?: string;      // Audit reference number
+  desTitle?: string;            // Title
+  desNotes?: string;            // Notes
+  desConsultant?: string;       // Consultant name (text)
+  desKamEvaluator?: string;     // KAM name (text)
+  desFieldData?: Record<string, unknown>; // Form field data
+  desStatus?: AuditStatus;      // Status
+  tdScheduledDate?: string;     // Scheduled date
 }
 
 /**
@@ -1324,28 +1357,62 @@ export interface DbAuditType {
   is_active: boolean;
   display_order: number;
   created_at: string;
-  updated_at: string;
 }
 
 /**
- * Database row type for audits
+ * Database row type for audits - CRP nomenclature
  */
 export interface DbAudit {
-  id: string;
-  audit_number: string;
-  company_id: string | null;    // CRP Portal: pk_id_company
-  brand_id: string | null;      // CRP Portal: pk_id_store
-  address_id: string | null;    // CRP Portal: pk_id_address
-  area_id: string | null;       // CRP Portal: pk_id_business_area
-  audit_type_id: string;
-  field_data: Record<string, unknown> | null;
-  status: string;
-  scheduled_date: string | null;
-  completed_at: string | null;
-  created_by: string | null;
-  updated_by: string | null;
-  created_at: string;
-  updated_at: string;
+  pk_id_audit: string;
+  pfk_id_company: string | null;
+  pfk_id_store: string | null;
+  pfk_id_portal: string | null;
+  pfk_id_audit_type: string;
+  des_audit_number: string;
+  des_status: string;
+  des_title: string | null;
+  des_notes: string | null;
+  des_consultant: string | null;
+  des_kam_evaluator: string | null;
+  des_field_data: Record<string, unknown> | null;
+  amt_score_total: number | null;
+  td_created_at: string;
+  td_updated_at: string;
+  td_scheduled_date: string | null;
+  td_completed_at: string | null;
+  td_delivered_at: string | null;
+  pfk_created_by: string | null;
+  pfk_updated_by: string | null;
+}
+
+/**
+ * Database row type for audit_responses - CRP nomenclature
+ */
+export interface DbAuditResponse {
+  pk_id_response: string;
+  pfk_id_audit: string;
+  des_section: string;
+  des_field_key: string;
+  des_field_type: string;
+  des_value_text: string | null;
+  amt_value_number: number | null;
+  td_created_at: string;
+  td_updated_at: string;
+}
+
+/**
+ * Database row type for audit_images - CRP nomenclature
+ */
+export interface DbAuditImage {
+  pk_id_image: string;
+  pfk_id_audit: string;
+  des_field_key: string;
+  des_storage_path: string;
+  des_file_name: string;
+  des_mime_type: string | null;
+  num_file_size: number | null;
+  num_sort_order: number;
+  td_created_at: string;
 }
 
 // ============================================

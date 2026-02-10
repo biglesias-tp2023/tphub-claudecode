@@ -1,4 +1,4 @@
-import { Calendar, User, FileText, FileSpreadsheet, Mail, ArrowRight, Edit2 } from 'lucide-react';
+import { Calendar, User, FileText, FileSpreadsheet, Mail } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -20,7 +20,7 @@ export function AuditCard({
   onExportExcel,
   onSendEmail,
 }: AuditCardProps) {
-  const statusConfig = getAuditStatusConfig(audit.status);
+  const statusConfig = getAuditStatusConfig(audit.desStatus);
   const scopeLabel = getAuditScopeLabel(audit);
   const typeName = audit.auditType?.name || 'Auditoría';
   const typeSlug = audit.auditType?.slug || '';
@@ -43,13 +43,16 @@ export function AuditCard({
     });
   };
 
-  const displayDate = audit.completedAt || audit.scheduledDate || audit.createdAt;
-  const creatorName = audit.createdByProfile?.fullName || 'Usuario';
+  const displayDate = audit.tdCompletedAt || audit.tdScheduledDate || audit.tdCreatedAt;
+  const consultantName = audit.desConsultant || audit.createdByProfile?.fullName || 'Usuario';
 
-  const isCompleted = audit.status === 'completed';
+  const isCompleted = audit.desStatus === 'completed' || audit.desStatus === 'delivered';
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 transition-colors">
+    <div
+      className="bg-white rounded-lg border border-gray-200 p-4 hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer"
+      onClick={() => onEdit(audit.pkIdAudit)}
+    >
       <div className="flex items-center justify-between gap-4">
         {/* Left section: Info */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -63,7 +66,7 @@ export function AuditCard({
             {/* Title row */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-gray-900">
-                {audit.auditNumber}
+                {audit.desAuditNumber}
               </span>
               <span className="text-gray-400">·</span>
               <span className="text-gray-600">{typeName}</span>
@@ -79,7 +82,7 @@ export function AuditCard({
               </span>
               <span className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
-                {creatorName}
+                {consultantName}
               </span>
               <span
                 className={cn(
@@ -96,15 +99,15 @@ export function AuditCard({
         </div>
 
         {/* Right section: Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {isCompleted ? (
+        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {isCompleted && (
             // Export actions for completed audits
             <>
               {onExportPdf && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onExportPdf(audit.id)}
+                  onClick={() => onExportPdf(audit.pkIdAudit)}
                   className="gap-1.5"
                 >
                   <FileText className="w-4 h-4" />
@@ -115,7 +118,7 @@ export function AuditCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onExportExcel(audit.id)}
+                  onClick={() => onExportExcel(audit.pkIdAudit)}
                   className="gap-1.5"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
@@ -126,7 +129,7 @@ export function AuditCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onSendEmail(audit.id)}
+                  onClick={() => onSendEmail(audit.pkIdAudit)}
                   className="gap-1.5"
                 >
                   <Mail className="w-4 h-4" />
@@ -134,26 +137,6 @@ export function AuditCard({
                 </Button>
               )}
             </>
-          ) : (
-            // Edit/Continue action for non-completed audits
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onEdit(audit.id)}
-              className="gap-1.5"
-            >
-              {audit.status === 'draft' ? (
-                <>
-                  <Edit2 className="w-4 h-4" />
-                  Editar
-                </>
-              ) : (
-                <>
-                  <ArrowRight className="w-4 h-4" />
-                  Continuar
-                </>
-              )}
-            </Button>
           )}
         </div>
       </div>

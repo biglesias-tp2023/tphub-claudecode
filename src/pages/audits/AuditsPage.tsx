@@ -2,16 +2,18 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Search, Filter, ClipboardList, Loader2, X, Download, Mail, FileText, FileSpreadsheet, UserSearch, Rocket, BarChart3, ChevronDown, Check, ArrowLeft } from 'lucide-react';
-import { Card } from '@/components/ui';
+import { Card, ToastContainer } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
-import { AuditCard, AuditCardSkeleton, AuditEditorModal } from '@/features/audits/components';
+import { AuditCard, AuditCardSkeleton } from '@/features/audits/components';
 import { useAuditsWithDetails, useAuditTypes, useCreateAudit } from '@/features/audits/hooks';
 import { AUDIT_STATUS_CONFIG, AUDIT_TYPE_CARDS, getAuditScopeLabel, calculateTotalScore, generateAuditNumber } from '@/features/audits/config';
 import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
-import { fetchCrpCompanies, fetchCrpBrands } from '@/services/crp-portal';
+import { fetchCrpCompanies, fetchCrpBrands, fetchCrpPortals, fetchCrpCompanyById } from '@/services/crp-portal';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import { useProfile } from '@/stores/authStore';
+import type { Portal } from '@/services/crp-portal';
 import {
   exportAuditToPDF,
   exportAuditToExcel,
@@ -47,6 +49,7 @@ function buildAuditExportData(
     draft: 'Borrador',
     in_progress: 'En progreso',
     completed: 'Completada',
+    delivered: 'Entregada',
   };
 
   const sections: AuditExportSection[] = auditType.fieldSchema.sections.map((section) => ({
@@ -56,21 +59,21 @@ function buildAuditExportData(
       key: field.key,
       label: field.label,
       type: field.type,
-      value: audit.fieldData?.[field.key] ?? null,
+      value: audit.desFieldData?.[field.key] ?? null,
       maxScore: field.maxScore,
       scoreLabels: field.scoreLabels,
     })),
   }));
 
-  const totalScore = calculateTotalScore(auditType, audit.fieldData);
+  const totalScore = calculateTotalScore(auditType, audit.desFieldData);
 
   return {
-    auditNumber: audit.auditNumber,
+    auditNumber: audit.desAuditNumber,
     auditType: auditType.name,
     scope: getAuditScopeLabel(audit),
-    status: statusLabels[audit.status],
-    completedAt: audit.completedAt,
-    createdAt: audit.createdAt,
+    status: statusLabels[audit.desStatus],
+    completedAt: audit.tdCompletedAt,
+    createdAt: audit.tdCreatedAt,
     createdBy: audit.createdByProfile?.fullName || 'Usuario',
     sections,
     totalScore: totalScore.maximum > 0 ? totalScore : undefined,
@@ -335,15 +338,7 @@ function EmailPreviewModal({ open, onClose, exportData, onSend }: EmailPreviewMo
   );
 }
 
-// ============================================
-// PLATFORM OPTIONS
-// ============================================
-
-const PLATFORM_OPTIONS = [
-  { id: 'glovo', name: 'Glovo' },
-  { id: 'ubereats', name: 'Uber Eats' },
-  { id: 'justeat', name: 'Just Eat' },
-];
+// Platform options are now fetched from the database via fetchCrpPortals
 
 // ============================================
 // DROPDOWN COMPONENT (for selectors)
@@ -463,145 +458,6 @@ function SimpleDropdown<T>({
 }
 
 // ============================================
-// MULTI-SELECT DROPDOWN COMPONENT
-// ============================================
-
-interface MultiSelectDropdownProps<T> {
-  placeholder: string;
-  values: T[];
-  options: T[];
-  isLoading?: boolean;
-  disabled?: boolean;
-  onChange: (options: T[]) => void;
-  getOptionLabel: (option: T) => string;
-  getOptionValue: (option: T) => string;
-}
-
-function MultiSelectDropdown<T>({
-  placeholder,
-  values,
-  options,
-  isLoading = false,
-  disabled = false,
-  onChange,
-  getOptionLabel,
-  getOptionValue,
-}: MultiSelectDropdownProps<T>) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const filteredOptions = useMemo(() => {
-    if (!search) return options;
-    const searchLower = search.toLowerCase();
-    return options.filter((opt) =>
-      getOptionLabel(opt).toLowerCase().includes(searchLower)
-    );
-  }, [options, search, getOptionLabel]);
-
-  const selectedValues = useMemo(() => {
-    return new Set(values.map(getOptionValue));
-  }, [values, getOptionValue]);
-
-  const toggleOption = (option: T) => {
-    const optionValue = getOptionValue(option);
-    if (selectedValues.has(optionValue)) {
-      onChange(values.filter((v) => getOptionValue(v) !== optionValue));
-    } else {
-      onChange([...values, option]);
-    }
-  };
-
-  const displayLabel = useMemo(() => {
-    if (values.length === 0) return null;
-    if (values.length === 1) return getOptionLabel(values[0]);
-    return `${values.length} seleccionados`;
-  }, [values, getOptionLabel]);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        className={cn(
-          'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border text-left transition-colors',
-          disabled
-            ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
-            : 'bg-white border-gray-300 hover:border-gray-400',
-          isOpen && 'border-primary-500 ring-1 ring-primary-500'
-        )}
-      >
-        <span className={cn('flex-1 truncate', !displayLabel && 'text-gray-400')}>
-          {isLoading ? 'Cargando...' : displayLabel || placeholder}
-        </span>
-        {isLoading ? (
-          <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
-        ) : (
-          <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', isOpen && 'rotate-180')} />
-        )}
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-50 w-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-64 overflow-hidden">
-            {options.length > 5 && (
-              <div className="p-2 border-b border-gray-100">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-primary-500"
-                  autoFocus
-                />
-              </div>
-            )}
-            <div className="max-h-48 overflow-y-auto">
-              {filteredOptions.length === 0 ? (
-                <div className="px-3 py-4 text-sm text-gray-500 text-center">
-                  No se encontraron resultados
-                </div>
-              ) : (
-                filteredOptions.map((option) => {
-                  const label = getOptionLabel(option);
-                  const optionValue = getOptionValue(option);
-                  const isSelected = selectedValues.has(optionValue);
-
-                  return (
-                    <button
-                      key={optionValue}
-                      type="button"
-                      onClick={() => toggleOption(option)}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
-                        isSelected && 'bg-primary-50'
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          'w-4 h-4 rounded border flex items-center justify-center',
-                          isSelected
-                            ? 'bg-primary-500 border-primary-500'
-                            : 'border-gray-300'
-                        )}
-                      >
-                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                      <span className="flex-1 truncate">{label}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ============================================
 // TYPE CARD ICON COMPONENT
 // ============================================
 
@@ -625,12 +481,12 @@ function TypeCardIcon({ slug, className }: { slug: string; className?: string })
 interface NewAuditModalProps {
   open: boolean;
   onClose: () => void;
-  onCreated: (auditId: string) => void;
+  onError: (message: string) => void;
 }
 
-function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
+function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
   const navigate = useNavigate();
-  const { data: auditTypes = [] } = useAuditTypes();
+  const { data: auditTypes = [], isLoading: auditTypesLoading } = useAuditTypes();
   const createAudit = useCreateAudit();
 
   // Global filters and current user profile
@@ -639,11 +495,11 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
 
   const [step, setStep] = useState<'type' | 'form'>('type');
   const [selectedTypeSlug, setSelectedTypeSlug] = useState<AuditTypeSlug | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<{ id: string; name: string } | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<{ id: string; name: string; keyAccountManager?: string | null } | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<{ id: string; name: string; companyId: string } | null>(null);
-  const [selectedPlatform, setSelectedPlatform] = useState<{ id: string; name: string } | null>(null);
-  const [selectedConsultants, setSelectedConsultants] = useState<Profile[]>([]);
-  const [selectedKam, setSelectedKam] = useState<Profile | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Portal | null>(null);
+  const [selectedConsultant, setSelectedConsultant] = useState<Profile | null>(null);
+  const [kamName, setKamName] = useState<string>('');
   const [isCreating, setIsCreating] = useState(false);
 
   // Fetch companies
@@ -662,7 +518,15 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch all profiles for consultant/KAM selection
+  // Fetch portals from database
+  const { data: portals = [], isLoading: portalsLoading } = useQuery({
+    queryKey: ['crp', 'portals'],
+    queryFn: fetchCrpPortals,
+    enabled: open && step === 'form',
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch all profiles for consultant selection
   const { data: fetchedProfiles = [], isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles', 'all'],
     queryFn: fetchAllProfiles,
@@ -711,6 +575,9 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
       }));
   }, [allBrands, selectedCompany]);
 
+  // Check if brand should be auto-locked (only 1 brand for company)
+  const isBrandAutoLocked = filteredBrands.length === 1;
+
   // Reset state when modal closes
   useEffect(() => {
     if (!open) {
@@ -719,24 +586,45 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
       setSelectedCompany(null);
       setSelectedBrand(null);
       setSelectedPlatform(null);
-      setSelectedConsultants([]);
-      setSelectedKam(null);
+      setSelectedConsultant(null);
+      setKamName('');
     }
   }, [open]);
-
-  // Auto-fill KAM with logged-in user when entering form step
-  useEffect(() => {
-    if (open && step === 'form' && currentUserProfile && !selectedKam) {
-      setSelectedKam(currentUserProfile);
-    }
-  }, [open, step, currentUserProfile, selectedKam]);
 
   // Auto-set locked company when entering form step
   useEffect(() => {
     if (open && step === 'form' && lockedCompany && !selectedCompany) {
-      setSelectedCompany({ id: lockedCompany.id, name: lockedCompany.name });
+      setSelectedCompany({ id: lockedCompany.id, name: lockedCompany.name, keyAccountManager: lockedCompany.keyAccountManager });
     }
   }, [open, step, lockedCompany, selectedCompany]);
+
+  // Auto-select brand if company has only one brand
+  useEffect(() => {
+    if (isBrandAutoLocked && filteredBrands.length === 1 && !selectedBrand) {
+      setSelectedBrand(filteredBrands[0]);
+    }
+  }, [isBrandAutoLocked, filteredBrands, selectedBrand]);
+
+  // Fetch KAM from company when company changes
+  useEffect(() => {
+    async function fetchKamFromCompany() {
+      if (selectedCompany?.id) {
+        try {
+          const companyDetails = await fetchCrpCompanyById(selectedCompany.id);
+          if (companyDetails?.keyAccountManager) {
+            setKamName(companyDetails.keyAccountManager);
+          } else {
+            setKamName('');
+          }
+        } catch {
+          setKamName('');
+        }
+      } else {
+        setKamName('');
+      }
+    }
+    fetchKamFromCompany();
+  }, [selectedCompany?.id]);
 
   const handleTypeSelect = (slug: AuditTypeSlug) => {
     // Only Mystery Shopper is active for now
@@ -750,16 +638,22 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
     setSelectedCompany(null);
     setSelectedBrand(null);
     setSelectedPlatform(null);
-    setSelectedConsultants([]);
-    setSelectedKam(null);
+    setSelectedConsultant(null);
+    setKamName('');
   };
 
   const handleCreate = async () => {
-    if (!selectedTypeSlug || !selectedCompany || !selectedBrand || !selectedPlatform || selectedConsultants.length === 0 || !selectedKam) return;
+    if (!selectedTypeSlug || !selectedCompany || !selectedBrand || !selectedPlatform || !selectedConsultant) {
+      onError('Por favor completa todos los campos requeridos');
+      return;
+    }
 
     // Find the audit type ID by slug
     const auditType = auditTypes.find((t) => t.slug === selectedTypeSlug);
-    if (!auditType) return;
+    if (!auditType) {
+      onError(`Tipo de auditoría "${selectedTypeSlug}" no encontrado. Recarga la página e intenta de nuevo.`);
+      return;
+    }
 
     setIsCreating(true);
     try {
@@ -767,27 +661,31 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
       const auditNumber = generateAuditNumber(selectedTypeSlug, selectedBrand.name);
 
       const newAudit = await createAudit.mutateAsync({
-        auditTypeId: auditType.id,
-        companyId: selectedCompany.id,
-        brandId: selectedBrand.id,
-        storeId: selectedBrand.id,
-        portalId: selectedPlatform.id,
-        consultantUserId: selectedConsultants[0].id, // Primary consultant
-        kamUserId: selectedKam.id,
-        auditNumber,
+        pfkIdAuditType: auditType.id,
+        pfkIdCompany: selectedCompany.id,
+        pfkIdStore: selectedBrand.id,
+        pfkIdPortal: selectedPlatform.id,
+        desConsultant: selectedConsultant.fullName || selectedConsultant.email,
+        desKamEvaluator: kamName ?? undefined,
+        desAuditNumber: auditNumber,
+        desFieldData: {
+          general_brand: selectedBrand.name,
+          general_platform: selectedPlatform.name,
+        },
       });
 
       onClose();
-      // Navigate to the audit detail page
-      navigate(`/audits/${newAudit.id}`);
-    } catch {
-      // Error handled by React Query
+      // Navigate to the audit detail page using new field name
+      navigate(`/audits/${newAudit.pkIdAudit}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido al crear la auditoría';
+      onError(errorMessage);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const isFormValid = selectedCompany && selectedBrand && selectedPlatform && selectedConsultants.length > 0 && selectedKam;
+  const isFormValid = selectedCompany && selectedBrand && selectedPlatform && selectedConsultant;
 
   if (!open) return null;
 
@@ -886,16 +784,22 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Marca <span className="text-red-500">*</span>
               </label>
-              <SimpleDropdown
-                placeholder={selectedCompany ? 'Seleccionar marca' : 'Primero selecciona una compañía'}
-                value={selectedBrand}
-                options={filteredBrands}
-                isLoading={brandsLoading}
-                disabled={!selectedCompany}
-                onChange={setSelectedBrand}
-                getOptionLabel={(b) => b.displayName}
-                getOptionValue={(b) => b.id}
-              />
+              {isBrandAutoLocked && selectedBrand ? (
+                <div className="px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700">
+                  {selectedBrand.name}
+                </div>
+              ) : (
+                <SimpleDropdown
+                  placeholder={selectedCompany ? 'Seleccionar marca' : 'Primero selecciona una compañía'}
+                  value={selectedBrand}
+                  options={filteredBrands}
+                  isLoading={brandsLoading}
+                  disabled={!selectedCompany}
+                  onChange={setSelectedBrand}
+                  getOptionLabel={(b) => b.name}
+                  getOptionValue={(b) => b.id}
+                />
+              )}
             </div>
 
             {/* Platform Selector */}
@@ -906,43 +810,38 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
               <SimpleDropdown
                 placeholder="Seleccionar plataforma"
                 value={selectedPlatform}
-                options={PLATFORM_OPTIONS}
+                options={portals}
+                isLoading={portalsLoading}
                 onChange={setSelectedPlatform}
                 getOptionLabel={(p) => p.name}
                 getOptionValue={(p) => p.id}
               />
             </div>
 
-            {/* Consultant Selector */}
+            {/* Consultant Selector (single-select) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Consultor que gestiona la cuenta <span className="text-red-500">*</span>
               </label>
-              <MultiSelectDropdown
+              <SimpleDropdown
                 placeholder="Seleccionar consultor"
-                values={selectedConsultants}
+                value={selectedConsultant}
                 options={profiles}
                 isLoading={profilesLoading}
-                onChange={setSelectedConsultants}
+                onChange={setSelectedConsultant}
                 getOptionLabel={(p) => p.fullName || p.email}
                 getOptionValue={(p) => p.id}
               />
             </div>
 
-            {/* KAM Evaluator Selector */}
+            {/* KAM Evaluator (auto-filled from company) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                KAM evaluador <span className="text-red-500">*</span>
+                KAM evaluador
               </label>
-              <SimpleDropdown
-                placeholder="Seleccionar KAM evaluador"
-                value={selectedKam}
-                options={profiles}
-                isLoading={profilesLoading}
-                onChange={setSelectedKam}
-                getOptionLabel={(p) => p.fullName || p.email}
-                getOptionValue={(p) => p.id}
-              />
+              <div className="px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700">
+                {kamName || <span className="text-gray-400">Se cargará de la compañía</span>}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -951,7 +850,7 @@ function NewAuditModal({ open, onClose, onCreated }: NewAuditModalProps) {
               </Button>
               <Button
                 onClick={handleCreate}
-                disabled={!isFormValid || isCreating}
+                disabled={!isFormValid || isCreating || auditTypesLoading}
                 className="gap-2"
               >
                 {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -1120,7 +1019,7 @@ function AuditsList({
     <div className="space-y-3">
       {audits.map((audit) => (
         <AuditCard
-          key={audit.id}
+          key={audit.pkIdAudit}
           audit={audit}
           onEdit={onEdit}
           onExportPdf={onExportPdf}
@@ -1137,6 +1036,9 @@ function AuditsList({
 // ============================================
 
 export function AuditsPage() {
+  // Toast notifications
+  const { toasts, closeToast, error: showError } = useToast();
+
   // State
   const [filters, setFilters] = useState<AuditFilters>({
     search: '',
@@ -1145,7 +1047,6 @@ export function AuditsPage() {
     consultantId: null,
   });
   const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
-  const [editingAuditId, setEditingAuditId] = useState<string | null>(null);
 
   // Preview modal state
   const [previewModal, setPreviewModal] = useState<{
@@ -1170,53 +1071,55 @@ export function AuditsPage() {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        const matchesNumber = audit.auditNumber.toLowerCase().includes(searchLower);
+        const matchesNumber = audit.desAuditNumber.toLowerCase().includes(searchLower);
         const matchesType = audit.auditType?.name.toLowerCase().includes(searchLower);
         const matchesScope =
           audit.company?.name.toLowerCase().includes(searchLower) ||
-          audit.brand?.name.toLowerCase().includes(searchLower) ||
-          audit.address?.name.toLowerCase().includes(searchLower);
+          audit.brand?.name.toLowerCase().includes(searchLower);
+        const matchesConsultant = audit.desConsultant?.toLowerCase().includes(searchLower);
 
-        if (!matchesNumber && !matchesType && !matchesScope) {
+        if (!matchesNumber && !matchesType && !matchesScope && !matchesConsultant) {
           return false;
         }
       }
 
       // Type filter
-      if (filters.type && audit.auditTypeId !== filters.type) {
+      if (filters.type && audit.pfkIdAuditType !== filters.type) {
         return false;
       }
 
       // Status filter
-      if (filters.status && audit.status !== filters.status) {
+      if (filters.status && audit.desStatus !== filters.status) {
         return false;
       }
 
-      // Consultant filter
-      if (filters.consultantId && audit.consultantUserId !== filters.consultantId) {
-        return false;
+      // Consultant filter (now filtering by consultant name text)
+      if (filters.consultantId) {
+        const consultantProfile = profiles.find((p) => p.id === filters.consultantId);
+        const consultantName = consultantProfile?.fullName || consultantProfile?.email || '';
+        if (audit.desConsultant !== consultantName) {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [audits, filters]);
+  }, [audits, filters, profiles]);
+
+  // Navigation
+  const navigate = useNavigate();
 
   // Handlers
-  const handleAuditCreated = useCallback((_auditId: string) => {
-    // The modal now handles navigation internally
-    // This callback is kept for potential future use
-  }, []);
-
   const handleEditAudit = useCallback((auditId: string) => {
-    setEditingAuditId(auditId);
-  }, []);
+    navigate(`/audits/${auditId}`);
+  }, [navigate]);
 
   // Helper to load export data
   const loadExportData = useCallback(async (auditId: string): Promise<AuditExportData | null> => {
     try {
       const audit = await fetchAuditWithDetailsById(auditId);
       if (!audit) return null;
-      const auditType = await fetchAuditTypeById(audit.auditTypeId);
+      const auditType = await fetchAuditTypeById(audit.pfkIdAuditType);
       if (!auditType) return null;
       return buildAuditExportData(audit, auditType);
     } catch {
@@ -1313,18 +1216,9 @@ export function AuditsPage() {
       <NewAuditModal
         open={isNewAuditModalOpen}
         onClose={() => setIsNewAuditModalOpen(false)}
-        onCreated={handleAuditCreated}
+        onError={showError}
       />
 
-      {/* Audit Editor Modal */}
-      <AuditEditorModal
-        auditId={editingAuditId}
-        open={!!editingAuditId}
-        onClose={() => setEditingAuditId(null)}
-        onSaved={() => {
-          // Refresh will happen automatically via React Query
-        }}
-      />
 
       {/* PDF Preview Modal */}
       <PdfPreviewModal
@@ -1349,6 +1243,9 @@ export function AuditsPage() {
         exportData={previewModal.data}
         onSend={handleSendEmailAction}
       />
+
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onClose={closeToast} />
     </div>
   );
 }

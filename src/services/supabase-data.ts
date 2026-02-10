@@ -6,7 +6,6 @@
  */
 
 import { supabase } from './supabase';
-import { deduplicateAndFilterDeleted } from './crp-portal/utils';
 import {
   isDevMode,
   mockCompanies,
@@ -1609,8 +1608,12 @@ import type {
   AuditInput,
   AuditWithDetails,
   AuditStatus,
+  AuditResponse,
+  AuditImage,
   DbAuditType,
   DbAudit,
+  DbAuditResponse,
+  DbAuditImage,
 } from '@/types';
 
 function mapDbAuditTypeToAuditType(db: DbAuditType): AuditType {
@@ -1624,29 +1627,66 @@ function mapDbAuditTypeToAuditType(db: DbAuditType): AuditType {
     isActive: db.is_active,
     displayOrder: db.display_order,
     createdAt: db.created_at,
-    updatedAt: db.updated_at,
   };
 }
 
 function mapDbAuditToAudit(db: DbAudit): Audit {
   return {
-    id: db.id,
-    auditNumber: db.audit_number,
-    companyId: db.company_id,
-    brandId: db.brand_id,
-    addressId: db.address_id,
-    areaId: db.area_id,
-    auditTypeId: db.audit_type_id,
-    fieldData: db.field_data,
-    status: db.status as AuditStatus,
-    scheduledDate: db.scheduled_date,
-    completedAt: db.completed_at,
-    createdBy: db.created_by,
-    updatedBy: db.updated_by,
-    createdAt: db.created_at,
-    updatedAt: db.updated_at,
+    pkIdAudit: db.pk_id_audit,
+    pfkIdCompany: db.pfk_id_company,
+    pfkIdStore: db.pfk_id_store,
+    pfkIdPortal: db.pfk_id_portal,
+    pfkIdAuditType: db.pfk_id_audit_type,
+    desAuditNumber: db.des_audit_number,
+    desStatus: db.des_status as AuditStatus,
+    desTitle: db.des_title,
+    desNotes: db.des_notes,
+    desConsultant: db.des_consultant,
+    desKamEvaluator: db.des_kam_evaluator,
+    desFieldData: db.des_field_data,
+    amtScoreTotal: db.amt_score_total,
+    tdCreatedAt: db.td_created_at,
+    tdUpdatedAt: db.td_updated_at,
+    tdScheduledDate: db.td_scheduled_date,
+    tdCompletedAt: db.td_completed_at,
+    tdDeliveredAt: db.td_delivered_at,
+    pfkCreatedBy: db.pfk_created_by,
+    pfkUpdatedBy: db.pfk_updated_by,
   };
 }
+
+// Prepared for future use when audit responses are implemented
+function _mapDbAuditResponseToAuditResponse(db: DbAuditResponse): AuditResponse {
+  return {
+    pkIdResponse: db.pk_id_response,
+    pfkIdAudit: db.pfk_id_audit,
+    desSection: db.des_section,
+    desFieldKey: db.des_field_key,
+    desFieldType: db.des_field_type as AuditResponse['desFieldType'],
+    desValueText: db.des_value_text,
+    amtValueNumber: db.amt_value_number,
+    tdCreatedAt: db.td_created_at,
+    tdUpdatedAt: db.td_updated_at,
+  };
+}
+
+// Prepared for future use when audit images are implemented
+function _mapDbAuditImageToAuditImage(db: DbAuditImage): AuditImage {
+  return {
+    pkIdImage: db.pk_id_image,
+    pfkIdAudit: db.pfk_id_audit,
+    desFieldKey: db.des_field_key,
+    desStoragePath: db.des_storage_path,
+    desFileName: db.des_file_name,
+    desMimeType: db.des_mime_type,
+    numFileSize: db.num_file_size,
+    numSortOrder: db.num_sort_order,
+    tdCreatedAt: db.td_created_at,
+  };
+}
+
+// Export for future use
+export { _mapDbAuditResponseToAuditResponse, _mapDbAuditImageToAuditImage };
 
 /**
  * Fetch all active audit types
@@ -1699,7 +1739,6 @@ export async function fetchAuditTypeById(id: string): Promise<AuditType | null> 
 interface FetchAuditsParams {
   companyIds?: string[];
   brandIds?: string[];
-  addressIds?: string[];
   auditTypeIds?: string[];
   status?: AuditStatus;
   search?: string;
@@ -1712,22 +1751,19 @@ export async function fetchAudits(params: FetchAuditsParams = {}): Promise<Audit
   let query = supabase
     .from('audits')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('td_created_at', { ascending: false });
 
   if (params.companyIds && params.companyIds.length > 0) {
-    query = query.in('company_id', params.companyIds);
+    query = query.in('pfk_id_company', params.companyIds);
   }
   if (params.brandIds && params.brandIds.length > 0) {
-    query = query.in('brand_id', params.brandIds);
-  }
-  if (params.addressIds && params.addressIds.length > 0) {
-    query = query.in('address_id', params.addressIds);
+    query = query.in('pfk_id_store', params.brandIds);
   }
   if (params.auditTypeIds && params.auditTypeIds.length > 0) {
-    query = query.in('audit_type_id', params.auditTypeIds);
+    query = query.in('pfk_id_audit_type', params.auditTypeIds);
   }
   if (params.status) {
-    query = query.eq('status', params.status);
+    query = query.eq('des_status', params.status);
   }
 
   const { data, error } = await query;
@@ -1747,12 +1783,10 @@ export async function fetchAuditsWithDetails(
   if (audits.length === 0) return [];
 
   // Fetch related data
-  const auditTypeIds = [...new Set(audits.map((a) => a.auditTypeId))];
-  const companyIds = [...new Set(audits.filter((a) => a.companyId).map((a) => a.companyId!))];
-  const brandIds = [...new Set(audits.filter((a) => a.brandId).map((a) => a.brandId!))];
-  const addressIds = [...new Set(audits.filter((a) => a.addressId).map((a) => a.addressId!))];
-  const areaIds = [...new Set(audits.filter((a) => a.areaId).map((a) => a.areaId!))];
-  const creatorIds = [...new Set(audits.filter((a) => a.createdBy).map((a) => a.createdBy!))];
+  const auditTypeIds = [...new Set(audits.map((a) => a.pfkIdAuditType))];
+  const companyIds = [...new Set(audits.filter((a) => a.pfkIdCompany).map((a) => a.pfkIdCompany!))];
+  const brandIds = [...new Set(audits.filter((a) => a.pfkIdStore).map((a) => a.pfkIdStore!))];
+  const creatorIds = [...new Set(audits.filter((a) => a.pfkCreatedBy).map((a) => a.pfkCreatedBy!))];
 
   // Fetch audit types
   const { data: auditTypes } = await supabase
@@ -1763,20 +1797,35 @@ export async function fetchAuditsWithDetails(
     (auditTypes as DbAuditType[] || []).map((t) => [t.id, mapDbAuditTypeToAuditType(t)])
   );
 
-  // Fetch companies
+  // Fetch companies from CRP Portal
+  // NOTE: For audit lookups, we include deleted companies since audits may reference them
   let companyMap = new Map<string, Company>();
   if (companyIds.length > 0) {
     const { data: companies } = await supabase
-      .from('companies')
-      .select('*')
-      .in('id', companyIds);
+      .from('crp_portal__dt_company')
+      .select('pk_id_company, des_company_name, flg_deleted')
+      .in('pk_id_company', companyIds.map(Number))
+      .order('pk_ts_month', { ascending: false });
+    // Deduplicate by PK (keep most recent snapshot), but DON'T filter deleted for lookups
+    const seenCompanyIds = new Set<string>();
+    const uniqueCompanies: Array<{ pk_id_company: number; des_company_name: string }> = [];
+    for (const c of (companies || []) as Array<{ pk_id_company: number; des_company_name: string; flg_deleted: number }>) {
+      const id = String(c.pk_id_company);
+      if (!seenCompanyIds.has(id)) {
+        seenCompanyIds.add(id);
+        uniqueCompanies.push(c);
+      }
+    }
     companyMap = new Map(
-      (companies as DbCompany[] || []).map((c) => [c.id, mapDbCompanyToCompany(c)])
+      uniqueCompanies.map((c) => [
+        String(c.pk_id_company),
+        { id: String(c.pk_id_company), name: c.des_company_name } as Company,
+      ])
     );
   }
 
   // Fetch brands from CRP Portal
-  // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication
+  // NOTE: For audit lookups, we include deleted brands since audits may reference them
   let brandMap = new Map<string, Brand>();
   if (brandIds.length > 0) {
     const { data: brands } = await supabase
@@ -1784,58 +1833,21 @@ export async function fetchAuditsWithDetails(
       .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
       .in('pk_id_store', brandIds.map(Number))
       .order('pk_ts_month', { ascending: false });
-    // Deduplicate by PK and filter deleted
-    const activeBrands = deduplicateAndFilterDeleted(
-      brands || [],
-      (b: { pk_id_store: number }) => String(b.pk_id_store)
-    );
+    // Deduplicate by PK (keep most recent snapshot), but DON'T filter deleted for lookups
+    const seenBrandIds = new Set<string>();
+    const uniqueBrands: Array<{ pk_id_store: number; des_store: string; pfk_id_company: number }> = [];
+    for (const b of (brands || []) as Array<{ pk_id_store: number; des_store: string; pfk_id_company: number; flg_deleted: number }>) {
+      const id = String(b.pk_id_store);
+      if (!seenBrandIds.has(id)) {
+        seenBrandIds.add(id);
+        uniqueBrands.push(b);
+      }
+    }
     brandMap = new Map(
-      activeBrands.map((b: { pk_id_store: number; des_store: string; pfk_id_company: number }) => [
+      uniqueBrands.map((b) => [
         String(b.pk_id_store),
         { id: String(b.pk_id_store), name: b.des_store, companyId: String(b.pfk_id_company) } as Brand,
       ])
-    );
-  }
-
-  // Fetch addresses from CRP Portal
-  // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication
-  let addressMap = new Map<string, Restaurant>();
-  if (addressIds.length > 0) {
-    const { data: addresses } = await supabase
-      .from('crp_portal__dt_address')
-      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted')
-      .in('pk_id_address', addressIds.map(Number))
-      .order('pk_ts_month', { ascending: false });
-    // Deduplicate by PK and filter deleted
-    const activeAddresses = deduplicateAndFilterDeleted(
-      addresses || [],
-      (a: { pk_id_address: number }) => String(a.pk_id_address)
-    );
-    addressMap = new Map(
-      activeAddresses.map((a: { pk_id_address: number; des_address: string; pfk_id_company: number; pfk_id_store: number | null; pfk_id_business_area: number | null; des_latitude: number | null; des_longitude: number | null }) => [
-        String(a.pk_id_address),
-        {
-          id: String(a.pk_id_address),
-          name: a.des_address,
-          companyId: String(a.pfk_id_company),
-          brandId: a.pfk_id_store ? String(a.pfk_id_store) : null,
-          areaId: a.pfk_id_business_area ? String(a.pfk_id_business_area) : null,
-          latitude: a.des_latitude,
-          longitude: a.des_longitude,
-        } as Restaurant,
-      ])
-    );
-  }
-
-  // Fetch areas
-  let areaMap = new Map<string, Area>();
-  if (areaIds.length > 0) {
-    const { data: areas } = await supabase
-      .from('areas')
-      .select('*')
-      .in('id', areaIds);
-    areaMap = new Map(
-      (areas as DbArea[] || []).map((a) => [a.id, mapDbAreaToArea(a)])
     );
   }
 
@@ -1857,12 +1869,10 @@ export async function fetchAuditsWithDetails(
   // Enrich audits
   return audits.map((audit) => ({
     ...audit,
-    auditType: auditTypeMap.get(audit.auditTypeId),
-    company: audit.companyId ? companyMap.get(audit.companyId) : undefined,
-    brand: audit.brandId ? brandMap.get(audit.brandId) : undefined,
-    address: audit.addressId ? addressMap.get(audit.addressId) : undefined,
-    area: audit.areaId ? areaMap.get(audit.areaId) : undefined,
-    createdByProfile: audit.createdBy ? creatorMap.get(audit.createdBy) : undefined,
+    auditType: auditTypeMap.get(audit.pfkIdAuditType),
+    company: audit.pfkIdCompany ? companyMap.get(audit.pfkIdCompany) : undefined,
+    brand: audit.pfkIdStore ? brandMap.get(audit.pfkIdStore) : undefined,
+    createdByProfile: audit.pfkCreatedBy ? creatorMap.get(audit.pfkCreatedBy) : undefined,
   }));
 }
 
@@ -1873,7 +1883,7 @@ export async function fetchAuditById(id: string): Promise<Audit | null> {
   const { data, error } = await supabase
     .from('audits')
     .select('*')
-    .eq('id', id)
+    .eq('pk_id_audit', id)
     .single();
 
   if (error) {
@@ -1889,6 +1899,24 @@ export async function fetchAuditById(id: string): Promise<Audit | null> {
 export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDetails | null> {
   const audit = await fetchAuditById(id);
   if (!audit) return null;
+
+  // Fetch company from CRP Portal
+  const fetchCrpCompanyById = async (companyId: string): Promise<Company | null> => {
+    const { data } = await supabase
+      .from('crp_portal__dt_company')
+      .select('pk_id_company, des_company, des_key_account_manager, flg_deleted')
+      .eq('pk_id_company', Number(companyId))
+      .order('pk_ts_month', { ascending: false })
+      .limit(1);
+    if (!data || data.length === 0) return null;
+    const mostRecent = data[0];
+    if (mostRecent.flg_deleted !== 0) return null;
+    return {
+      id: String(mostRecent.pk_id_company),
+      name: mostRecent.des_company,
+      keyAccountManager: mostRecent.des_key_account_manager,
+    } as Company;
+  };
 
   // Fetch brand from CRP Portal
   // NOTE: Do NOT filter flg_deleted - get most recent snapshot first
@@ -1909,37 +1937,25 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
     } as Brand;
   };
 
-  // Fetch address from CRP Portal
-  // NOTE: Do NOT filter flg_deleted - get most recent snapshot first
-  const fetchAddressById = async (addressId: string): Promise<Restaurant | null> => {
+  // Fetch portal name from CRP Portal
+  const fetchPortalById = async (portalId: string): Promise<{ id: string; name: string } | null> => {
     const { data } = await supabase
-      .from('crp_portal__dt_address')
-      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted')
-      .eq('pk_id_address', Number(addressId))
+      .from('crp_portal__dt_portal')
+      .select('pk_id_portal, des_portal')
+      .eq('pk_id_portal', portalId)
       .order('pk_ts_month', { ascending: false })
       .limit(1);
     if (!data || data.length === 0) return null;
-    const mostRecent = data[0];
-    if (mostRecent.flg_deleted !== 0) return null;
-    return {
-      id: String(mostRecent.pk_id_address),
-      name: mostRecent.des_address,
-      companyId: String(mostRecent.pfk_id_company),
-      brandId: mostRecent.pfk_id_store ? String(mostRecent.pfk_id_store) : null,
-      areaId: mostRecent.pfk_id_business_area ? String(mostRecent.pfk_id_business_area) : null,
-      latitude: mostRecent.des_latitude,
-      longitude: mostRecent.des_longitude,
-    } as Restaurant;
+    return { id: String(data[0].pk_id_portal), name: data[0].des_portal };
   };
 
-  const [auditType, company, brand, address, area, creator] = await Promise.all([
-    fetchAuditTypeById(audit.auditTypeId),
-    audit.companyId ? fetchCompanyById(audit.companyId) : null,
-    audit.brandId ? fetchBrandById(audit.brandId) : null,
-    audit.addressId ? fetchAddressById(audit.addressId) : null,
-    audit.areaId ? fetchAreaById(audit.areaId) : null,
-    audit.createdBy
-      ? supabase.from('profiles').select('full_name, avatar_url').eq('id', audit.createdBy).single()
+  const [auditType, company, brand, portal, creator] = await Promise.all([
+    fetchAuditTypeById(audit.pfkIdAuditType),
+    audit.pfkIdCompany ? fetchCrpCompanyById(audit.pfkIdCompany) : null,
+    audit.pfkIdStore ? fetchBrandById(audit.pfkIdStore) : null,
+    audit.pfkIdPortal ? fetchPortalById(audit.pfkIdPortal) : null,
+    audit.pfkCreatedBy
+      ? supabase.from('profiles').select('full_name, avatar_url').eq('id', audit.pfkCreatedBy).single()
       : null,
   ]);
 
@@ -1948,8 +1964,7 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
     auditType: auditType || undefined,
     company: company || undefined,
     brand: brand || undefined,
-    address: address || undefined,
-    area: area || undefined,
+    portal: portal || undefined,
     createdByProfile: creator?.data
       ? { fullName: creator.data.full_name || 'Usuario', avatarUrl: creator.data.avatar_url }
       : undefined,
@@ -1964,22 +1979,21 @@ export async function createAudit(input: AuditInput): Promise<Audit> {
   const userId = user?.id || null;
 
   const dbInput: Record<string, unknown> = {
-    company_id: input.companyId || null,
-    brand_id: input.brandId || null,
-    address_id: input.addressId || null,
-    area_id: input.areaId || null,
-    audit_type_id: input.auditTypeId,
-    field_data: input.fieldData || null,
-    status: input.status || 'draft',
-    scheduled_date: input.scheduledDate || null,
-    created_by: userId,
-    updated_by: userId,
+    pfk_id_company: input.pfkIdCompany || null,
+    pfk_id_store: input.pfkIdStore || null,
+    pfk_id_portal: input.pfkIdPortal || null,
+    pfk_id_audit_type: input.pfkIdAuditType,
+    des_audit_number: input.desAuditNumber || null,
+    des_title: input.desTitle || null,
+    des_notes: input.desNotes || null,
+    des_consultant: input.desConsultant || null,
+    des_kam_evaluator: input.desKamEvaluator || null,
+    des_field_data: input.desFieldData || null,
+    des_status: input.desStatus || 'draft',
+    td_scheduled_date: input.tdScheduledDate || null,
+    pfk_created_by: userId,
+    pfk_updated_by: userId,
   };
-
-  // If audit number is provided, use it (new nomenclature)
-  if (input.auditNumber) {
-    dbInput.audit_number = input.auditNumber;
-  }
 
   const { data, error } = await supabase
     .from('audits')
@@ -1996,31 +2010,38 @@ export async function createAudit(input: AuditInput): Promise<Audit> {
  */
 export async function updateAudit(
   id: string,
-  updates: Partial<AuditInput> & { status?: AuditStatus }
+  updates: Partial<AuditInput> & { desStatus?: AuditStatus; amtScoreTotal?: number; tdDeliveredAt?: string }
 ): Promise<Audit> {
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id || null;
 
-  const dbUpdates: Record<string, unknown> = { updated_by: userId };
+  const dbUpdates: Record<string, unknown> = { pfk_updated_by: userId };
 
-  if (updates.companyId !== undefined) dbUpdates.company_id = updates.companyId;
-  if (updates.brandId !== undefined) dbUpdates.brand_id = updates.brandId;
-  if (updates.addressId !== undefined) dbUpdates.address_id = updates.addressId;
-  if (updates.areaId !== undefined) dbUpdates.area_id = updates.areaId;
-  if (updates.auditNumber !== undefined) dbUpdates.audit_number = updates.auditNumber;
-  if (updates.fieldData !== undefined) dbUpdates.field_data = updates.fieldData;
-  if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
-  if (updates.status !== undefined) {
-    dbUpdates.status = updates.status;
-    if (updates.status === 'completed') {
-      dbUpdates.completed_at = new Date().toISOString();
+  if (updates.pfkIdCompany !== undefined) dbUpdates.pfk_id_company = updates.pfkIdCompany;
+  if (updates.pfkIdStore !== undefined) dbUpdates.pfk_id_store = updates.pfkIdStore;
+  if (updates.pfkIdPortal !== undefined) dbUpdates.pfk_id_portal = updates.pfkIdPortal;
+  if (updates.desAuditNumber !== undefined) dbUpdates.des_audit_number = updates.desAuditNumber;
+  if (updates.desTitle !== undefined) dbUpdates.des_title = updates.desTitle;
+  if (updates.desNotes !== undefined) dbUpdates.des_notes = updates.desNotes;
+  if (updates.desConsultant !== undefined) dbUpdates.des_consultant = updates.desConsultant;
+  if (updates.desKamEvaluator !== undefined) dbUpdates.des_kam_evaluator = updates.desKamEvaluator;
+  if (updates.amtScoreTotal !== undefined) dbUpdates.amt_score_total = updates.amtScoreTotal;
+  if (updates.desFieldData !== undefined) dbUpdates.des_field_data = updates.desFieldData;
+  if (updates.tdScheduledDate !== undefined) dbUpdates.td_scheduled_date = updates.tdScheduledDate;
+  if (updates.desStatus !== undefined) {
+    dbUpdates.des_status = updates.desStatus;
+    if (updates.desStatus === 'completed') {
+      dbUpdates.td_completed_at = new Date().toISOString();
+    }
+    if (updates.desStatus === 'delivered') {
+      dbUpdates.td_delivered_at = updates.tdDeliveredAt || new Date().toISOString();
     }
   }
 
   const { data, error } = await supabase
     .from('audits')
     .update(dbUpdates)
-    .eq('id', id)
+    .eq('pk_id_audit', id)
     .select()
     .single();
 
@@ -2035,7 +2056,7 @@ export async function deleteAudit(id: string): Promise<void> {
   const { error } = await supabase
     .from('audits')
     .delete()
-    .eq('id', id);
+    .eq('pk_id_audit', id);
 
   if (error) throw new Error(`Error deleting audit: ${error.message}`);
 }
@@ -2044,5 +2065,5 @@ export async function deleteAudit(id: string): Promise<void> {
  * Mark an audit as completed
  */
 export async function completeAudit(id: string): Promise<Audit> {
-  return updateAudit(id, { status: 'completed' });
+  return updateAudit(id, { desStatus: 'completed' });
 }

@@ -65,7 +65,6 @@ export function useAuditTypeBySlug(slug: string | undefined) {
 interface UseAuditsParams {
   companyIds?: string[];
   brandIds?: string[];
-  addressIds?: string[];
   auditTypeIds?: string[];
   status?: AuditStatus;
 }
@@ -138,11 +137,13 @@ export function useUpdateAudit() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<AuditInput> & { status?: AuditStatus } }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<AuditInput> & { desStatus?: AuditStatus } }) =>
       updateAudit(id, updates),
     onSuccess: (data) => {
       // Update the specific audit in the cache
-      queryClient.setQueryData(queryKeys.audits.detail(data.id), data);
+      queryClient.setQueryData(queryKeys.audits.detail(data.pkIdAudit), data);
+      // Invalidate the withDetails query so it refetches with fresh joined data
+      queryClient.invalidateQueries({ queryKey: queryKeys.audits.withDetails(data.pkIdAudit) });
       // Invalidate list queries
       queryClient.invalidateQueries({ queryKey: ['audits', 'list'] });
     },
@@ -177,7 +178,9 @@ export function useCompleteAudit() {
     mutationFn: (id: string) => completeAudit(id),
     onSuccess: (data) => {
       // Update the specific audit in the cache
-      queryClient.setQueryData(queryKeys.audits.detail(data.id), data);
+      queryClient.setQueryData(queryKeys.audits.detail(data.pkIdAudit), data);
+      // Invalidate the withDetails query so it refetches with fresh joined data
+      queryClient.invalidateQueries({ queryKey: queryKeys.audits.withDetails(data.pkIdAudit) });
       // Invalidate list queries
       queryClient.invalidateQueries({ queryKey: ['audits', 'list'] });
     },
@@ -192,10 +195,12 @@ export function useSaveAuditFieldData() {
 
   return useMutation({
     mutationFn: ({ id, fieldData }: { id: string; fieldData: Record<string, unknown> }) =>
-      updateAudit(id, { fieldData }),
+      updateAudit(id, { desFieldData: fieldData }),
     onSuccess: (data) => {
       // Update the specific audit in the cache
-      queryClient.setQueryData(queryKeys.audits.detail(data.id), data);
+      queryClient.setQueryData(queryKeys.audits.detail(data.pkIdAudit), data);
+      // Invalidate the withDetails query so it refetches with fresh joined data
+      queryClient.invalidateQueries({ queryKey: queryKeys.audits.withDetails(data.pkIdAudit) });
     },
   });
 }

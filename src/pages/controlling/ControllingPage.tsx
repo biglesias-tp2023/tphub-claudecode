@@ -170,6 +170,8 @@ type SortColumn =
   | 'ticketMedio'
   | 'nuevosClientes'
   | 'porcentajeNuevos'
+  | 'recurrentesClientes'
+  | 'porcentajeRecurrentes'
   | 'openTime'
   | 'ratioConversion'
   | 'tiempoEspera'
@@ -184,6 +186,7 @@ type SortDirection = 'asc' | 'desc' | null;
 
 interface HierarchyTableProps {
   data: HierarchyRow[];
+  periodLabels: { current: string; comparison: string };
 }
 
 const LEVEL_ICONS: Record<HierarchyRow['level'], React.ElementType> = {
@@ -242,7 +245,7 @@ function SortableHeader({ column, label, currentSort, currentDirection, onSort, 
   );
 }
 
-function HierarchyTable({ data }: HierarchyTableProps) {
+function HierarchyTable({ data, periodLabels }: HierarchyTableProps) {
   const [activeTabs, setActiveTabs] = useState<Set<ViewTab>>(new Set(['rendimiento']));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -406,7 +409,13 @@ function HierarchyTable({ data }: HierarchyTableProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-100">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-900">Detalle por Compañía</h3>
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-sm font-semibold text-gray-900">Detalle por Compañía</h3>
+          <span className="text-xs">
+            <span className="font-medium text-gray-500">{periodLabels.current}</span>
+            <span className="italic text-gray-400 ml-1">vs. {periodLabels.comparison}</span>
+          </span>
+        </div>
         <div className="flex gap-1">
           {tabs.map((tab) => {
             const isActive = activeTabs.has(tab.id);
@@ -480,6 +489,20 @@ function HierarchyTable({ data }: HierarchyTableProps) {
                   <SortableHeader
                     column="porcentajeNuevos"
                     label="% Nuevos"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="recurrentesClientes"
+                    label="Recurrentes"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="porcentajeRecurrentes"
+                    label="% Recurrentes"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
@@ -634,6 +657,8 @@ function HierarchyTable({ data }: HierarchyTableProps) {
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ticketMedio.toFixed(1)}€</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.nuevosClientes)}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeNuevos.toFixed(1)}%</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.recurrentesClientes)}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeRecurrentes.toFixed(1)}%</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.openTime != null ? `${row.openTime.toFixed(0)}%` : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratioConversion != null ? `${row.ratioConversion.toFixed(1)}%` : '-'}</td>
                     </>
@@ -887,7 +912,7 @@ export function ControllingPage() {
 
       {/* Detalle por Compañía */}
       <section>
-        <HierarchyTable data={hierarchy} />
+        <HierarchyTable data={hierarchy} periodLabels={periodLabels} />
       </section>
     </div>
   );
