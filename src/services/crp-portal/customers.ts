@@ -99,6 +99,10 @@ export interface ChannelCustomerMetrics {
   avgCLV: number;
   avgTicket: number;
   avgOrdersPerCustomer: number;
+  /** Customers with more than 1 order */
+  returningCustomers: number;
+  /** Percentage of customers with more than 1 order */
+  repetitionRate: number;
 }
 
 /** Cohort data for retention analysis */
@@ -107,8 +111,10 @@ export interface CohortData {
   cohortId: string;
   /** Number of customers in this cohort */
   cohortSize: number;
-  /** Retention by period (0 = first purchase, 1 = second period, etc.) */
+  /** Retention by specific period (0 = first purchase, 1 = second period, etc.) */
   retention: number[];
+  /** Cumulative retention (% who have returned at least once up to this period) */
+  cumulativeRetention: number[];
 }
 
 /** Customer with churn risk score */
@@ -133,6 +139,14 @@ export interface SpendSegment {
   percentage: number;
   avgSpend: number;
   totalRevenue: number;
+  /** Customers with more than 1 order in this segment */
+  repeatCustomers: number;
+  /** Percentage of customers with more than 1 order */
+  repetitionRate: number;
+  /** Average orders per customer in this segment */
+  avgOrdersPerCustomer: number;
+  /** Average days between orders (null for single_order segment) */
+  avgFrequencyDays: number | null;
 }
 
 /** Spend distribution with histogram data */
@@ -240,49 +254,79 @@ function getCohortId(date: Date, granularity: 'week' | 'month'): string {
 // ============================================
 
 /**
- * Fetches raw order data for customer analysis.
+ * Fetches raw order data for customer analysis using pagination.
+ *
+ * NOTE: Uses pagination to bypass Supabase's server-side max_rows limit (default 1000).
+ * This ensures all orders are fetched even when selecting multiple companies.
  */
 async function fetchCustomerOrders(params: FetchCustomerDataParams): Promise<CustomerOrder[]> {
   const { companyIds, brandIds, channelIds, startDate, endDate } = params;
 
-  let query = supabase
-    .from('crp_portal__ft_order_head')
-    .select('cod_id_customer, td_creation_time, amt_total_price, amt_promotions, amt_refunds, flg_customer_new, pfk_id_portal')
-    .gte('td_creation_time', `${startDate}T00:00:00`)
-    .lte('td_creation_time', `${endDate}T23:59:59`)
-    .not('cod_id_customer', 'is', null);
-
-  if (companyIds && companyIds.length > 0) {
-    query = query.in('pfk_id_company', companyIds);
-  }
-
-  if (brandIds && brandIds.length > 0) {
-    query = query.in('pfk_id_store', brandIds);
-  }
-
+  // Determine portal IDs for channel filter
+  let portalIdsToFilter: string[] | null = null;
   if (channelIds && channelIds.length > 0) {
-    const portalIds = channelIds.flatMap(channelIdToPortalIds);
-    if (portalIds.length > 0) {
-      query = query.in('pfk_id_portal', portalIds);
+    portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
+  }
+
+  // Use pagination to fetch all orders (bypasses Supabase's server-side max_rows limit)
+  const PAGE_SIZE = 1000;
+  const allData: CustomerOrder[] = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabase
+      .from('crp_portal__ft_order_head')
+      .select('cod_id_customer, td_creation_time, amt_total_price, amt_promotions, amt_refunds, flg_customer_new, pfk_id_portal')
+      .gte('td_creation_time', `${startDate}T00:00:00`)
+      .lte('td_creation_time', `${endDate}T23:59:59`)
+      .not('cod_id_customer', 'is', null);
+
+    if (companyIds && companyIds.length > 0) {
+      query = query.in('pfk_id_company', companyIds);
+    }
+
+    if (brandIds && brandIds.length > 0) {
+      query = query.in('pfk_id_store', brandIds);
+    }
+
+    if (portalIdsToFilter && portalIdsToFilter.length > 0) {
+      query = query.in('pfk_id_portal', portalIdsToFilter);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + PAGE_SIZE - 1);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching customer orders:', error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      const mapped = data.map((row) => ({
+        customerId: row.cod_id_customer as string,
+        orderDate: new Date(row.td_creation_time),
+        totalPrice: row.amt_total_price || 0,
+        promotions: row.amt_promotions || 0,
+        refunds: row.amt_refunds || 0,
+        isNewCustomer: row.flg_customer_new === true,
+        portalId: row.pfk_id_portal as string,
+      }));
+      allData.push(...mapped);
+      offset += PAGE_SIZE;
+      hasMore = data.length === PAGE_SIZE;
+    } else {
+      hasMore = false;
     }
   }
 
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching customer orders:', error);
-    throw error;
+  if (import.meta.env.DEV) {
+    console.log(`[fetchCustomerOrders] Fetched ${allData.length} orders using pagination`);
   }
 
-  return (data || []).map((row) => ({
-    customerId: row.cod_id_customer as string,
-    orderDate: new Date(row.td_creation_time),
-    totalPrice: row.amt_total_price || 0,
-    promotions: row.amt_promotions || 0,
-    refunds: row.amt_refunds || 0,
-    isNewCustomer: row.flg_customer_new === true,
-    portalId: row.pfk_id_portal as string,
-  }));
+  return allData;
 }
 
 // ============================================
@@ -432,6 +476,17 @@ export async function fetchCustomerMetricsByChannel(
     const chOrders = channelOrders.get(channelId) || [];
     const metrics = calculateMetrics(chOrders);
 
+    // Calculate returning customers (customers with >1 order in this channel)
+    const customerOrderCounts = new Map<string, number>();
+    for (const order of chOrders) {
+      customerOrderCounts.set(order.customerId, (customerOrderCounts.get(order.customerId) || 0) + 1);
+    }
+    let returningCustomers = 0;
+    for (const count of customerOrderCounts.values()) {
+      if (count > 1) returningCustomers++;
+    }
+    const repetitionRate = metrics.totalCustomers > 0 ? (returningCustomers / metrics.totalCustomers) * 100 : 0;
+
     results.push({
       channelId,
       channelName: channelNames[channelId],
@@ -441,6 +496,8 @@ export async function fetchCustomerMetricsByChannel(
       avgCLV: metrics.estimatedCLV,
       avgTicket: metrics.avgTicket,
       avgOrdersPerCustomer: metrics.avgOrdersPerCustomer,
+      returningCustomers,
+      repetitionRate,
     });
   }
 
@@ -525,10 +582,38 @@ export async function fetchCustomerCohorts(
       const count = data.periodCounts.get(i) || 0;
       retention.push(data.size > 0 ? (count / data.size) * 100 : 0);
     }
+
+    // Calculate cumulative retention: % of customers who have returned at least once up to this period
+    const cumulativeRetention: number[] = [];
+    const returnedCustomers = new Set<string>();
+
+    for (let i = 0; i <= maxPeriods; i++) {
+      if (i === 0) {
+        // Period 0 is always 100% (first purchase)
+        cumulativeRetention.push(100);
+      } else {
+        // Count unique customers who have purchased in any period from 1 to i
+        for (const [customerId, { cohortId: cId, purchasePeriods }] of customerCohorts) {
+          if (cId !== cohortId) continue;
+          const cohortPeriodIndex = sortedPeriods.indexOf(cohortId);
+          for (const period of purchasePeriods) {
+            const periodIndex = sortedPeriods.indexOf(period);
+            const relativePeriod = periodIndex - cohortPeriodIndex;
+            if (relativePeriod > 0 && relativePeriod <= i) {
+              returnedCustomers.add(customerId);
+              break;
+            }
+          }
+        }
+        cumulativeRetention.push(data.size > 0 ? (returnedCustomers.size / data.size) * 100 : 0);
+      }
+    }
+
     cohorts.push({
       cohortId,
       cohortSize: data.size,
       retention,
+      cumulativeRetention,
     });
   }
 
@@ -657,72 +742,86 @@ export async function fetchSpendDistribution(
     customerOrderCounts.set(order.customerId, current + 1);
   }
 
-  // Build segments
-  const segmentCounts = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
-  const segmentSpends = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
+  // Build segments with extended metrics
+  type SegmentKey = 'vip' | 'high' | 'medium' | 'low' | 'single_order';
+  const segmentCounts: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
+  const segmentSpends: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
+  const segmentTotalOrders: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
+  const segmentRepeatCustomers: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
+
+  // Track customer order dates for frequency calculation
+  const customerOrderDates = new Map<string, Date[]>();
+  for (const order of orders) {
+    if (!customerOrderDates.has(order.customerId)) {
+      customerOrderDates.set(order.customerId, []);
+    }
+    customerOrderDates.get(order.customerId)!.push(order.orderDate);
+  }
+
+  // Calculate frequency per segment
+  const segmentFrequencyDays: Record<SegmentKey, number[]> = { vip: [], high: [], medium: [], low: [], single_order: [] };
 
   for (const [customerId, spend] of customerSpend) {
     const orderCount = customerOrderCounts.get(customerId) || 0;
+    let segment: SegmentKey;
 
     if (orderCount === 1) {
-      segmentCounts.single_order++;
-      segmentSpends.single_order += spend;
+      segment = 'single_order';
     } else if (spend >= p90) {
-      segmentCounts.vip++;
-      segmentSpends.vip += spend;
+      segment = 'vip';
     } else if (spend >= p70) {
-      segmentCounts.high++;
-      segmentSpends.high += spend;
+      segment = 'high';
     } else if (spend >= p30) {
-      segmentCounts.medium++;
-      segmentSpends.medium += spend;
+      segment = 'medium';
     } else {
-      segmentCounts.low++;
-      segmentSpends.low += spend;
+      segment = 'low';
+    }
+
+    segmentCounts[segment]++;
+    segmentSpends[segment] += spend;
+    segmentTotalOrders[segment] += orderCount;
+
+    if (orderCount > 1) {
+      segmentRepeatCustomers[segment]++;
+
+      // Calculate average frequency for this customer
+      const dates = customerOrderDates.get(customerId) || [];
+      if (dates.length > 1) {
+        const sortedDates = dates.sort((a, b) => a.getTime() - b.getTime());
+        const firstDate = sortedDates[0];
+        const lastDate = sortedDates[sortedDates.length - 1];
+        const daysBetween = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
+        const avgDays = daysBetween / (sortedDates.length - 1);
+        segmentFrequencyDays[segment].push(avgDays);
+      }
     }
   }
 
+  const buildSegment = (key: SegmentKey, label: string): SpendSegment => {
+    const count = segmentCounts[key];
+    const freqs = segmentFrequencyDays[key];
+    const avgFreq = freqs.length > 0 ? freqs.reduce((a, b) => a + b, 0) / freqs.length : null;
+
+    return {
+      segment: key,
+      label,
+      count,
+      percentage: (count / totalCustomers) * 100,
+      avgSpend: count > 0 ? segmentSpends[key] / count : 0,
+      totalRevenue: segmentSpends[key],
+      repeatCustomers: segmentRepeatCustomers[key],
+      repetitionRate: count > 0 ? (segmentRepeatCustomers[key] / count) * 100 : 0,
+      avgOrdersPerCustomer: count > 0 ? segmentTotalOrders[key] / count : 0,
+      avgFrequencyDays: avgFreq !== null ? Math.round(avgFreq) : null,
+    };
+  };
+
   const segments: SpendSegment[] = [
-    {
-      segment: 'vip',
-      label: 'VIP (Top 10%)',
-      count: segmentCounts.vip,
-      percentage: (segmentCounts.vip / totalCustomers) * 100,
-      avgSpend: segmentCounts.vip > 0 ? segmentSpends.vip / segmentCounts.vip : 0,
-      totalRevenue: segmentSpends.vip,
-    },
-    {
-      segment: 'high',
-      label: 'Alto (70-90%)',
-      count: segmentCounts.high,
-      percentage: (segmentCounts.high / totalCustomers) * 100,
-      avgSpend: segmentCounts.high > 0 ? segmentSpends.high / segmentCounts.high : 0,
-      totalRevenue: segmentSpends.high,
-    },
-    {
-      segment: 'medium',
-      label: 'Medio (30-70%)',
-      count: segmentCounts.medium,
-      percentage: (segmentCounts.medium / totalCustomers) * 100,
-      avgSpend: segmentCounts.medium > 0 ? segmentSpends.medium / segmentCounts.medium : 0,
-      totalRevenue: segmentSpends.medium,
-    },
-    {
-      segment: 'low',
-      label: 'Bajo (10-30%)',
-      count: segmentCounts.low,
-      percentage: (segmentCounts.low / totalCustomers) * 100,
-      avgSpend: segmentCounts.low > 0 ? segmentSpends.low / segmentCounts.low : 0,
-      totalRevenue: segmentSpends.low,
-    },
-    {
-      segment: 'single_order',
-      label: 'Único pedido',
-      count: segmentCounts.single_order,
-      percentage: (segmentCounts.single_order / totalCustomers) * 100,
-      avgSpend: segmentCounts.single_order > 0 ? segmentSpends.single_order / segmentCounts.single_order : 0,
-      totalRevenue: segmentSpends.single_order,
-    },
+    buildSegment('vip', 'VIP (Top 10%)'),
+    buildSegment('high', 'Alto (70-90%)'),
+    buildSegment('medium', 'Medio (30-70%)'),
+    buildSegment('low', 'Bajo (10-30%)'),
+    buildSegment('single_order', 'Único pedido'),
   ];
 
   // Build histogram buckets

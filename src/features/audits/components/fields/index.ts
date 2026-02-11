@@ -10,3 +10,5 @@ export { CompanySelectField } from './CompanySelectField';
 export { UserSelectField } from './UserSelectField';
 export { FileUploadField } from './FileUploadField';
 export { FieldRenderer } from './FieldRenderer';
+export { RatingField } from './RatingField';
+export { ImageUploadField } from './ImageUploadField';

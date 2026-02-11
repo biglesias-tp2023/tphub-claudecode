@@ -34,6 +34,18 @@ import type {
 // TYPES
 // ============================================
 
+/** Real sales data from CRP Portal (filtered by brand/restaurant) */
+interface RealSalesData {
+  totalRevenue: number;
+  totalPromos: number;
+  totalAds?: number;  // Not available in order data, optional
+  byChannel?: {
+    glovo: { revenue: number; promos: number };
+    ubereats: { revenue: number; promos: number };
+    justeat: { revenue: number; promos: number };
+  };
+}
+
 interface SalesProjectionProps {
   config: SalesProjectionConfig;
   targetRevenue: GridChannelMonthData;
@@ -46,6 +58,10 @@ interface SalesProjectionProps {
   onActualPromosChange?: (data: GridChannelMonthData) => void;
   onEditConfig?: () => void;
   restaurantName?: string;
+  /** Real sales data from CRP Portal (filtered by selected brand/restaurant) */
+  realSalesData?: RealSalesData;
+  /** Loading state for real sales data */
+  isLoadingRealData?: boolean;
 }
 
 interface MonthInfo {
@@ -115,13 +131,15 @@ const getPercent = (config: InvestmentConfig | number, ch: SalesChannel): number
 
 /** Scorecard individual con objetivo y real */
 function Scorecard({
-  label, value, actual, color, showActual
+  label, value, actual, color, showActual, isLoading = false, isRealData = false
 }: {
   label: string;
   value: number;
   actual: number;
   color: string;
   showActual: boolean;
+  isLoading?: boolean;
+  isRealData?: boolean;
 }) {
   const diff = actual > 0 && value > 0
     ? ((actual / value - 1) * 100).toFixed(0)
@@ -138,14 +156,23 @@ function Scorecard({
 
   return (
     <div>
-      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+        {isRealData && (
+          <span className="text-[9px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+            Real
+          </span>
+        )}
+      </div>
       <div className="flex items-baseline gap-2">
         <p className={cn('text-xl font-bold tabular-nums', color)}>{fmtK(value)}€</p>
-        {showActual && actual > 0 && (
+        {isLoading ? (
+          <span className="text-sm text-gray-400 animate-pulse">cargando...</span>
+        ) : showActual && actual > 0 && (
           <p className={cn('text-sm font-medium tabular-nums', color.replace('600', '500'))}>/ {fmtK(actual)}€</p>
         )}
       </div>
-      {showActual && actual > 0 && diff && (
+      {!isLoading && showActual && actual > 0 && diff && (
         <p className={cn('text-[10px] mt-0.5', diffColor)}>{diffText}</p>
       )}
     </div>
@@ -248,6 +275,8 @@ export function SalesProjection({
   config, targetRevenue, actualRevenue, actualAds, actualPromos,
   onTargetChange, onActualRevenueChange, onActualAdsChange, onActualPromosChange, onEditConfig,
   restaurantName = 'Restaurante',
+  realSalesData,
+  isLoadingRealData = false,
 }: SalesProjectionProps) {
   const [showActual, setShowActual] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
@@ -406,11 +435,35 @@ export function SalesProjection({
         </div>
       </div>
 
-      {/* Scorecards */}
+      {/* Scorecards - Use real data when available, fallback to manual entry */}
       <div className="grid grid-cols-3 gap-4 px-5 py-4 bg-gray-50 border-b border-gray-100">
-        <Scorecard label="Ventas" value={calculations.grandTarget} actual={calculations.grandActual} color="text-primary-600" showActual={showActual} />
-        <Scorecard label="ADS" value={calculations.totalTargetAds} actual={calculations.totalActualAds} color="text-amber-600" showActual={showActual} />
-        <Scorecard label="Promos" value={calculations.totalTargetPromos} actual={calculations.totalActualPromos} color="text-purple-600" showActual={showActual} />
+        <Scorecard
+          label="Ventas"
+          value={calculations.grandTarget}
+          actual={realSalesData?.totalRevenue ?? calculations.grandActual}
+          color="text-primary-600"
+          showActual={showActual}
+          isLoading={isLoadingRealData}
+          isRealData={!!realSalesData?.totalRevenue}
+        />
+        <Scorecard
+          label="ADS"
+          value={calculations.totalTargetAds}
+          actual={realSalesData?.totalAds ?? calculations.totalActualAds}
+          color="text-amber-600"
+          showActual={showActual}
+          isLoading={isLoadingRealData}
+          isRealData={!!realSalesData?.totalAds}
+        />
+        <Scorecard
+          label="Promos"
+          value={calculations.totalTargetPromos}
+          actual={realSalesData?.totalPromos ?? calculations.totalActualPromos}
+          color="text-purple-600"
+          showActual={showActual}
+          isLoading={isLoadingRealData}
+          isRealData={!!realSalesData?.totalPromos}
+        />
       </div>
 
       {/* Chart */}

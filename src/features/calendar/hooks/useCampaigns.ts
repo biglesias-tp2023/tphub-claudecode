@@ -24,9 +24,10 @@ import type {
 
 /**
  * Use localStorage for campaigns (demo mode).
- * Set to false to use Supabase with CRP Portal references.
+ * Controlled by VITE_CAMPAIGNS_USE_LOCAL_STORAGE environment variable.
+ * Set to 'false' in .env.local to use Supabase with CRP Portal references.
  */
-const USE_LOCAL_STORAGE = true;
+const USE_LOCAL_STORAGE = import.meta.env.VITE_CAMPAIGNS_USE_LOCAL_STORAGE !== 'false';
 const STORAGE_KEY = 'tphub_campaigns';
 
 // ============================================
@@ -36,8 +37,19 @@ const STORAGE_KEY = 'tphub_campaigns';
 function getStoredCampaigns(): PromotionalCampaign[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+
+    // Validate that parsed data is an array
+    if (!Array.isArray(parsed)) {
+      console.warn('[useCampaigns] Invalid localStorage data: expected array, got', typeof parsed);
+      return [];
+    }
+
+    return parsed;
+  } catch (error) {
+    console.warn('[useCampaigns] Failed to parse localStorage campaigns:', error);
     return [];
   }
 }

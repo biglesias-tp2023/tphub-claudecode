@@ -20,7 +20,7 @@ interface AuditEditorProps {
 
 export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
   const { data: audit, isLoading: auditLoading, refetch: refetchAudit } = useAuditWithDetails(auditId);
-  const { data: auditType, isLoading: typeLoading } = useAuditType(audit?.auditTypeId);
+  const { data: auditType, isLoading: typeLoading } = useAuditType(audit?.pfkIdAuditType);
   const { data: companies = [] } = useCompanies();
   const updateAudit = useUpdateAudit();
   const completeAudit = useCompleteAudit();
@@ -32,15 +32,15 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
 
   // Track current audit number
   useEffect(() => {
-    if (audit?.auditNumber) {
-      setCurrentAuditNumber(audit.auditNumber);
+    if (audit?.desAuditNumber) {
+      setCurrentAuditNumber(audit.desAuditNumber);
     }
-  }, [audit?.auditNumber]);
+  }, [audit?.desAuditNumber]);
 
   // Initialize field data from audit
   useEffect(() => {
-    if (audit?.fieldData) {
-      setFieldData(audit.fieldData);
+    if (audit?.desFieldData) {
+      setFieldData(audit.desFieldData);
     }
   }, [audit]);
 
@@ -66,7 +66,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
   const shouldUpdateAuditNumber = useCallback(() => {
     if (!audit || !auditType) return false;
     // If current number starts with AUD- (old format), we should update
-    if (audit.auditNumber.startsWith('AUD-')) return true;
+    if (audit.desAuditNumber.startsWith('AUD-')) return true;
     return false;
   }, [audit, auditType]);
 
@@ -76,20 +76,20 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
 
     setSaveStatus('saving');
     try {
-      const updates: Record<string, unknown> = { fieldData };
+      const updates: Record<string, unknown> = { desFieldData: fieldData };
 
       // Check if we need to update the audit number (new nomenclature)
       if (shouldUpdateAuditNumber()) {
         const clientName = getClientNameFromFieldData();
         if (clientName) {
           const newAuditNumber = generateAuditNumber(auditType.slug, clientName);
-          updates.auditNumber = newAuditNumber;
+          updates.desAuditNumber = newAuditNumber;
           setCurrentAuditNumber(newAuditNumber);
         }
       }
 
       await updateAudit.mutateAsync({
-        id: audit.id,
+        id: audit.pkIdAudit,
         updates,
       });
 
@@ -143,7 +143,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
 
     // Then complete
     try {
-      await completeAudit.mutateAsync(audit.id);
+      await completeAudit.mutateAsync(audit.pkIdAudit);
       onSaved?.();
       onClose();
     } catch {
@@ -163,7 +163,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
   }, [handleSave]);
 
   const isLoading = auditLoading || typeLoading;
-  const statusConfig = audit ? getAuditStatusConfig(audit.status) : null;
+  const statusConfig = audit ? getAuditStatusConfig(audit.desStatus) : null;
 
   if (isLoading) {
     return (
@@ -202,7 +202,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-lg font-semibold text-gray-900">
-                  {currentAuditNumber || audit.auditNumber}
+                  {currentAuditNumber || audit.desAuditNumber}
                 </h1>
                 {statusConfig && (
                   <span
@@ -255,7 +255,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
             </Button>
 
             {/* Complete button (only for non-completed audits) */}
-            {audit.status !== 'completed' && (
+            {audit.desStatus !== 'completed' && audit.desStatus !== 'delivered' && (
               <Button
                 onClick={handleComplete}
                 disabled={completeAudit.isPending}
@@ -284,8 +284,8 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
             auditType={auditType}
             fieldData={fieldData}
             onChange={handleFieldDataChange}
-            disabled={audit.status === 'completed'}
-            autoSave={audit.status !== 'completed'}
+            disabled={audit.desStatus === 'completed' || audit.desStatus === 'delivered'}
+            autoSave={audit.desStatus !== 'completed' && audit.desStatus !== 'delivered'}
             onAutoSave={handleAutoSave}
           />
         </div>

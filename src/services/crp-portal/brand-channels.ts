@@ -25,8 +25,10 @@ function portalIdToChannelId(portalId: string): ChannelId | null {
 }
 
 /**
- * Fetches active channels for each brand based on order history.
+ * Fetches active channels for each brand based on order history using pagination.
  * Only considers orders from the last 90 days for efficiency.
+ *
+ * NOTE: Uses pagination to bypass Supabase's server-side max_rows limit (default 1000).
  *
  * @param companyIds - Optional array of company IDs to filter by
  * @returns Map of brand ID to array of channel IDs with orders
@@ -42,21 +44,39 @@ export async function fetchBrandActiveChannels(
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 90);
 
-  let query = supabase
-    .from('crp_portal__ft_order_head')
-    .select('pfk_id_store, pfk_id_portal')
-    .gte('td_creation_time', cutoffDate.toISOString());
+  // Use pagination to fetch all data (bypasses Supabase's server-side max_rows limit)
+  const PAGE_SIZE = 1000;
+  const allData: { pfk_id_store: string; pfk_id_portal: string }[] = [];
+  let offset = 0;
+  let hasMore = true;
 
-  if (companyIds?.length) {
-    query = query.in('pfk_id_company', companyIds);
+  while (hasMore) {
+    let query = supabase
+      .from('crp_portal__ft_order_head')
+      .select('pfk_id_store, pfk_id_portal')
+      .gte('td_creation_time', cutoffDate.toISOString());
+
+    if (companyIds?.length) {
+      query = query.in('pfk_id_company', companyIds);
+    }
+
+    query = query.range(offset, offset + PAGE_SIZE - 1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData.push(...(data as { pfk_id_store: string; pfk_id_portal: string }[]));
+      offset += PAGE_SIZE;
+      hasMore = data.length === PAGE_SIZE;
+    } else {
+      hasMore = false;
+    }
   }
-
-  const { data, error } = await query;
-  if (error) throw error;
 
   // Group by brand, collecting unique channels
   const channelMap = new Map<string, Set<ChannelId>>();
-  for (const row of data || []) {
+  for (const row of allData) {
     const brandId = String(row.pfk_id_store);
     const channelId = portalIdToChannelId(row.pfk_id_portal);
     if (channelId) {
@@ -74,8 +94,10 @@ export async function fetchBrandActiveChannels(
 }
 
 /**
- * Fetches active channels for each restaurant (address) based on order history.
+ * Fetches active channels for each restaurant (address) based on order history using pagination.
  * Only considers orders from the last 90 days for efficiency.
+ *
+ * NOTE: Uses pagination to bypass Supabase's server-side max_rows limit (default 1000).
  *
  * @param companyIds - Optional array of company IDs to filter by
  * @returns Map of restaurant ID to array of channel IDs with orders
@@ -91,21 +113,39 @@ export async function fetchRestaurantActiveChannels(
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 90);
 
-  let query = supabase
-    .from('crp_portal__ft_order_head')
-    .select('pfk_id_store_address, pfk_id_portal')
-    .gte('td_creation_time', cutoffDate.toISOString());
+  // Use pagination to fetch all data (bypasses Supabase's server-side max_rows limit)
+  const PAGE_SIZE = 1000;
+  const allData: { pfk_id_store_address: string; pfk_id_portal: string }[] = [];
+  let offset = 0;
+  let hasMore = true;
 
-  if (companyIds?.length) {
-    query = query.in('pfk_id_company', companyIds);
+  while (hasMore) {
+    let query = supabase
+      .from('crp_portal__ft_order_head')
+      .select('pfk_id_store_address, pfk_id_portal')
+      .gte('td_creation_time', cutoffDate.toISOString());
+
+    if (companyIds?.length) {
+      query = query.in('pfk_id_company', companyIds);
+    }
+
+    query = query.range(offset, offset + PAGE_SIZE - 1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData.push(...(data as { pfk_id_store_address: string; pfk_id_portal: string }[]));
+      offset += PAGE_SIZE;
+      hasMore = data.length === PAGE_SIZE;
+    } else {
+      hasMore = false;
+    }
   }
-
-  const { data, error } = await query;
-  if (error) throw error;
 
   // Group by restaurant (address), collecting unique channels
   const channelMap = new Map<string, Set<ChannelId>>();
-  for (const row of data || []) {
+  for (const row of allData) {
     const restaurantId = String(row.pfk_id_store_address);
     const channelId = portalIdToChannelId(row.pfk_id_portal);
     if (channelId) {

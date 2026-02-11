@@ -32,3 +32,6 @@ dist-ssr
 # Claude Code
 .claude/
 supabase/.temp/
+
+# Reference files (not for production)
+referencias-tphub/

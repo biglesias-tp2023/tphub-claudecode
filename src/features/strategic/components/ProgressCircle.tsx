@@ -6,15 +6,17 @@
  *
  * @example
  * <ProgressCircle value={78} color="green" size={64} />
+ * <ProgressCircle value={100} color="emerald" showIcon />
  */
 
+import { Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 // ============================================
 // TYPES
 // ============================================
 
-export type ProgressCircleColor = 'green' | 'yellow' | 'red' | 'blue' | 'purple' | 'gray';
+export type ProgressCircleColor = 'green' | 'yellow' | 'red' | 'blue' | 'purple' | 'gray' | 'emerald' | 'primary';
 
 interface ProgressCircleProps {
   /** Progress value (0-100+) */
@@ -27,6 +29,8 @@ interface ProgressCircleProps {
   color?: ProgressCircleColor;
   /** Show percentage text inside */
   showValue?: boolean;
+  /** Show checkmark icon when complete (overrides showValue at 100%) */
+  showIcon?: boolean;
   /** Custom class name */
   className?: string;
 }
@@ -37,6 +41,11 @@ interface ProgressCircleProps {
 
 const COLOR_CONFIG: Record<ProgressCircleColor, { stroke: string; bg: string; text: string }> = {
   green: {
+    stroke: 'stroke-emerald-500',
+    bg: 'stroke-emerald-100',
+    text: 'text-emerald-600',
+  },
+  emerald: {
     stroke: 'stroke-emerald-500',
     bg: 'stroke-emerald-100',
     text: 'text-emerald-600',
@@ -66,6 +75,11 @@ const COLOR_CONFIG: Record<ProgressCircleColor, { stroke: string; bg: string; te
     bg: 'stroke-gray-100',
     text: 'text-gray-500',
   },
+  primary: {
+    stroke: 'stroke-primary-500',
+    bg: 'stroke-primary-100',
+    text: 'text-primary-600',
+  },
 };
 
 // ============================================
@@ -78,6 +92,7 @@ export function ProgressCircle({
   strokeWidth = 5,
   color = 'green',
   showValue = true,
+  showIcon = false,
   className,
 }: ProgressCircleProps) {
   // Calculate SVG dimensions
@@ -93,6 +108,10 @@ export function ProgressCircle({
 
   // Format value for display
   const formattedValue = value === null ? '-' : `${Math.round(displayValue)}%`;
+
+  // Show checkmark icon when complete and showIcon is true
+  const shouldShowIcon = showIcon && clampedValue >= 100;
+  const iconSize = Math.max(size * 0.35, 14);
 
   return (
     <div className={cn('relative inline-flex items-center justify-center', className)}>
@@ -130,9 +149,15 @@ export function ProgressCircle({
         )}
       </svg>
 
-      {/* Center text */}
-      {showValue && (
-        <div className="absolute inset-0 flex items-center justify-center">
+      {/* Center content: Icon or text */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {shouldShowIcon ? (
+          <Check
+            className={cn(colors.text, 'animate-in zoom-in duration-300')}
+            style={{ width: iconSize, height: iconSize }}
+            strokeWidth={3}
+          />
+        ) : showValue ? (
           <span
             className={cn(
               'font-semibold tabular-nums',
@@ -142,8 +167,8 @@ export function ProgressCircle({
           >
             {formattedValue}
           </span>
-        </div>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 }

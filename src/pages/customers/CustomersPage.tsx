@@ -123,18 +123,21 @@ export function CustomersPage() {
               value={formatNumber(metrics.totalCustomers)}
               change={metrics.totalCustomersChange}
               icon={Users}
+              tooltip="Total de clientes únicos en el período"
             />
             <CustomerScorecard
               title="Nuevos"
               value={formatNumber(metrics.newCustomers)}
               change={metrics.newCustomersChange}
               icon={UserPlus}
+              tooltip="Clientes que hacen su primer pedido en el período"
             />
             <CustomerScorecard
               title="Repetidores"
               value={`${metrics.retentionRate.toFixed(1)}%`}
               change={metrics.retentionRateChange}
               icon={RefreshCcw}
+              tooltip="% de clientes que han hecho más de 1 pedido"
             />
             <CustomerScorecard
               title="Frecuencia"
@@ -142,6 +145,7 @@ export function CustomersPage() {
               change={metrics.avgFrequencyDaysChange}
               icon={Clock}
               subtitle="entre pedidos"
+              tooltip="Días promedio entre pedidos (solo clientes con 2+ pedidos)"
             />
             <CustomerScorecard
               title="CLV Est."
@@ -149,12 +153,14 @@ export function CustomersPage() {
               change={metrics.estimatedCLVChange}
               icon={DollarSign}
               subtitle="anualizado"
+              tooltip="Valor estimado anual: Ticket × Pedidos/cliente × 12"
             />
             <CustomerScorecard
               title="Ticket"
               value={formatCurrency(metrics.avgTicket)}
               change={metrics.avgTicketChange}
               icon={Receipt}
+              tooltip="Valor promedio por pedido"
             />
           </div>
         </section>
@@ -176,6 +182,8 @@ export function CustomersPage() {
                 avgCLV={channel.avgCLV}
                 avgTicket={channel.avgTicket}
                 avgOrdersPerCustomer={channel.avgOrdersPerCustomer}
+                returningCustomers={channel.returningCustomers}
+                repetitionRate={channel.repetitionRate}
               />
             ))}
           </div>

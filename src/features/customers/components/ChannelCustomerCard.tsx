@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import type { ChannelId } from '@/types';
@@ -11,6 +12,10 @@ interface ChannelCustomerCardProps {
   avgCLV: number;
   avgTicket: number;
   avgOrdersPerCustomer: number;
+  /** Customers with more than 1 order */
+  returningCustomers: number;
+  /** Percentage of customers with more than 1 order */
+  repetitionRate: number;
 }
 
 const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string; accent: string }> = {
@@ -28,6 +33,8 @@ export function ChannelCustomerCard({
   avgCLV,
   avgTicket,
   avgOrdersPerCustomer,
+  returningCustomers,
+  repetitionRate,
 }: ChannelCustomerCardProps) {
   const styles = CHANNEL_STYLES[channelId];
 
@@ -50,16 +57,32 @@ export function ChannelCustomerCard({
           <p className="text-[10px] text-gray-400 tabular-nums">{newCustomersPercentage.toFixed(1)}%</p>
         </div>
         <div>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">CLV</p>
-          <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(avgCLV)}</p>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Repetidores</p>
+            <span
+              className="cursor-help text-gray-300"
+              title="% de clientes que han hecho más de 1 pedido"
+            >
+              <Info className="w-3 h-3" />
+            </span>
+          </div>
+          <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatNumber(returningCustomers)}</p>
+          <p className="text-[10px] text-gray-400 tabular-nums">{repetitionRate.toFixed(1)}%</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200/60">
+      <div className="grid grid-cols-2 gap-3 py-3 border-t border-gray-200/60">
+        <div>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">CLV</p>
+          <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(avgCLV)}</p>
+        </div>
         <div>
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ticket</p>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(avgTicket)}</p>
         </div>
+      </div>
+
+      <div className="pt-3 border-t border-gray-200/60">
         <div>
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ped./Cliente</p>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{avgOrdersPerCustomer.toFixed(1)}</p>

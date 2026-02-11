@@ -60,7 +60,20 @@ export const useGlobalFiltersStore = create<GlobalFiltersState>()(
 // ============================================
 // DASHBOARD FILTERS STORE (Por página)
 // ============================================
-const defaultDateRange = getDateRangeFromPreset('30d');
+const defaultDateRange = getDateRangeFromPreset('last_7_days');
+
+// Migrate legacy preset values to new format
+function migrateLegacyPreset(preset: string): DatePreset {
+  const legacyToNew: Record<string, DatePreset> = {
+    'today': 'last_7_days',
+    'yesterday': 'last_7_days',
+    '7d': 'last_7_days',
+    '30d': 'last_30_days',
+    '90d': 'last_12_weeks',
+    'year': 'last_12_months',
+  };
+  return legacyToNew[preset] || (preset as DatePreset);
+}
 
 interface DashboardFiltersState {
   // Filtros múltiples (vacío = todos)
@@ -112,7 +125,7 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
       restaurantIds: [],
       channelIds: [],
       dateRange: defaultDateRange,
-      datePreset: '30d',
+      datePreset: 'last_7_days',
 
       // Marcas
       setBrandIds: (ids) => set({ brandIds: ids }),
@@ -215,26 +228,66 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
         datePreset: state.datePreset,
         dateRange: state.dateRange,
       }),
-      // Custom storage to handle Date serialization/deserialization
+      // Custom storage to handle Date serialization/deserialization and legacy migration
       storage: {
         getItem: (name) => {
           try {
             const str = localStorage.getItem(name);
             if (!str) return null;
             const parsed = JSON.parse(str);
+
+            // Validate basic structure
+            if (!parsed || typeof parsed !== 'object' || !parsed.state) {
+              console.warn('[FiltersStore] Invalid localStorage structure, using defaults');
+              return null;
+            }
+
+            // Validate and sanitize channelIds
+            if (parsed.state.channelIds) {
+              const validChannels = ['glovo', 'ubereats', 'justeat'];
+              if (!Array.isArray(parsed.state.channelIds)) {
+                console.warn('[FiltersStore] Invalid channelIds, resetting to empty array');
+                parsed.state.channelIds = [];
+              } else {
+                // Filter out invalid channel IDs
+                parsed.state.channelIds = parsed.state.channelIds.filter(
+                  (ch: unknown): ch is ChannelId =>
+                    typeof ch === 'string' && validChannels.includes(ch)
+                );
+              }
+            }
+
+            // Migrate legacy preset values (e.g., '30d' → 'last_30_days')
+            if (parsed.state?.datePreset) {
+              const migratedPreset = migrateLegacyPreset(parsed.state.datePreset);
+              if (migratedPreset !== parsed.state.datePreset) {
+                console.log('[FiltersStore] Migrated legacy preset:', parsed.state.datePreset, '→', migratedPreset);
+                parsed.state.datePreset = migratedPreset;
+                // Recalculate date range for migrated preset
+                parsed.state.dateRange = getDateRangeFromPreset(migratedPreset);
+              }
+            }
+
             // Convert date strings back to Date objects
             if (parsed.state?.dateRange?.start && parsed.state?.dateRange?.end) {
-              parsed.state.dateRange = {
-                start: new Date(parsed.state.dateRange.start),
-                end: new Date(parsed.state.dateRange.end),
-              };
+              const start = new Date(parsed.state.dateRange.start);
+              const end = new Date(parsed.state.dateRange.end);
+
+              // Validate dates are valid
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                console.warn('[FiltersStore] Invalid date range, using defaults');
+                delete parsed.state.dateRange;
+              } else {
+                parsed.state.dateRange = { start, end };
+              }
             } else {
               // If dateRange is missing or invalid, use default
               delete parsed.state?.dateRange;
             }
             return parsed;
-          } catch {
+          } catch (error) {
             // If parsing fails, return null to use defaults
+            console.warn('[FiltersStore] Failed to parse localStorage:', error);
             return null;
           }
         },

@@ -4,52 +4,7 @@ import { BrandSelector } from './BrandSelector';
 import { EstablishmentSelector } from './EstablishmentSelector';
 import { ChannelSelector } from './ChannelSelector';
 import { DateRangePicker } from './DateRangePicker';
-import type { DatePresetId } from './DateRangePicker';
 import type { DatePreset, DateRange } from '@/types';
-
-// Map from UI DatePresetId to store DatePreset
-function toStorePreset(presetId: DatePresetId): DatePreset {
-  switch (presetId) {
-    case 'last_7_days':
-      return '7d';
-    case 'last_30_days':
-      return '30d';
-    case 'last_12_weeks':
-      return '90d';
-    case 'last_12_months':
-      return 'year';
-    case 'this_week':
-    case 'last_week':
-      return '7d';
-    case 'this_month':
-    case 'last_month':
-      return '30d';
-    case 'custom':
-      return 'custom';
-    default:
-      return '30d';
-  }
-}
-
-// Map from store DatePreset to UI DatePresetId
-function toUIPreset(preset: DatePreset): DatePresetId {
-  switch (preset) {
-    case 'today':
-    case 'yesterday':
-    case '7d':
-      return 'last_7_days';
-    case '30d':
-      return 'last_30_days';
-    case '90d':
-      return 'last_12_weeks';
-    case 'year':
-      return 'last_12_months';
-    case 'custom':
-      return 'custom';
-    default:
-      return 'last_30_days';
-  }
-}
 
 interface DashboardFiltersProps {
   className?: string;
@@ -60,18 +15,14 @@ interface DashboardFiltersProps {
 export function DashboardFilters({ className, excludeChannels }: DashboardFiltersProps) {
   const { dateRange, datePreset, setDateRangeWithPreset } = useDashboardFiltersStore();
 
-  const handleDateChange = (range: DateRange, presetId: DatePresetId) => {
-    const storePreset = toStorePreset(presetId);
-
-    // Always use the range from the picker directly - don't recalculate
-    // This ensures presets like "last_month" use the exact dates from presets.ts
-    setDateRangeWithPreset(range, storePreset);
+  const handleDateChange = (range: DateRange, presetId: DatePreset) => {
+    // Use the preset directly - no mapping needed since types are now unified
+    setDateRangeWithPreset(range, presetId);
 
     // Debug logging
     if (import.meta.env.DEV) {
       console.log('[DashboardFilters] Date changed:', {
         presetId,
-        storePreset,
         rangeStart: range.start.toISOString(),
         rangeEnd: range.end.toISOString(),
       });
@@ -99,7 +50,7 @@ export function DashboardFilters({ className, excludeChannels }: DashboardFilter
         <ChannelSelector excludeChannels={excludeChannels} />
         <DateRangePicker
           value={dateRange}
-          presetId={toUIPreset(datePreset)}
+          presetId={datePreset}
           onChange={handleDateChange}
         />
       </div>

@@ -5,7 +5,7 @@
  * Supports client mode (read-only) sharing.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { X, Link2, Mail, Copy, Check, Send, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -35,6 +35,18 @@ export function ShareCalendarModal({
   const [emailMessage, setEmailMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+
+  // Refs for timeout cleanup to prevent memory leaks
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailSentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      if (emailSentTimeoutRef.current) clearTimeout(emailSentTimeoutRef.current);
+    };
+  }, []);
 
   // Generate shareable link
   const shareLink = useMemo(() => {
@@ -76,7 +88,9 @@ export function ShareCalendarModal({
     try {
       await navigator.clipboard.writeText(shareLink);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // Clear previous timeout if exists
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy link:', err);
     }
@@ -115,7 +129,9 @@ export function ShareCalendarModal({
       window.open(`mailto:${emailList.join(',')}?subject=${subject}&body=${body}`);
 
       setEmailSent(true);
-      setTimeout(() => setEmailSent(false), 3000);
+      // Clear previous timeout if exists
+      if (emailSentTimeoutRef.current) clearTimeout(emailSentTimeoutRef.current);
+      emailSentTimeoutRef.current = setTimeout(() => setEmailSent(false), 3000);
     } catch (err) {
       console.error('Failed to send email:', err);
     } finally {

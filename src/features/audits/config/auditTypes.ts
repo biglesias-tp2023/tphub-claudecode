@@ -36,6 +36,12 @@ export const AUDIT_STATUS_CONFIG: Record<AuditStatus, AuditStatusConfig> = {
     bgColor: 'bg-green-100',
     icon: 'CheckCircle',
   },
+  delivered: {
+    label: 'Entregada',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    icon: 'Send',
+  },
 };
 
 // ============================================
@@ -43,10 +49,51 @@ export const AUDIT_STATUS_CONFIG: Record<AuditStatus, AuditStatusConfig> = {
 // ============================================
 
 export const AUDIT_TYPE_ICONS: Record<string, string> = {
-  delivery: 'Truck',
+  onboarding: 'Rocket',
   google_ads: 'BarChart3',
   mystery_shopper: 'UserSearch',
 };
+
+// Type card configurations for the new audit modal
+export interface AuditTypeCardConfig {
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  isActive: boolean;
+  color: string;
+  bgColor: string;
+}
+
+export const AUDIT_TYPE_CARDS: AuditTypeCardConfig[] = [
+  {
+    slug: 'mystery_shopper',
+    name: 'Mystery Shopper',
+    description: 'Evalúa producto y experiencia de compra',
+    icon: 'UserSearch',
+    isActive: true,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100',
+  },
+  {
+    slug: 'onboarding',
+    name: 'Onboarding',
+    description: 'Auditoría inicial del cliente',
+    icon: 'Rocket',
+    isActive: false,
+    color: 'text-green-600',
+    bgColor: 'bg-green-100',
+  },
+  {
+    slug: 'google_ads',
+    name: 'Google Ads',
+    description: 'Auditoría de campañas de ads',
+    icon: 'BarChart3',
+    isActive: false,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100',
+  },
+];
 
 // ============================================
 // HELPER FUNCTIONS
@@ -70,7 +117,7 @@ export function formatAuditNumber(auditNumber: string): string {
  * Type codes for audit nomenclature
  */
 export const AUDIT_TYPE_CODES: Record<string, string> = {
-  delivery: 'DEL',
+  onboarding: 'OB',
   google_ads: 'GADS',
   mystery_shopper: 'MS',
 };

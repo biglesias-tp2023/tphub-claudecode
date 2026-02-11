@@ -137,7 +137,7 @@ export function useUpdateAudit() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<AuditInput> & { desStatus?: AuditStatus } }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<AuditInput> & { desStatus?: AuditStatus; amtScoreTotal?: number } }) =>
       updateAudit(id, updates),
     onSuccess: (data) => {
       // Update the specific audit in the cache

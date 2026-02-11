@@ -5,15 +5,35 @@ import { ProtectedRoute } from '@/components/common';
 import { ControllingPage } from '@/pages/controlling';
 import { CustomersPage } from '@/pages/customers';
 import { ReputationPage } from '@/pages/reputation';
-import { StrategicPage } from '@/pages/strategic';
-import { CalendarPage } from '@/pages/calendar';
-import { MapsPage } from '@/pages/maps';
 import { LoginPage } from '@/pages/auth';
 import { AdminPage } from '@/pages/admin/AdminPage';
-import { AuditsPage, AuditDetailPage } from '@/pages/audits';
 
-// Lazy load public pages
+// Lazy load heavy pages to reduce initial bundle size
+// Maps: uses leaflet (~180KB)
+const MapsPage = lazy(() => import('@/pages/maps').then(m => ({ default: m.MapsPage })));
+// Calendar: uses react-day-picker and complex scheduling logic
+const CalendarPage = lazy(() => import('@/pages/calendar').then(m => ({ default: m.CalendarPage })));
+// Strategic: large page with charts and projections
+const StrategicPage = lazy(() => import('@/pages/strategic').then(m => ({ default: m.StrategicPage })));
+// Audits: large pages with extensive forms
+const AuditsPage = lazy(() => import('@/pages/audits').then(m => ({ default: m.AuditsPage })));
+const AuditDetailPage = lazy(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
+// Public shared pages
 const SharedObjectivePage = lazy(() => import('@/pages/shared/SharedObjectivePage'));
+
+// Loading spinner for lazy-loaded pages
+function PageLoader() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// Wrapper for lazy-loaded pages with Suspense
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
 
 // Placeholder pages - will be replaced with real implementations
 // eslint-disable-next-line react-refresh/only-export-components
@@ -44,11 +64,11 @@ export const router = createBrowserRouter([
       { path: 'operations', element: <PlaceholderPage title="Operaciones" /> },
       { path: 'clients', element: <PlaceholderPage title="Clientes" /> },
       { path: 'reputation', element: <ReputationPage /> },
-      { path: 'strategic', element: <StrategicPage /> },
-      { path: 'calendar', element: <CalendarPage /> },
-      { path: 'audits', element: <AuditsPage /> },
-      { path: 'audits/:id', element: <AuditDetailPage /> },
-      { path: 'maps', element: <MapsPage /> },
+      { path: 'strategic', element: <LazyPage><StrategicPage /></LazyPage> },
+      { path: 'calendar', element: <LazyPage><CalendarPage /></LazyPage> },
+      { path: 'audits', element: <LazyPage><AuditsPage /></LazyPage> },
+      { path: 'audits/:id', element: <LazyPage><AuditDetailPage /></LazyPage> },
+      { path: 'maps', element: <LazyPage><MapsPage /></LazyPage> },
       { path: 'admin', element: <AdminPage /> },
       { path: 'admin/users', element: <AdminPage /> },
       // Consultant portal - unified page

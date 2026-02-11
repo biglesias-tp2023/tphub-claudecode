@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   ArrowLeft,
   Shield,
-  Building2,
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -34,7 +33,7 @@ import { TrendIndicator } from '@/features/strategic/components/TrendIndicator';
 import { useShareLinkByToken, useRecordAccess } from '@/features/strategic/hooks/useShareLinks';
 import { useObjectiveProgress } from '@/features/strategic/hooks/useObjectiveProgress';
 import { fetchStrategicObjectiveById } from '@/services/supabase-data';
-import { isShareLinkValid, isEmailAllowed } from '@/services/shareLinks';
+import { isShareLinkValid } from '@/services/shareLinks';
 import { formatKpiValue } from '@/features/strategic/hooks/useStrategicData';
 import { getCategoryConfig } from '@/features/strategic/config';
 import type { StrategicObjective, ObjectiveCategory } from '@/types';

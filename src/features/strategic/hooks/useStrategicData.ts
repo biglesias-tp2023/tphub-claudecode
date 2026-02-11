@@ -391,11 +391,31 @@ export function useStrategicTasks(params?: {
     return { completed, pending, overdue, total: tasks.length };
   }, [tasksQuery.data]);
 
+  // Task counts by objective ID (for ObjectiveCard)
+  const taskCountByObjectiveId = useMemo(() => {
+    const tasks = tasksQuery.data || [];
+    const counts: Record<string, { completed: number; total: number }> = {};
+
+    for (const task of tasks) {
+      if (!task.objectiveId) continue;
+      if (!counts[task.objectiveId]) {
+        counts[task.objectiveId] = { completed: 0, total: 0 };
+      }
+      counts[task.objectiveId].total++;
+      if (task.isCompleted) {
+        counts[task.objectiveId].completed++;
+      }
+    }
+
+    return counts;
+  }, [tasksQuery.data]);
+
   return {
     tasks: tasksQuery.data || [],
     tasksByDate,
     sortedDates,
     stats,
+    taskCountByObjectiveId,
     restaurantIds,
     isLoading: restaurantsQuery.isLoading || tasksQuery.isLoading,
     error: restaurantsQuery.error || tasksQuery.error,

@@ -104,6 +104,21 @@ export function SpendHistogram({ data }: SpendHistogramProps) {
                 <th className="text-left py-2.5 px-4 font-medium text-gray-500 text-xs">Segmento</th>
                 <th className="text-right py-2.5 px-3 font-medium text-gray-500 text-xs">Clientes</th>
                 <th className="text-right py-2.5 px-3 font-medium text-gray-500 text-xs">%</th>
+                <th className="text-right py-2.5 px-3 font-medium text-gray-500 text-xs">
+                  <span title="% de clientes con más de 1 pedido" className="cursor-help">
+                    Rep. %
+                  </span>
+                </th>
+                <th className="text-right py-2.5 px-3 font-medium text-gray-500 text-xs">
+                  <span title="Pedidos promedio por cliente" className="cursor-help">
+                    Ped./Cli
+                  </span>
+                </th>
+                <th className="text-right py-2.5 px-3 font-medium text-gray-500 text-xs">
+                  <span title="Días promedio entre pedidos" className="cursor-help">
+                    Frec. (días)
+                  </span>
+                </th>
                 <th className="text-right py-2.5 px-3 font-medium text-gray-500 text-xs">Gasto Prom.</th>
                 <th className="text-right py-2.5 px-4 font-medium text-gray-500 text-xs">Ingresos</th>
               </tr>
@@ -127,6 +142,15 @@ export function SpendHistogram({ data }: SpendHistogramProps) {
                     {segment.percentage.toFixed(1)}%
                   </td>
                   <td className="py-2.5 px-3 text-right text-gray-600 text-xs tabular-nums">
+                    {segment.repetitionRate.toFixed(1)}%
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-gray-600 text-xs tabular-nums">
+                    {segment.avgOrdersPerCustomer.toFixed(1)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-gray-600 text-xs tabular-nums">
+                    {segment.avgFrequencyDays !== null ? segment.avgFrequencyDays : '-'}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-gray-600 text-xs tabular-nums">
                     {formatCurrency(segment.avgSpend)}
                   </td>
                   <td className="py-2.5 px-4 text-right font-medium text-gray-900 text-xs tabular-nums">
@@ -142,6 +166,9 @@ export function SpendHistogram({ data }: SpendHistogramProps) {
                   {formatNumber(totalCustomers)}
                 </td>
                 <td className="py-2.5 px-3 text-right font-semibold text-gray-900 text-xs tabular-nums">100%</td>
+                <td className="py-2.5 px-3 text-right text-gray-400 text-xs">-</td>
+                <td className="py-2.5 px-3 text-right text-gray-400 text-xs">-</td>
+                <td className="py-2.5 px-3 text-right text-gray-400 text-xs">-</td>
                 <td className="py-2.5 px-3 text-right text-gray-400 text-xs">-</td>
                 <td className="py-2.5 px-4 text-right font-semibold text-gray-900 text-xs tabular-nums">
                   {formatCurrency(segments.reduce((sum, s) => sum + s.totalRevenue, 0))}

@@ -1,4 +1,4 @@
-import { Calendar, User, FileText, FileSpreadsheet, Mail } from 'lucide-react';
+import { Calendar, User, Eye } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -8,17 +8,13 @@ import type { AuditWithDetails } from '@/types';
 interface AuditCardProps {
   audit: AuditWithDetails;
   onEdit: (auditId: string) => void;
-  onExportPdf?: (auditId: string) => void;
-  onExportExcel?: (auditId: string) => void;
-  onSendEmail?: (auditId: string) => void;
+  onPreview?: (auditId: string) => void;
 }
 
 export function AuditCard({
   audit,
   onEdit,
-  onExportPdf,
-  onExportExcel,
-  onSendEmail,
+  onPreview,
 }: AuditCardProps) {
   const statusConfig = getAuditStatusConfig(audit.desStatus);
   const scopeLabel = getAuditScopeLabel(audit);
@@ -100,43 +96,16 @@ export function AuditCard({
 
         {/* Right section: Actions */}
         <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          {isCompleted && (
-            // Export actions for completed audits
-            <>
-              {onExportPdf && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onExportPdf(audit.pkIdAudit)}
-                  className="gap-1.5"
-                >
-                  <FileText className="w-4 h-4" />
-                  PDF
-                </Button>
-              )}
-              {onExportExcel && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onExportExcel(audit.pkIdAudit)}
-                  className="gap-1.5"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  Excel
-                </Button>
-              )}
-              {onSendEmail && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onSendEmail(audit.pkIdAudit)}
-                  className="gap-1.5"
-                >
-                  <Mail className="w-4 h-4" />
-                  Email
-                </Button>
-              )}
-            </>
+          {isCompleted && onPreview && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPreview(audit.pkIdAudit)}
+              className="gap-1.5"
+            >
+              <Eye className="w-4 h-4" />
+              Preview
+            </Button>
           )}
         </div>
       </div>

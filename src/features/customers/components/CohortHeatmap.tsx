@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Info } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import type { CohortData } from '@/services/crp-portal';
 
@@ -5,6 +7,8 @@ interface CohortHeatmapProps {
   data: CohortData[];
   granularity: 'week' | 'month';
 }
+
+type ViewMode = 'period' | 'cumulative';
 
 function getColorIntensity(value: number): string {
   if (value >= 80) return 'bg-primary-600 text-white';
@@ -54,6 +58,8 @@ function formatCohortLabel(cohortId: string, granularity: 'week' | 'month'): str
 }
 
 export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('cumulative');
+
   if (data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 p-6">
@@ -70,8 +76,48 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
     return granularity === 'week' ? `+${i}S` : `+${i}M`;
   });
 
+  const tooltipText = viewMode === 'cumulative'
+    ? '% de clientes que han vuelto al menos una vez hasta este período'
+    : '% de clientes que compraron específicamente en este período';
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      {/* Toggle Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('cumulative')}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                viewMode === 'cumulative'
+                  ? 'bg-white shadow-sm text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
+              )}
+            >
+              Acumulado
+            </button>
+            <button
+              onClick={() => setViewMode('period')}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                viewMode === 'period'
+                  ? 'bg-white shadow-sm text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
+              )}
+            >
+              Por período
+            </button>
+          </div>
+          <span
+            className="cursor-help text-gray-400"
+            title={tooltipText}
+          >
+            <Info className="w-4 h-4" />
+          </span>
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -86,31 +132,37 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
             </tr>
           </thead>
           <tbody>
-            {data.map((cohort) => (
-              <tr key={cohort.cohortId} className="border-b border-gray-50 hover:bg-gray-50/50">
-                <td className="py-2 px-4 font-medium text-gray-900 text-xs">
-                  {formatCohortLabel(cohort.cohortId, granularity)}
-                </td>
-                <td className="py-2 px-2 text-right text-gray-600 text-xs tabular-nums">
-                  {cohort.cohortSize}
-                </td>
-                {periodLabels.map((_, i) => {
-                  const value = cohort.retention[i] ?? 0;
-                  return (
-                    <td key={i} className="py-1 px-1">
-                      <div
-                        className={cn(
-                          'flex items-center justify-center h-8 rounded text-xs font-medium tabular-nums',
-                          getColorIntensity(value)
-                        )}
-                      >
-                        {value > 0 ? `${value.toFixed(0)}%` : '-'}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {data.map((cohort) => {
+              const retentionData = viewMode === 'cumulative'
+                ? cohort.cumulativeRetention
+                : cohort.retention;
+
+              return (
+                <tr key={cohort.cohortId} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <td className="py-2 px-4 font-medium text-gray-900 text-xs">
+                    {formatCohortLabel(cohort.cohortId, granularity)}
+                  </td>
+                  <td className="py-2 px-2 text-right text-gray-600 text-xs tabular-nums">
+                    {cohort.cohortSize}
+                  </td>
+                  {periodLabels.map((_, i) => {
+                    const value = retentionData?.[i] ?? 0;
+                    return (
+                      <td key={i} className="py-1 px-1">
+                        <div
+                          className={cn(
+                            'flex items-center justify-center h-8 rounded text-xs font-medium tabular-nums',
+                            getColorIntensity(value)
+                          )}
+                        >
+                          {value > 0 ? `${value.toFixed(0)}%` : '-'}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

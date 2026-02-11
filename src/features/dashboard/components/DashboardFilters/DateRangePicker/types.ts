@@ -1,17 +1,9 @@
-import type { DateRange } from '@/types';
+import type { DateRange, DatePreset as DatePresetType } from '@/types';
 
-export type DatePresetId =
-  | 'this_week'
-  | 'this_month'
-  | 'last_week'
-  | 'last_month'
-  | 'last_7_days'
-  | 'last_30_days'
-  | 'last_12_weeks'
-  | 'last_12_months'
-  | 'custom';
+// Re-export DatePreset from @/types for backwards compatibility
+export type DatePresetId = DatePresetType;
 
-export interface DatePreset {
+export interface DatePresetConfig {
   id: DatePresetId;
   label: string;
   getRange: () => DateRange;

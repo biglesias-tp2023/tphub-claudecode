@@ -253,7 +253,7 @@ function calculateProjectedValue(
 function calculateWillComplete(
   projectedValue: number | null,
   target: number,
-  baseline: number,
+  _baseline: number,
   direction: 'increase' | 'decrease' | 'maintain'
 ): boolean {
   if (projectedValue === null) return false;

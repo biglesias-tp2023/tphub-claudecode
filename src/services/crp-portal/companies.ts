@@ -81,6 +81,7 @@ export async function fetchCompanyById(companyId: string): Promise<Company | nul
     .from(TABLE_NAME)
     .select('*')
     .eq('pk_id_company', parseInt(companyId, 10))
+    .eq('pk_ts_month', getCurrentMonthFilter())
     .in('des_status', VALID_COMPANY_STATUSES)
     .single();
 
