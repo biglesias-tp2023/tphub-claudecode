@@ -796,10 +796,10 @@ export function ControllingPage() {
   }, [buildExportData]);
 
   // Generate PDF blob for preview
-  const generatePdfBlob = useCallback((): Blob => {
+  const generatePdfBlob = useCallback(async (): Promise<Blob> => {
     const exportData = buildExportData();
     if (!exportData) throw new Error('No data available');
-    return generateControllingPdfBlob(exportData);
+    return await generateControllingPdfBlob(exportData);
   }, [buildExportData]);
 
   if (isLoading) {

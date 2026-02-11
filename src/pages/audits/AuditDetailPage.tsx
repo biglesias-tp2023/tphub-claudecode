@@ -191,8 +191,7 @@ export function AuditDetailPage() {
         updates: {
           desFieldData: stripReadOnlyFields(fieldData),
           desStatus: 'completed',
-          tdCompletedAt: new Date().toISOString(),
-          amtScoreTotal: finalScore ?? null,
+          amtScoreTotal: finalScore,
         },
       });
 

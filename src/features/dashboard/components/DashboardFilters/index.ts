@@ -15,4 +15,4 @@ export {
   getPresetLabel,
   getRangeFromPreset,
 } from './DateRangePicker';
-export type { DatePresetId, DatePreset, DateRangePickerState } from './DateRangePicker';
+export type { DatePresetId, DatePresetConfig, DateRangePickerState } from './DateRangePicker';

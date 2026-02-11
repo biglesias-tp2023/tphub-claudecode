@@ -53,7 +53,7 @@
  * // Deduplicate and filter deleted
  * const activeStores = deduplicateAndFilterDeleted(data, s => s.pk_id_store);
  */
-export function deduplicateAndFilterDeleted<T extends { flg_deleted: number }>(
+export function deduplicateAndFilterDeleted<T extends { flg_deleted?: number }>(
   data: T[],
   getKey: (item: T) => string | number
 ): T[] {
@@ -65,8 +65,8 @@ export function deduplicateAndFilterDeleted<T extends { flg_deleted: number }>(
       map.set(key, item);
     }
   }
-  // Step 2: Filter out deleted records
-  return Array.from(map.values()).filter(item => item.flg_deleted === 0);
+  // Step 2: Filter out deleted records (treat undefined as 0/active)
+  return Array.from(map.values()).filter(item => (item.flg_deleted ?? 0) === 0);
 }
 
 /**
@@ -232,7 +232,7 @@ export interface GroupedItem<T> {
  * //   { primary: { pk_id_store: 'B1', ... }, allIds: ['B1'] }
  * // ]
  */
-export function groupByName<T extends { pk_ts_month: string }>(
+export function groupByName<T extends { pk_ts_month?: string }>(
   items: T[],
   nameFn: (item: T) => string,
   idFn: (item: T) => string
@@ -254,7 +254,7 @@ export function groupByName<T extends { pk_ts_month: string }>(
   for (const [, group] of groups) {
     // Sort by pk_ts_month descending (most recent first)
     const sorted = [...group].sort((a, b) =>
-      b.pk_ts_month.localeCompare(a.pk_ts_month)
+      (b.pk_ts_month ?? '').localeCompare(a.pk_ts_month ?? '')
     );
 
     // Primary is the most recent
@@ -397,7 +397,7 @@ export function deduplicateAddressesKeepingLatest<T extends { pk_ts_month: strin
  * //   { primary: { pk_id_address: 'B1', ... }, allIds: ['B1'] }
  * // ]
  */
-export function groupAddressesByName<T extends { pk_ts_month: string; des_latitude?: number | null; des_longitude?: number | null }>(
+export function groupAddressesByName<T extends { pk_ts_month?: string; des_latitude?: number | null; des_longitude?: number | null }>(
   items: T[],
   addressFn: (item: T) => string,
   idFn: (item: T) => string
@@ -421,7 +421,7 @@ export function groupAddressesByName<T extends { pk_ts_month: string; des_latitu
     const sorted = [...group].sort((a, b) => {
       const lenDiff = addressFn(b).length - addressFn(a).length;
       if (lenDiff !== 0) return lenDiff;
-      return b.pk_ts_month.localeCompare(a.pk_ts_month);
+      return (b.pk_ts_month ?? '').localeCompare(a.pk_ts_month ?? '');
     });
 
     // Primary is the best (longest, most recent)

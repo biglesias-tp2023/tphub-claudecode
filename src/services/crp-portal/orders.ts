@@ -29,7 +29,7 @@ import { supabase } from '../supabase';
 import type { DbCrpOrderHead } from './types';
 import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
-import { normalizeAddress, deduplicateAndFilterDeleted } from './utils';
+import { deduplicateAndFilterDeleted } from './utils';
 
 // ============================================
 // TYPES
@@ -480,7 +480,6 @@ export async function fetchControllingMetricsRPC(
   });
 
   if (error) {
-    console.error('[fetchControllingMetricsRPC] Error:', error);
     throw error;
   }
 
@@ -542,6 +541,8 @@ interface AddressDim {
   id: string;  // pk_id_address - unique, no normalization
   name: string;
   companyId: string;  // String for consistent comparisons
+  allIds: string[];   // All IDs that share this normalized address
+  storeId?: string;   // Store ID from dimension data (pfk_id_store)
 }
 
 interface PortalDim {
@@ -568,7 +569,7 @@ interface AllDimensions {
  */
 async function fetchAllDimensions(
   companyIds: number[],
-  companyIdsAsStrings: string[]
+  _companyIdsAsStrings: string[]
 ): Promise<AllDimensions> {
   // Fetch all dimension data in parallel (ordered by pk_ts_month DESC for deduplication)
   // Note: Supabase has a default limit of 1000 rows. We need explicit limits for large datasets.
@@ -591,10 +592,9 @@ async function fetchAllDimensions(
 
     // Fetch ALL addresses for these companies (include flg_deleted for post-dedup filtering)
     // NOTE: pfk_id_company is INTEGER (same as other dimension tables)
-    // NOTE: This table does NOT have pfk_id_store - address→store mapping comes from order data
     supabase
       .from('crp_portal__dt_address')
-      .select('pk_id_address, des_address, pfk_id_company, flg_deleted')
+      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, flg_deleted')
       .in('pfk_id_company', companyIds)
       .order('pk_ts_month', { ascending: false })
       .limit(50000),
@@ -645,6 +645,8 @@ async function fetchAllDimensions(
     id: String(a.pk_id_address),
     name: a.des_address || '',
     companyId: String(a.pfk_id_company),
+    allIds: [String(a.pk_id_address)],
+    storeId: a.pfk_id_store ? String(a.pfk_id_store) : undefined,
   }));
 
   const activePortals = deduplicateAndFilterDeleted(
@@ -655,22 +657,6 @@ async function fetchAllDimensions(
     id: String(p.pk_id_portal),
     name: p.des_portal,
   }));
-
-  if (import.meta.env.DEV) {
-    console.log('[fetchAllDimensions] Raw counts:',
-      'companies:', companiesResult.data?.length || 0,
-      'stores:', storesResult.data?.length || 0,
-      'addresses:', addressesResult.data?.length || 0,
-      'portals:', portalsResult.data?.length || 0
-    );
-    console.log('[fetchAllDimensions] After dedup:',
-      'companies:', companies.length,
-      'stores:', stores.length,
-      'addresses:', addresses.length,
-      'portals:', portals.length
-    );
-
-  }
 
   return { companies, stores, addresses, portals };
 }
@@ -943,7 +929,7 @@ function buildHierarchyFromDimensions(
   // Helper: Sum metrics from multiple address keys
   const sumMetricsFromAllIds = (
     allIds: string[],
-    companyId: number,
+    companyId: string,
     storeId: string,
     metricsMap: Map<string, BaseMetrics>
   ): BaseMetrics => {
@@ -963,7 +949,7 @@ function buildHierarchyFromDimensions(
   // Helper: Sum portal metrics from multiple address IDs
   const sumPortalMetricsFromAllIds = (
     allIds: string[],
-    companyId: number,
+    companyId: string,
     storeId: string,
     portalId: string,
     metricsMap: Map<string, BaseMetrics>

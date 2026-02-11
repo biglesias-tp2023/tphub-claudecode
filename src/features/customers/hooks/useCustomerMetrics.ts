@@ -29,17 +29,10 @@ function formatDate(date: Date | string): string {
   return `${year}-${month}-${day}`;
 }
 
-function getPreviousPeriodRange(dateRange: DateRange, preset: DatePreset): { start: Date; end: Date } {
+function getPreviousPeriodRange(dateRange: DateRange, _preset: DatePreset): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
   const durationMs = end.getTime() - start.getTime();
-
-  if (preset === 'year') {
-    return {
-      start: new Date(start.getFullYear() - 1, start.getMonth(), start.getDate()),
-      end: new Date(end.getFullYear() - 1, end.getMonth(), end.getDate()),
-    };
-  }
 
   return {
     start: new Date(start.getTime() - durationMs - 86400000),

@@ -95,10 +95,10 @@ export function ReputationPage() {
   }, [buildExportData]);
 
   // Generate PDF blob for preview
-  const generatePdfBlob = useCallback((): Blob => {
+  const generatePdfBlob = useCallback(async (): Promise<Blob> => {
     const exportData = buildExportData();
     if (!exportData) throw new Error('No data available');
-    return generateReputationPdfBlob(exportData);
+    return await generateReputationPdfBlob(exportData);
   }, [buildExportData]);
 
   // Preview data for export modal

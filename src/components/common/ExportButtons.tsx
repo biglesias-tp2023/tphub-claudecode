@@ -46,7 +46,7 @@ interface ExportButtonsProps {
   /** Función que retorna datos para el preview (habilita modal de preview) */
   getPreviewData?: () => PreviewTableData;
   /** Función que genera blob PDF para preview real (requiere getPreviewData) */
-  generatePdfBlob?: () => Blob;
+  generatePdfBlob?: () => Promise<Blob> | Blob;
   /** Título del modal de preview */
   previewTitle?: string;
   /** Subtítulo del modal de preview */

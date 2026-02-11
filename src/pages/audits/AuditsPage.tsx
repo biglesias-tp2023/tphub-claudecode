@@ -1,12 +1,12 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Filter, ClipboardList, Loader2, X, Download, Mail, FileText, FileSpreadsheet, UserSearch, Rocket, BarChart3, ChevronDown, Check, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Filter, ClipboardList, Loader2, UserSearch, Rocket, BarChart3, ChevronDown, Check, ArrowLeft } from 'lucide-react';
 import { Card, ToastContainer } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
-import { AuditCard, AuditCardSkeleton } from '@/features/audits/components';
+import { AuditCard, AuditCardSkeleton, AuditPdfPreviewModal, AuditExcelPreviewModal, AuditEmailPreviewModal } from '@/features/audits/components';
 import { useAuditsWithDetails, useAuditTypes, useCreateAudit } from '@/features/audits/hooks';
 import { AUDIT_STATUS_CONFIG, AUDIT_TYPE_CARDS, getAuditScopeLabel, calculateTotalScore, generateAuditNumber } from '@/features/audits/config';
 import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
@@ -17,7 +17,6 @@ import type { Portal } from '@/services/crp-portal';
 import {
   exportAuditToPDF,
   exportAuditToExcel,
-  generateAuditPdfBlob,
   type AuditExportData,
   type AuditExportSection,
 } from '@/utils/export';
@@ -78,264 +77,6 @@ function buildAuditExportData(
     sections,
     totalScore: totalScore.maximum > 0 ? totalScore : undefined,
   };
-}
-
-// ============================================
-// PDF PREVIEW MODAL
-// ============================================
-
-interface PdfPreviewModalProps {
-  open: boolean;
-  onClose: () => void;
-  exportData: AuditExportData | null;
-  onDownload: () => void;
-}
-
-function PdfPreviewModal({ open, onClose, exportData, onDownload }: PdfPreviewModalProps) {
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open && exportData) {
-      const blob = generateAuditPdfBlob(exportData);
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    return undefined;
-  }, [open, exportData]);
-
-  if (!open || !exportData) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-red-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Preview PDF</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={onDownload} leftIcon={<Download className="w-4 h-4" />}>
-              Descargar PDF
-            </Button>
-            <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* PDF Preview */}
-        <div className="flex-1 p-4 bg-gray-100 overflow-hidden">
-          {pdfUrl ? (
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full rounded-lg border border-gray-200"
-              title="PDF Preview"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// EXCEL PREVIEW MODAL
-// ============================================
-
-interface ExcelPreviewModalProps {
-  open: boolean;
-  onClose: () => void;
-  exportData: AuditExportData | null;
-  onDownload: () => void;
-}
-
-function ExcelPreviewModal({ open, onClose, exportData, onDownload }: ExcelPreviewModalProps) {
-  if (!open || !exportData) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <FileSpreadsheet className="w-5 h-5 text-green-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Preview Excel</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={onDownload} leftIcon={<Download className="w-4 h-4" />}>
-              Descargar Excel
-            </Button>
-            <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Excel Preview (Table format) */}
-        <div className="flex-1 p-6 overflow-auto">
-          {/* Metadata */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-2">Información General</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-gray-500">Referencia:</span> {exportData.auditNumber}</div>
-              <div><span className="text-gray-500">Tipo:</span> {exportData.auditType}</div>
-              <div><span className="text-gray-500">Alcance:</span> {exportData.scope}</div>
-              <div><span className="text-gray-500">Estado:</span> {exportData.status}</div>
-              <div><span className="text-gray-500">Creado por:</span> {exportData.createdBy}</div>
-              {exportData.totalScore && (
-                <div><span className="text-gray-500">Puntuación:</span> {exportData.totalScore.obtained}/{exportData.totalScore.maximum} ({exportData.totalScore.percentage}%)</div>
-              )}
-            </div>
-          </div>
-
-          {/* Sections */}
-          {exportData.sections.map((section, sIdx) => (
-            <div key={sIdx} className="mb-6">
-              <h3 className="font-medium text-gray-900 mb-3">{section.title}</h3>
-              <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left px-4 py-2 font-medium text-gray-700 border-b">Campo</th>
-                    <th className="text-left px-4 py-2 font-medium text-gray-700 border-b">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {section.fields.map((field, fIdx) => (
-                    <tr key={fIdx} className="border-b border-gray-100 last:border-0">
-                      <td className="px-4 py-2 text-gray-600">{field.label}</td>
-                      <td className="px-4 py-2 text-gray-900">
-                        {field.value === null || field.value === undefined || field.value === ''
-                          ? '-'
-                          : field.type === 'checkbox'
-                          ? (field.value ? 'Sí' : 'No')
-                          : field.type === 'score'
-                          ? `${field.value}/${field.maxScore || 5}`
-                          : field.type === 'multiselect' && Array.isArray(field.value)
-                          ? (field.value as string[]).join(', ')
-                          : String(field.value)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// EMAIL PREVIEW MODAL
-// ============================================
-
-interface EmailPreviewModalProps {
-  open: boolean;
-  onClose: () => void;
-  exportData: AuditExportData | null;
-  onSend: () => void;
-}
-
-function EmailPreviewModal({ open, onClose, exportData, onSend }: EmailPreviewModalProps) {
-  if (!open || !exportData) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <Mail className="w-5 h-5 text-primary-500" />
-            <h2 className="text-lg font-semibold text-gray-900">Preview Email</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={onSend} leftIcon={<Mail className="w-4 h-4" />}>
-              Enviar Email
-            </Button>
-            <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Email Preview */}
-        <div className="flex-1 p-6 overflow-auto">
-          {/* Email Header */}
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg text-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-gray-500 w-16">Para:</span>
-              <span className="text-gray-400 italic">cliente@empresa.com</span>
-            </div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-gray-500 w-16">Asunto:</span>
-              <span className="text-gray-900 font-medium">
-                {exportData.auditType} - {exportData.scope} ({exportData.auditNumber})
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 w-16">Adjunto:</span>
-              <span className="text-primary-600">📎 {exportData.auditNumber}.pdf</span>
-            </div>
-          </div>
-
-          {/* Email Body Preview */}
-          <div className="border border-gray-200 rounded-lg p-6 bg-white">
-            {/* Logo */}
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-              <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold">
-                TP
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">ThinkPaladar</p>
-                <p className="text-sm text-gray-500">Consultoría de Delivery</p>
-              </div>
-            </div>
-
-            {/* Content */}
-            <p className="text-gray-700 mb-4">
-              Estimado cliente,
-            </p>
-            <p className="text-gray-700 mb-4">
-              Adjuntamos el informe de <strong>{exportData.auditType}</strong> correspondiente a <strong>{exportData.scope}</strong>.
-            </p>
-
-            {/* Summary */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <h4 className="font-medium text-gray-900 mb-2">Resumen</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Referencia: {exportData.auditNumber}</li>
-                <li>• Fecha: {new Date(exportData.createdAt).toLocaleDateString('es-ES')}</li>
-                <li>• Estado: {exportData.status}</li>
-                {exportData.totalScore && (
-                  <li>• Puntuación: {exportData.totalScore.obtained}/{exportData.totalScore.maximum} ({exportData.totalScore.percentage}%)</li>
-                )}
-              </ul>
-            </div>
-
-            <p className="text-gray-700 mb-4">
-              Puede consultar el informe completo en el documento adjunto.
-            </p>
-
-            <p className="text-gray-700">
-              Un saludo,<br />
-              <strong>{exportData.createdBy}</strong><br />
-              <span className="text-gray-500 text-sm">ThinkPaladar</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // Platform options are now fetched from the database via fetchCrpPortals
@@ -1165,7 +906,8 @@ export function AuditsPage() {
   }, [previewModal.data]);
 
   const handleSendEmailAction = useCallback(() => {
-    // TODO: Implement actual email sending
+    // Feature: Email sending - Requires backend implementation
+    // See NEXT_STEPS.md for planned email service integration
     alert('Funcionalidad de envío por email próximamente disponible');
     closePreviewModal();
   }, [closePreviewModal]);
@@ -1221,7 +963,7 @@ export function AuditsPage() {
 
 
       {/* PDF Preview Modal */}
-      <PdfPreviewModal
+      <AuditPdfPreviewModal
         open={previewModal.type === 'pdf'}
         onClose={closePreviewModal}
         exportData={previewModal.data}
@@ -1229,7 +971,7 @@ export function AuditsPage() {
       />
 
       {/* Excel Preview Modal */}
-      <ExcelPreviewModal
+      <AuditExcelPreviewModal
         open={previewModal.type === 'excel'}
         onClose={closePreviewModal}
         exportData={previewModal.data}
@@ -1237,7 +979,7 @@ export function AuditsPage() {
       />
 
       {/* Email Preview Modal */}
-      <EmailPreviewModal
+      <AuditEmailPreviewModal
         open={previewModal.type === 'email'}
         onClose={closePreviewModal}
         exportData={previewModal.data}

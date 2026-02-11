@@ -27,3 +27,8 @@ export { StrategicTaskEditor } from './StrategicTaskEditor';
 export { SalesProjection } from './SalesProjection';
 export { SalesProjectionSetup } from './SalesProjectionSetup';
 export { SalesProjectionWarning } from './SalesProjectionWarning';
+
+// Page components
+export { MetricItem } from './MetricItem';
+export { HorizonSection } from './HorizonSection';
+export { StrategicEmptyState } from './StrategicEmptyState';

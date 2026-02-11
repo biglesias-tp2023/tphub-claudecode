@@ -52,16 +52,9 @@ function formatDate(date: Date | string): string {
  * - previousEnd = day before current start = Feb 1
  * - previousStart = previousEnd - duration = Jan 26
  */
-function getPreviousPeriodRange(dateRange: DateRange, preset: DatePreset): { start: Date; end: Date } {
+function getPreviousPeriodRange(dateRange: DateRange, _preset: DatePreset): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
-
-  if (preset === 'year') {
-    return {
-      start: new Date(start.getFullYear() - 1, start.getMonth(), start.getDate()),
-      end: new Date(end.getFullYear() - 1, end.getMonth(), end.getDate()),
-    };
-  }
 
   // Calculate duration in full days (ignoring time component)
   const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
