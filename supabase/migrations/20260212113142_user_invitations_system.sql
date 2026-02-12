@@ -1,66 +1,53 @@
 -- ============================================
--- USER INVITATIONS SYSTEM
--- Sistema para invitar usuarios externos (consultores)
--- con rol y compañías pre-asignadas
+-- PENDING MIGRATIONS TO EXECUTE IN SUPABASE
+-- ============================================
+-- Execute this SQL in Supabase SQL Editor
+-- Date: 2026-02-12
 -- ============================================
 
 -- ============================================
--- ENUM: invitation_status
+-- STEP 1: USER INVITATIONS SYSTEM
+-- From: 012_user_invitations.sql
 -- ============================================
 
-CREATE TYPE public.invitation_status AS ENUM (
-  'pending',
-  'accepted',
-  'expired',
-  'cancelled'
-);
+-- Create invitation_status enum (if not exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invitation_status') THEN
+    CREATE TYPE public.invitation_status AS ENUM (
+      'pending',
+      'accepted',
+      'expired',
+      'cancelled'
+    );
+  END IF;
+END $$;
 
--- ============================================
--- TABLE: user_invitations
--- Invitaciones pendientes con configuración pre-asignada
--- ============================================
-
-CREATE TABLE public.user_invitations (
+-- Create user_invitations table
+CREATE TABLE IF NOT EXISTS public.user_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  -- Email del invitado (no necesita ser @thinkpaladar.com)
   email TEXT NOT NULL,
-
-  -- Rol pre-asignado (se aplicará al crear el perfil)
-  -- NOTE: 'owner' is not invitable - there can only be one owner
+  -- Roles: owner is NOT invitable (there can only be one)
   role TEXT NOT NULL DEFAULT 'consultant' CHECK (role IN ('superadmin', 'admin', 'manager', 'consultant', 'viewer')),
-
-  -- Compañías pre-asignadas (CRP Portal IDs como TEXT)
   assigned_company_ids TEXT[] DEFAULT '{}',
-
-  -- Estado de la invitación
   status public.invitation_status NOT NULL DEFAULT 'pending',
-
-  -- Quién invitó
   invited_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-
-  -- Timestamps
   invited_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   accepted_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days'),
-
-  -- Nota opcional del admin
   invitation_note TEXT,
-
-  -- Constraints
-  CONSTRAINT unique_pending_invitation UNIQUE (email, status)
-    DEFERRABLE INITIALLY DEFERRED
+  CONSTRAINT unique_pending_invitation UNIQUE (email, status) DEFERRABLE INITIALLY DEFERRED
 );
 
--- Índices
-CREATE INDEX idx_invitations_email ON public.user_invitations(email);
-CREATE INDEX idx_invitations_status ON public.user_invitations(status);
-CREATE INDEX idx_invitations_expires_at ON public.user_invitations(expires_at);
-CREATE INDEX idx_invitations_invited_by ON public.user_invitations(invited_by);
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_invitations_email ON public.user_invitations(email);
+CREATE INDEX IF NOT EXISTS idx_invitations_status ON public.user_invitations(status);
+CREATE INDEX IF NOT EXISTS idx_invitations_expires_at ON public.user_invitations(expires_at);
+CREATE INDEX IF NOT EXISTS idx_invitations_invited_by ON public.user_invitations(invited_by);
 
 -- ============================================
 -- FUNCTION: apply_invitation_config
--- Aplica rol y compañías cuando el usuario se registra
+-- Applies role and companies when user signs up
 -- ============================================
 
 CREATE OR REPLACE FUNCTION public.apply_invitation_config()
@@ -68,7 +55,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   invitation_record RECORD;
 BEGIN
-  -- Buscar invitación pendiente para este email
+  -- Find pending invitation for this email
   SELECT *
   INTO invitation_record
   FROM public.user_invitations
@@ -78,17 +65,16 @@ BEGIN
   ORDER BY invited_at DESC
   LIMIT 1;
 
-  -- Si existe invitación, aplicar configuración
+  -- If invitation exists, apply configuration
   IF FOUND THEN
-    -- Actualizar el perfil con rol y compañías
-    -- NOTE: assigned_company_ids are TEXT (CRP Portal IDs), not UUIDs
+    -- Update profile with role and companies
     UPDATE public.profiles
     SET
       role = invitation_record.role,
       assigned_company_ids = invitation_record.assigned_company_ids
     WHERE id = NEW.id;
 
-    -- Marcar invitación como aceptada
+    -- Mark invitation as accepted
     UPDATE public.user_invitations
     SET
       status = 'accepted',
@@ -101,9 +87,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================
--- TRIGGER: Aplicar configuración al crear perfil
+-- TRIGGER: Apply config when profile is created
 -- ============================================
 
+DROP TRIGGER IF EXISTS on_profile_created_apply_invitation ON public.profiles;
 CREATE TRIGGER on_profile_created_apply_invitation
   AFTER INSERT ON public.profiles
   FOR EACH ROW
@@ -111,7 +98,6 @@ CREATE TRIGGER on_profile_created_apply_invitation
 
 -- ============================================
 -- FUNCTION: cleanup_expired_invitations
--- Marca invitaciones expiradas
 -- ============================================
 
 CREATE OR REPLACE FUNCTION public.cleanup_expired_invitations()
@@ -135,7 +121,13 @@ $$ LANGUAGE plpgsql;
 
 ALTER TABLE public.user_invitations ENABLE ROW LEVEL SECURITY;
 
--- Owner, Superadmin y Admin pueden ver todas las invitaciones
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Admins can view all invitations" ON public.user_invitations;
+DROP POLICY IF EXISTS "Admins can create invitations" ON public.user_invitations;
+DROP POLICY IF EXISTS "Admins can update invitations" ON public.user_invitations;
+DROP POLICY IF EXISTS "Admins can delete invitations" ON public.user_invitations;
+
+-- Owner, Superadmin and Admin can view all invitations
 CREATE POLICY "Admins can view all invitations"
 ON public.user_invitations FOR SELECT
 USING (
@@ -145,7 +137,7 @@ USING (
   )
 );
 
--- Owner, Superadmin y Admin pueden crear invitaciones
+-- Owner, Superadmin and Admin can create invitations
 CREATE POLICY "Admins can create invitations"
 ON public.user_invitations FOR INSERT
 WITH CHECK (
@@ -155,7 +147,7 @@ WITH CHECK (
   )
 );
 
--- Owner, Superadmin y Admin pueden actualizar invitaciones
+-- Owner, Superadmin and Admin can update invitations
 CREATE POLICY "Admins can update invitations"
 ON public.user_invitations FOR UPDATE
 USING (
@@ -165,7 +157,7 @@ USING (
   )
 );
 
--- Owner, Superadmin y Admin pueden eliminar invitaciones
+-- Owner, Superadmin and Admin can delete invitations
 CREATE POLICY "Admins can delete invitations"
 ON public.user_invitations FOR DELETE
 USING (
@@ -177,7 +169,6 @@ USING (
 
 -- ============================================
 -- OPTIONAL: Add kam_display_name to profiles
--- Para vincular con des_key_account_manager
 -- ============================================
 
 ALTER TABLE public.profiles

@@ -328,6 +328,39 @@ supabase.auth.onAuthStateChange((event, session) => {
 // Selector hooks for convenience
 export const useUser = () => useAuthStore((state) => state.user);
 export const useProfile = () => useAuthStore((state) => state.profile);
-export const useIsAdmin = () => useAuthStore((state) => state.profile?.role === 'admin');
+
+// Role-based selectors
+export const useIsOwner = () => useAuthStore((state) => state.profile?.role === 'owner');
+export const useIsSuperadmin = () => useAuthStore((state) => state.profile?.role === 'superadmin');
+export const useIsAdmin = () => useAuthStore((state) =>
+  state.profile?.role === 'admin' ||
+  state.profile?.role === 'superadmin' ||
+  state.profile?.role === 'owner'
+);
+export const useIsManager = () => useAuthStore((state) => state.profile?.role === 'manager');
+
+/**
+ * Check if current user can manage other users (Owner, Superadmin, or Admin)
+ */
+export const useCanManageUsers = () => useAuthStore((state) =>
+  state.profile?.role === 'owner' ||
+  state.profile?.role === 'superadmin' ||
+  state.profile?.role === 'admin'
+);
+
+/**
+ * Check if current user can invite other users
+ */
+export const useCanInviteUsers = () => useAuthStore((state) =>
+  state.profile?.role === 'owner' ||
+  state.profile?.role === 'superadmin' ||
+  state.profile?.role === 'admin'
+);
+
 export const useAssignedCompanyIds = () =>
   useAuthStore((state) => state.profile?.assignedCompanyIds || []);
+
+/**
+ * Get current user's role
+ */
+export const useCurrentRole = () => useAuthStore((state) => state.profile?.role);

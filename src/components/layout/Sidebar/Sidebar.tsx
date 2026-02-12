@@ -106,7 +106,7 @@ export function Sidebar() {
             onMouseEnter={() => setIsToggleHovered(true)}
             onMouseLeave={() => setIsToggleHovered(false)}
             className={cn(
-              'relative w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+              'relative w-11 h-11 rounded-lg flex items-center justify-center shrink-0',
               'transition-colors duration-150',
               isSidebarCollapsed
                 ? 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
@@ -114,16 +114,19 @@ export function Sidebar() {
             )}
             title={isSidebarCollapsed ? 'Abrir barra lateral' : 'Cerrar barra lateral'}
           >
-            {/* Brand Logo - visible when not hovered (both states) */}
+            {/* Brand Pictogram - visible when not hovered */}
             <div
               className={cn(
                 'absolute inset-0 flex items-center justify-center',
-                'bg-primary-600 rounded-lg',
                 'transition-opacity duration-150',
                 isToggleHovered ? 'opacity-0' : 'opacity-100'
               )}
             >
-              <span className="text-white font-bold text-sm">TP</span>
+              <img
+                src="/images/logo/icon.svg"
+                alt="ThinkPaladar"
+                className="w-9 h-9"
+              />
             </div>
             {/* Toggle Icon - visible on hover */}
             {isSidebarCollapsed ? (
@@ -145,9 +148,13 @@ export function Sidebar() {
             )}
           </button>
 
-          {/* Brand Name - only when expanded */}
+          {/* Brand Logo - only when expanded */}
           {!isSidebarCollapsed && (
-            <span className="ml-2.5 text-lg font-bold text-gray-900">TPHub</span>
+            <img
+              src="/images/logo/logo.png"
+              alt="ThinkPaladar"
+              className="ml-1 h-8 w-auto"
+            />
           )}
         </div>
 

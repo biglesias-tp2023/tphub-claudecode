@@ -23,6 +23,7 @@ export type MysteryShopperFieldType =
   | 'number'
   | 'date'
   | 'datetime'
+  | 'time'
   | 'rating'
   | 'image_upload';
 
@@ -247,13 +248,6 @@ export const MYSTERY_SHOPPER_SECTIONS: MysteryShopperSection[] = [
           '5 - Sistema avanzado con modificadores personalizados por producto',
         ],
       },
-      {
-        key: 'nav_suggestions',
-        label: 'Escribe sugerencias de mejora',
-        type: 'textarea',
-        required: false,
-        placeholder: 'Propón mejoras concretas sobre fotos, estructura, orden, naming o pricing',
-      },
     ],
   },
 
@@ -412,9 +406,8 @@ export const MYSTERY_SHOPPER_SECTIONS: MysteryShopperSection[] = [
       {
         key: 'ops_actual_time',
         label: 'Hora exacta de entrega del pedido',
-        type: 'text',
+        type: 'time',
         required: true,
-        placeholder: 'Ejemplo: 13:50h',
       },
       {
         key: 'ops_time_diff',

@@ -181,6 +181,28 @@ function SectionCard({
               disabled={disabled}
             />
           ))}
+
+          {/* Comentarios adicionales - no mostrar en sección general */}
+          {section.key !== 'general' && (
+            <div className="pt-3 border-t border-gray-100">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Comentarios adicionales
+              </label>
+              <textarea
+                value={(fieldData[`${section.key}_suggestions`] as string) || ''}
+                onChange={(e) => onFieldChange(`${section.key}_suggestions`, e.target.value)}
+                disabled={disabled}
+                placeholder="Añade observaciones o comentarios relevantes para esta sección"
+                rows={3}
+                className={cn(
+                  'w-full px-3 py-2.5 text-sm rounded-lg border transition-colors resize-y min-h-[80px]',
+                  disabled
+                    ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-white border-gray-300 hover:border-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none'
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -30,10 +30,10 @@ type Step = 'channels' | 'investment' | 'baseline' | 'targets';
 // CONSTANTS
 // ============================================
 
-const CHANNELS: { id: SalesChannel; name: string; logo: string; color: string; bg: string }[] = [
-  { id: 'glovo', name: 'Glovo', logo: '🟡', color: 'border-yellow-400 bg-yellow-50', bg: 'bg-yellow-400' },
-  { id: 'ubereats', name: 'Uber Eats', logo: '🟢', color: 'border-green-500 bg-green-50', bg: 'bg-green-500' },
-  { id: 'justeat', name: 'Just Eat', logo: '🟠', color: 'border-orange-500 bg-orange-50', bg: 'bg-orange-500' },
+const CHANNELS: { id: SalesChannel; name: string; logoUrl: string; color: string; bg: string }[] = [
+  { id: 'glovo', name: 'Glovo', logoUrl: '/images/channels/glovo.png', color: 'border-yellow-400 bg-yellow-50', bg: 'bg-yellow-400' },
+  { id: 'ubereats', name: 'Uber Eats', logoUrl: '/images/channels/ubereats.png', color: 'border-green-500 bg-green-50', bg: 'bg-green-500' },
+  { id: 'justeat', name: 'Just Eat', logoUrl: '/images/channels/justeat.webp', color: 'border-orange-500 bg-orange-50', bg: 'bg-orange-500' },
 ];
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -98,7 +98,7 @@ function ChannelStep({ selected, onToggle }: { selected: SalesChannel[]; onToggl
                   <Check className="w-3 h-3 text-white" />
                 </div>
               )}
-              <span className="text-3xl">{ch.logo}</span>
+              <img src={ch.logoUrl} alt={ch.name} className="w-10 h-10 rounded-full object-cover" />
               <span className={cn('text-sm font-medium', isSelected ? 'text-gray-900' : 'text-gray-600')}>{ch.name}</span>
             </button>
           );
@@ -276,7 +276,7 @@ function BaselineStep({
             return (
               <div key={ch} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className={cn('w-3 h-3 rounded-full', channel?.bg)} />
+                  {channel && <img src={channel.logoUrl} alt={channel.name} className="w-5 h-5 rounded-full object-cover" />}
                   <span className="text-sm font-medium text-gray-700">{channel?.name}</span>
                 </div>
                 {isEditing ? (
@@ -353,7 +353,7 @@ function TargetsStep({
                 <tr key={ch}>
                   <td className="py-1.5">
                     <div className="flex items-center gap-2">
-                      <span className={cn('w-2 h-2 rounded-full', channel?.bg)} />
+                      {channel && <img src={channel.logoUrl} alt={channel.name} className="w-4 h-4 rounded-full object-cover" />}
                       <span className="text-sm text-gray-700">{channel?.name}</span>
                     </div>
                   </td>

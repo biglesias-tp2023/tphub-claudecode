@@ -8,7 +8,5 @@ export { AuditScopeSelector, EntityScopeSelector } from '@/components/common';
 export type { AuditScopeSelectorProps, EntityScopeSelectorProps } from '@/components/common';
 export * from './fields';
 
-// Preview modals
-export { AuditPdfPreviewModal } from './AuditPdfPreviewModal';
-export { AuditExcelPreviewModal } from './AuditExcelPreviewModal';
-export { AuditEmailPreviewModal } from './AuditEmailPreviewModal';
+// Preview modal
+export { AuditPreviewModal } from './AuditPreviewModal';

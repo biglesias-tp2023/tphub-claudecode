@@ -247,3 +247,29 @@ export interface DbCrpOrderHead {
   /** Customer identifier */
   cod_id_customer: string | null;
 }
+
+// ============================================
+// HUBSPOT CONTACT TYPES
+// ============================================
+
+/**
+ * Raw database row from crp_hubspot__dt_contact_mp table.
+ * Represents a HubSpot contact.
+ */
+export interface DbHubspotContact {
+  pk_id_contact: number;
+  des_first_name: string;
+  des_last_name: string;
+  des_email: string;
+  pk_ts_month: string;
+}
+
+/**
+ * Raw database row from crp_hubspot__lt_company_contact_mp table.
+ * Maps HubSpot contacts to companies.
+ */
+export interface DbHubspotCompanyContact {
+  pk_id_contact: number;
+  pk_id_company: number;
+  pk_ts_month: string;
+}

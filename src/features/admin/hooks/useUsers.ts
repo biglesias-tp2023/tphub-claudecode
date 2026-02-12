@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAllProfiles, updateProfile } from '@/services/supabase-data';
+import { fetchAllProfiles, updateProfile, deleteProfile } from '@/services/supabase-data';
 import type { UserRole } from '@/types';
 
 /**
@@ -96,6 +96,29 @@ export function useUpdateRole() {
       profileId: string;
       role: UserRole;
     }) => updateProfile(profileId, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    },
+  });
+}
+
+/**
+ * Mutation to delete a user's profile
+ *
+ * Note: Owner accounts cannot be deleted (protected by DB trigger).
+ * Only users with higher role hierarchy can delete other users.
+ *
+ * @returns React Query mutation for deleting profiles
+ *
+ * @example
+ * const { mutate: deleteUser } = useDeleteUser();
+ * deleteUser('profile-uuid');
+ */
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (profileId: string) => deleteProfile(profileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
     },

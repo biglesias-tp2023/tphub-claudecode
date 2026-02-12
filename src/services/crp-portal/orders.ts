@@ -592,9 +592,10 @@ async function fetchAllDimensions(
 
     // Fetch ALL addresses for these companies (include flg_deleted for post-dedup filtering)
     // NOTE: pfk_id_company is INTEGER (same as other dimension tables)
+    // NOTE: pfk_id_store does NOT exist in this table - store assignment comes from order data
     supabase
       .from('crp_portal__dt_address')
-      .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, flg_deleted')
+      .select('pk_id_address, des_address, pfk_id_company, flg_deleted')
       .in('pfk_id_company', companyIds)
       .order('pk_ts_month', { ascending: false })
       .limit(50000),
@@ -641,12 +642,14 @@ async function fetchAllDimensions(
     addressesResult.data || [],
     a => String(a.pk_id_address)
   );
+  // NOTE: storeId will be assigned later from order data (buildHierarchyFromRPCMetrics)
+  // since pfk_id_store does NOT exist in dt_address table
   const addresses: AddressDim[] = activeAddresses.map(a => ({
     id: String(a.pk_id_address),
     name: a.des_address || '',
     companyId: String(a.pfk_id_company),
     allIds: [String(a.pk_id_address)],
-    storeId: a.pfk_id_store ? String(a.pfk_id_store) : undefined,
+    storeId: undefined, // Will be populated from order data
   }));
 
   const activePortals = deduplicateAndFilterDeleted(
@@ -1349,6 +1352,15 @@ function buildHierarchyFromRPCMetrics(
     }
   }
 
+  // DEBUG: Log address-to-store mapping
+  if (import.meta.env.DEV) {
+    console.log('[buildHierarchyFromRPCMetrics] Address-to-store mapping size:', addressToStoreMap.size);
+    console.log('[buildHierarchyFromRPCMetrics] Addresses in dimensions:', addresses.length);
+    // Show addresses with storeId from dimension table
+    const addressesWithStoreId = addresses.filter(a => a.storeId);
+    console.log('[buildHierarchyFromRPCMetrics] Addresses with storeId in dimension:', addressesWithStoreId.length);
+  }
+
   const rows: HierarchyDataRow[] = [];
 
   // 1. COMPANY rows
@@ -1384,19 +1396,22 @@ function buildHierarchyFromRPCMetrics(
   }
 
   // 3. ADDRESS rows
-  // Each address is assigned to its store based on order data (addressToStoreMap)
-  // Addresses without orders are assigned to ALL stores of their company
+  // Priority for store assignment:
+  // 1. Use storeId from order data (addressToStoreMap) if available
+  // 2. Fall back to storeId from dimension table (address.storeId)
+  // 3. If neither, assign to first store of the company
   for (const address of addresses) {
-    const mappedStoreId = addressToStoreMap.get(address.id);
+    // Try to get storeId from order data first, then from dimension table
+    const mappedStoreId = addressToStoreMap.get(address.id) || address.storeId;
 
     if (mappedStoreId) {
-      // Address has orders → assign to its specific store
+      // Address has a known store assignment
       const parentStore = stores.find(s => s.id === mappedStoreId && s.companyId === address.companyId);
       const parentId = parentStore
         ? `brand::${parentStore.companyId}::${parentStore.id}`
         : `company-${address.companyId}`;
 
-      // Get metrics for this specific address
+      // Get metrics for this specific address - try both possible key formats
       const addressKey = `${address.companyId}::${mappedStoreId}::${address.id}`;
       const current = currentAgg.byAddress.get(addressKey);
       const previous = previousAgg.byAddress.get(addressKey);
@@ -1433,22 +1448,21 @@ function buildHierarchyFromRPCMetrics(
         }
       }
     } else {
-      // Address has NO orders → assign to ALL stores of its company
+      // Address has NO store assignment → assign to first store of its company (if exists)
       const companyStores = stores.filter(s => s.companyId === address.companyId);
 
       if (companyStores.length > 0) {
-        // Add address under each store of the company
-        for (const store of companyStores) {
-          rows.push({
-            id: `address::${address.companyId}::${store.id}::${address.id}`,
-            level: 'address',
-            name: `${address.name} (${address.id})`,
-            parentId: `brand::${store.companyId}::${store.id}`,
-            companyId: address.companyId,
-            brandId: store.id,
-            metrics: toFinalMetrics(undefined, undefined),
-          });
-        }
+        // Add address under the first store of the company (avoiding duplicates)
+        const firstStore = companyStores[0];
+        rows.push({
+          id: `address::${address.companyId}::${address.id}`,
+          level: 'address',
+          name: `${address.name} (${address.id})`,
+          parentId: `brand::${firstStore.companyId}::${firstStore.id}`,
+          companyId: address.companyId,
+          brandId: firstStore.id,
+          metrics: toFinalMetrics(undefined, undefined),
+        });
       } else {
         // No stores for this company, add under company directly
         rows.push({
@@ -1503,16 +1517,66 @@ export async function fetchHierarchyDataRPC(
   // Step 1: Fetch ALL dimensions for selected companies (for names)
   const dimensions = await fetchAllDimensions(numericCompanyIds, companyIds);
 
+  // DEBUG: Log dimensions counts
+  if (import.meta.env.DEV) {
+    console.log('[fetchHierarchyDataRPC] Dimensions loaded:', {
+      companies: dimensions.companies.length,
+      stores: dimensions.stores.length,
+      addresses: dimensions.addresses.length,
+      portals: dimensions.portals.length,
+    });
+    if (dimensions.addresses.length > 0) {
+      console.log('[fetchHierarchyDataRPC] Sample addresses:', dimensions.addresses.slice(0, 3));
+    }
+  }
+
   // Step 2: Fetch metrics from RPC for both periods in parallel
   const [currentMetrics, previousMetrics] = await Promise.all([
     fetchControllingMetricsRPC(companyIds, startDate, endDate),
     fetchControllingMetricsRPC(companyIds, previousStartDate, previousEndDate),
   ]);
 
+  // DEBUG: Log metrics counts
+  if (import.meta.env.DEV) {
+    console.log('[fetchHierarchyDataRPC] Metrics loaded:', {
+      currentMetrics: currentMetrics.length,
+      previousMetrics: previousMetrics.length,
+    });
+    if (currentMetrics.length > 0) {
+      console.log('[fetchHierarchyDataRPC] Sample metrics:', currentMetrics.slice(0, 3));
+    }
+  }
+
   // Step 3: Aggregate metrics bottom-up
   const currentAgg = aggregateRPCMetrics(currentMetrics);
   const previousAgg = aggregateRPCMetrics(previousMetrics);
 
+  // DEBUG: Log aggregation counts
+  if (import.meta.env.DEV) {
+    console.log('[fetchHierarchyDataRPC] Aggregation results:', {
+      byPortal: currentAgg.byPortal.size,
+      byAddress: currentAgg.byAddress.size,
+      byStore: currentAgg.byStore.size,
+      byCompany: currentAgg.byCompany.size,
+    });
+    // Log sample keys to understand the format
+    if (currentAgg.byAddress.size > 0) {
+      const sampleAddressKeys = Array.from(currentAgg.byAddress.keys()).slice(0, 3);
+      console.log('[fetchHierarchyDataRPC] Sample address keys:', sampleAddressKeys);
+    }
+  }
+
   // Step 4: Build complete hierarchy from dimensions and aggregated metrics
-  return buildHierarchyFromRPCMetrics(dimensions, currentAgg, previousAgg);
+  const result = buildHierarchyFromRPCMetrics(dimensions, currentAgg, previousAgg);
+
+  // DEBUG: Log hierarchy result breakdown
+  if (import.meta.env.DEV) {
+    const levelCounts = result.reduce((acc, row) => {
+      acc[row.level] = (acc[row.level] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('[fetchHierarchyDataRPC] Hierarchy rows by level:', levelCounts);
+  }
+
+  return result;
 }

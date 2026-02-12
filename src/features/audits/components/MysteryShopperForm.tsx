@@ -55,6 +55,35 @@ export function MysteryShopperForm({
   const handleFieldChange = useCallback(
     (fieldKey: string, value: unknown) => {
       const newData = { ...fieldData, [fieldKey]: value };
+
+      // Auto-calculate time difference when order_date or ops_actual_time changes
+      if (fieldKey === 'order_date' || fieldKey === 'ops_actual_time') {
+        const orderDate = fieldKey === 'order_date' ? value as string : newData.order_date as string;
+        const actualTime = fieldKey === 'ops_actual_time' ? value as string : newData.ops_actual_time as string;
+
+        if (orderDate && actualTime) {
+          // orderDate format: "YYYY-MM-DDTHH:MM" (datetime-local)
+          // actualTime format: "HH:MM" (time input)
+          const orderDateTime = new Date(orderDate);
+
+          // Extract date from order and combine with delivery time
+          const [hours, minutes] = actualTime.split(':').map(Number);
+          const deliveryDateTime = new Date(orderDate);
+          deliveryDateTime.setHours(hours, minutes, 0, 0);
+
+          // If delivery time is earlier than order time, assume next day
+          if (deliveryDateTime < orderDateTime) {
+            deliveryDateTime.setDate(deliveryDateTime.getDate() + 1);
+          }
+
+          // Calculate difference in minutes
+          const diffMs = deliveryDateTime.getTime() - orderDateTime.getTime();
+          const diffMinutes = Math.round(diffMs / (1000 * 60));
+
+          newData.ops_time_diff = diffMinutes;
+        }
+      }
+
       onChange(newData);
 
       if (autoSave && onAutoSave) {
@@ -187,6 +216,29 @@ function SectionCard({
               auditId={auditId}
             />
           ))}
+
+          {/* Comentarios adicionales - no mostrar en sección general */}
+          {section.id !== 'general' && (
+            <div className="pt-3 border-t border-gray-100">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Comentarios adicionales
+              </label>
+              <textarea
+                value={(fieldData[`${section.id}_suggestions`] as string) || ''}
+                onChange={(e) => onFieldChange(`${section.id}_suggestions`, e.target.value)}
+                disabled={disabled}
+                placeholder="Añade observaciones o comentarios relevantes para esta sección"
+                rows={3}
+                className={cn(
+                  'w-full px-3 py-2.5 rounded-lg border text-sm transition-colors resize-y min-h-[80px]',
+                  'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
+                  disabled
+                    ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-white border-gray-200 text-gray-900'
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -377,6 +429,30 @@ function FieldRenderer({ field, value, onChange, disabled, auditId }: FieldRende
           </div>
           <input
             type="datetime-local"
+            value={(value as string) || ''}
+            onChange={(e) => onChange(e.target.value)}
+            onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+            disabled={disabled}
+            className={cn(
+              'w-full px-3 py-2.5 rounded-lg border text-sm transition-colors cursor-pointer',
+              'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
+              disabled
+                ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-white border-gray-200 text-gray-900'
+            )}
+          />
+        </div>
+      );
+
+    case 'time':
+      return wrapWithId(
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">{field.label}</label>
+            {field.required && <span className="text-red-500 text-xs">*</span>}
+          </div>
+          <input
+            type="time"
             value={(value as string) || ''}
             onChange={(e) => onChange(e.target.value)}
             onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}

@@ -1,7 +1,6 @@
-import { Calendar, User, Eye } from 'lucide-react';
+import { Calendar, User, Trash2 } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { Button } from '@/components/ui/Button';
 import { getAuditStatusConfig, getAuditScopeLabel, AUDIT_TYPE_ICONS } from '../config';
 import type { AuditWithDetails } from '@/types';
 
@@ -9,12 +8,14 @@ interface AuditCardProps {
   audit: AuditWithDetails;
   onEdit: (auditId: string) => void;
   onPreview?: (auditId: string) => void;
+  onDelete?: (auditId: string, auditNumber: string) => void;
 }
 
 export function AuditCard({
   audit,
   onEdit,
   onPreview,
+  onDelete,
 }: AuditCardProps) {
   const statusConfig = getAuditStatusConfig(audit.desStatus);
   const scopeLabel = getAuditScopeLabel(audit);
@@ -44,10 +45,18 @@ export function AuditCard({
 
   const isCompleted = audit.desStatus === 'completed' || audit.desStatus === 'delivered';
 
+  const handleCardClick = () => {
+    if (isCompleted && onPreview) {
+      onPreview(audit.pkIdAudit);
+    } else {
+      onEdit(audit.pkIdAudit);
+    }
+  };
+
   return (
     <div
       className="bg-white rounded-lg border border-gray-200 p-4 hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer"
-      onClick={() => onEdit(audit.pkIdAudit)}
+      onClick={handleCardClick}
     >
       <div className="flex items-center justify-between gap-4">
         {/* Left section: Info */}
@@ -94,18 +103,17 @@ export function AuditCard({
           </div>
         </div>
 
-        {/* Right section: Actions */}
+        {/* Right section: Delete button */}
         <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          {isCompleted && onPreview && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPreview(audit.pkIdAudit)}
-              className="gap-1.5"
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(audit.pkIdAudit, audit.desAuditNumber)}
+              className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="Eliminar auditoría"
             >
-              <Eye className="w-4 h-4" />
-              Preview
-            </Button>
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>

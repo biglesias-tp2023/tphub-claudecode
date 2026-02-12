@@ -76,10 +76,10 @@ type TabType = 'revenue' | 'ads' | 'promos';
 // CONSTANTS
 // ============================================
 
-const CHANNELS: { id: SalesChannel; name: string; color: string; dot: string }[] = [
-  { id: 'glovo', name: 'Glovo', color: '#FFC244', dot: 'bg-yellow-400' },
-  { id: 'ubereats', name: 'UberEats', color: '#06C167', dot: 'bg-green-500' },
-  { id: 'justeat', name: 'JustEat', color: '#FF8000', dot: 'bg-orange-500' },
+const CHANNELS: { id: SalesChannel; name: string; color: string; logo: string }[] = [
+  { id: 'glovo', name: 'Glovo', color: '#FFC244', logo: '/images/channels/glovo.png' },
+  { id: 'ubereats', name: 'UberEats', color: '#06C167', logo: '/images/channels/ubereats.png' },
+  { id: 'justeat', name: 'JustEat', color: '#FF8000', logo: '/images/channels/justeat.webp' },
 ];
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -214,10 +214,10 @@ function Row({ label, value, color }: { label: string; value: number; color: str
 
 /** Fila de tabla editable */
 function TableRow({
-  label, dotColor, months, values, channel, onChange, total, variant, readOnly,
+  label, logoUrl, months, values, channel, onChange, total, variant, readOnly,
 }: {
   label: string;
-  dotColor: string;
+  logoUrl: string;
   months: MonthInfo[];
   values: GridChannelMonthData;
   channel: SalesChannel;
@@ -232,7 +232,7 @@ function TableRow({
     <tr className={cn(isActual && 'bg-emerald-50/30')}>
       <td className="py-1.5 pr-2">
         <div className="flex items-center gap-1.5">
-          <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', dotColor)} />
+          <img src={logoUrl} alt={label} className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
           <span className="text-xs text-gray-600 whitespace-nowrap">{label}</span>
           {isActual && <span className="text-[9px] text-emerald-600 font-medium">(real)</span>}
         </div>
@@ -413,7 +413,9 @@ export function SalesProjection({
           <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg">
             {activeChannels.map((ch) => {
               const channel = CHANNELS.find((c) => c.id === ch);
-              return <span key={ch} className={cn('w-2 h-2 rounded-full', channel?.dot)} />;
+              return channel ? (
+                <img key={ch} src={channel.logo} alt={channel.name} className="w-4 h-4 rounded-full object-cover" />
+              ) : null;
             })}
           </div>
           <ExportButtons onExport={handleExport} size="sm" />
@@ -556,7 +558,7 @@ export function SalesProjection({
                           <TableRow
                             key={`target-${ch}`}
                             label={channel?.name || ch}
-                            dotColor={channel?.dot || 'bg-gray-400'}
+                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
                             values={targetRevenue}
                             channel={ch}
@@ -572,7 +574,7 @@ export function SalesProjection({
                           <TableRow
                             key={`actual-${ch}`}
                             label={channel?.name || ch}
-                            dotColor={channel?.dot || 'bg-gray-400'}
+                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
                             values={actualRevenue}
                             channel={ch}
@@ -616,7 +618,7 @@ export function SalesProjection({
                           <TableRow
                             key={`ads-${ch}`}
                             label={`${channel?.name} (${getPercent(config.maxAdsPercent, ch)}%)`}
-                            dotColor={channel?.dot || 'bg-gray-400'}
+                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
                             values={targetData}
                             channel={ch}
@@ -632,7 +634,7 @@ export function SalesProjection({
                           <TableRow
                             key={`ads-actual-${ch}`}
                             label={channel?.name || ch}
-                            dotColor={channel?.dot || 'bg-gray-400'}
+                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
                             values={actualAds}
                             channel={ch}
@@ -679,7 +681,7 @@ export function SalesProjection({
                           <TableRow
                             key={`promos-${ch}`}
                             label={`${channel?.name} (${getPercent(config.maxPromosPercent, ch)}%)`}
-                            dotColor={channel?.dot || 'bg-gray-400'}
+                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
                             values={targetData}
                             channel={ch}
@@ -695,7 +697,7 @@ export function SalesProjection({
                           <TableRow
                             key={`promos-actual-${ch}`}
                             label={channel?.name || ch}
-                            dotColor={channel?.dot || 'bg-gray-400'}
+                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
                             values={actualPromos}
                             channel={ch}

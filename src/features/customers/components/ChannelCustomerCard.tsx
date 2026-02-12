@@ -1,6 +1,7 @@
 import { Info } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
+import { CHANNELS } from '@/constants/channels';
 import type { ChannelId } from '@/types';
 
 interface ChannelCustomerCardProps {
@@ -18,10 +19,10 @@ interface ChannelCustomerCardProps {
   repetitionRate: number;
 }
 
-const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string; accent: string }> = {
-  glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100', accent: 'bg-amber-400' },
-  ubereats: { bg: 'bg-emerald-50/50', border: 'border-emerald-100', accent: 'bg-emerald-500' },
-  justeat: { bg: 'bg-orange-50/50', border: 'border-orange-100', accent: 'bg-orange-400' },
+const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string }> = {
+  glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100' },
+  ubereats: { bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
+  justeat: { bg: 'bg-orange-50/50', border: 'border-orange-100' },
 };
 
 export function ChannelCustomerCard({
@@ -40,9 +41,13 @@ export function ChannelCustomerCard({
 
   return (
     <div className={cn('rounded-xl border p-5', styles.bg, styles.border)}>
-      <div className="flex items-center gap-2.5 mb-4">
-        <div className={cn('w-3 h-3 rounded-full', styles.accent)} />
-        <span className="font-semibold text-gray-900">{channelName}</span>
+      <div className="flex items-center gap-3 mb-4">
+        <img
+          src={CHANNELS[channelId].logoUrl}
+          alt={channelName}
+          className="w-7 h-7 rounded-full object-cover"
+        />
+        <span className="text-lg font-semibold text-gray-900">{channelName}</span>
       </div>
 
       <div className="mb-5">

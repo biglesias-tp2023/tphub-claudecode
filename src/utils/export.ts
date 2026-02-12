@@ -78,11 +78,13 @@ const BRAND = {
   name: 'ThinkPaladar',
   tagline: 'Consultoría de Delivery',
   colors: {
-    primary: [37, 99, 235] as [number, number, number],
-    secondary: [99, 102, 241] as [number, number, number],
-    accent: [16, 185, 129] as [number, number, number],
+    primary: [9, 87, 137] as [number, number, number],       // #095789 - ThinkPaladar primary
+    primaryLight: [200, 225, 240] as [number, number, number], // Light blue for backgrounds
+    secondary: [7, 69, 103] as [number, number, number],     // #074567 - Darker blue
+    accent: [255, 161, 102] as [number, number, number],     // #ffa166 - ThinkPaladar accent orange
     dark: [30, 41, 59] as [number, number, number],
     gray: [100, 116, 139] as [number, number, number],
+    lightGray: [243, 247, 249] as [number, number, number],  // #f3f7f9 - Background
   },
   logoText: 'TP',
 };
@@ -341,7 +343,7 @@ export interface AuditExportSection {
 export interface AuditExportField {
   key: string;
   label: string;
-  type: 'checkbox' | 'score' | 'text' | 'select' | 'number' | 'multiselect' | 'datetime' | 'time' | 'company_select' | 'user_select' | 'file';
+  type: 'checkbox' | 'score' | 'text' | 'select' | 'number' | 'multiselect' | 'datetime' | 'time' | 'company_select' | 'user_select' | 'file' | 'image_upload' | 'rating' | 'textarea' | 'multi_select' | 'tag_input';
   value: unknown;
   maxScore?: number;
   scoreLabels?: string[];
@@ -399,6 +401,7 @@ function formatFieldValue(field: AuditExportField): string {
     case 'checkbox':
       return value ? 'Sí' : 'No';
     case 'score':
+    case 'rating':
       if (typeof value === 'number') {
         const label = scoreLabels?.[value - 1] || '';
         return `${value}/${maxScore || 5}${label ? ` (${label})` : ''}`;
@@ -407,6 +410,8 @@ function formatFieldValue(field: AuditExportField): string {
     case 'number':
       return typeof value === 'number' ? formatNumber(value) : String(value);
     case 'multiselect':
+    case 'multi_select':
+    case 'tag_input':
       return Array.isArray(value) ? value.join(', ') : String(value);
     case 'datetime':
       if (typeof value === 'string') {
@@ -427,12 +432,14 @@ function formatFieldValue(field: AuditExportField): string {
     case 'user_select':
       return typeof value === 'string' ? value : '-';
     case 'file':
+    case 'image_upload':
       if (Array.isArray(value) && value.length > 0) {
         const files = value as { name: string }[];
-        return files.map((f) => f.name).join(', ');
+        return `${files.length} archivo(s): ${files.map((f) => f.name).join(', ')}`;
       }
       return '-';
     case 'text':
+    case 'textarea':
     case 'select':
     default:
       return String(value);
@@ -816,35 +823,6 @@ export async function exportObjectivesTableToExcel(data: ObjectivesTableExportDa
   downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), `objetivos_venta_${formatDate()}.xlsx`);
 }
 
-export async function exportAuditToExcel(data: AuditExportData): Promise<void> {
-  const XLSX = await loadXlsxLibrary();
-  const wb = XLSX.utils.book_new();
-
-  const summaryData: (string | number)[][] = [
-    ['AUDITORÍA - ' + data.auditNumber], [''],
-    ['Tipo', data.auditType], ['Alcance', data.scope], ['Estado', data.status],
-    ['Realizado por', data.createdBy], ['Fecha', data.completedAt || data.createdAt], [''],
-  ];
-  if (data.totalScore && data.totalScore.maximum > 0) {
-    summaryData.push(['PUNTUACIÓN TOTAL'], ['Obtenido', data.totalScore.obtained], ['Máximo', data.totalScore.maximum], ['Porcentaje', `${data.totalScore.percentage}%`], ['']);
-  }
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumen');
-
-  const detailData: (string | number)[][] = [['DETALLE DE AUDITORÍA'], [''], ['Sección', 'Campo', 'Valor']];
-  data.sections.forEach((section) => {
-    section.fields.forEach((field) => { detailData.push([section.title, field.label, formatFieldValue(field)]); });
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailData), 'Detalle');
-
-  data.sections.forEach((section, index) => {
-    const sectionData: (string | number)[][] = [[section.title.toUpperCase()], [''], ['Campo', 'Valor'], ...section.fields.map((field) => [field.label, formatFieldValue(field)])];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sectionData), `${index + 1}. ${section.title}`.substring(0, 31));
-  });
-
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), `auditoria_${data.auditNumber}_${formatDate()}.xlsx`);
-}
-
 // ============================================
 // PDF EXPORT (Async - Dynamic Import)
 // ============================================
@@ -1084,55 +1062,154 @@ export async function exportObjectivesTableToPDF(data: ObjectivesTableExportData
   doc.save(`objetivos_venta_${formatDate()}.pdf`);
 }
 
-export async function exportAuditToPDF(data: AuditExportData): Promise<void> {
-  const { jsPDF, autoTable } = await loadPdfLibraries();
-  const doc = new jsPDF();
+/**
+ * Determines background color for a select/rating value based on its score prefix.
+ * Returns [R,G,B] or null for no background.
+ */
+function getValueBadgeColor(field: AuditExportField): [number, number, number] | null {
+  const { type, value } = field;
+
+  if (type === 'select' && typeof value === 'string') {
+    const match = value.match(/^(\d+)\s*[-–]/);
+    if (match) {
+      const score = parseInt(match[1]);
+      if (score <= 2) return [254, 226, 226];   // light red
+      if (score === 3) return [254, 243, 199];   // light yellow
+      if (score >= 4) return [209, 250, 229];    // light green
+    }
+    // Select without numeric prefix: light purple
+    return [237, 233, 254];
+  }
+
+  if ((type === 'multiselect' || type === 'multi_select' || type === 'tag_input') && Array.isArray(value) && value.length > 0) {
+    return [219, 234, 254]; // light blue
+  }
+
+  if (type === 'rating' && typeof value === 'number') {
+    const max = field.maxScore || 10;
+    const ratio = value / max;
+    if (ratio < 0.4) return [254, 226, 226];
+    if (ratio < 0.7) return [254, 243, 199];
+    return [209, 250, 229];
+  }
+
+  return null;
+}
+
+/**
+ * Shared builder: creates the audit PDF document with clean question+answer layout.
+ */
+async function buildAuditPdfDoc(data: AuditExportData): Promise<jsPDF> {
+  const { jsPDF: JsPDF, autoTable } = await loadPdfLibraries();
+  const doc = new JsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
 
   const subtitle = `${data.scope} · ${data.status}`;
   let yPos = addBrandedHeader(doc, data.auditType, subtitle);
 
-  doc.setFontSize(10);
+  // Reference and metadata
+  doc.setFontSize(9);
   doc.setTextColor(...BRAND.colors.gray);
   doc.text(`Referencia: ${data.auditNumber}`, 14, yPos + 2);
-  doc.text(`Realizado por: ${data.createdBy}`, 14, yPos + 8);
-  doc.text(`Fecha: ${data.completedAt ? new Date(data.completedAt).toLocaleDateString('es-ES') : new Date(data.createdAt).toLocaleDateString('es-ES')}`, 14, yPos + 14);
+  doc.text(`Realizado por: ${data.createdBy}`, 14, yPos + 7);
+  const dateStr = data.completedAt
+    ? new Date(data.completedAt).toLocaleDateString('es-ES')
+    : new Date(data.createdAt).toLocaleDateString('es-ES');
+  doc.text(`Fecha: ${dateStr}`, 14, yPos + 12);
 
+  // Total score badge (right side)
   if (data.totalScore && data.totalScore.maximum > 0) {
-    doc.setFontSize(12);
-    doc.setTextColor(...BRAND.colors.primary);
+    const scoreText = `${data.totalScore.obtained}/${data.totalScore.maximum}`;
+    const percentText = `${data.totalScore.percentage}%`;
+    doc.setFillColor(...BRAND.colors.primary);
+    doc.roundedRect(pageWidth - 55, yPos - 2, 41, 18, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Puntuación Total: ${data.totalScore.obtained}/${data.totalScore.maximum} (${data.totalScore.percentage}%)`, doc.internal.pageSize.getWidth() - 14, yPos + 8, { align: 'right' });
+    doc.text(scoreText, pageWidth - 34.5, yPos + 6, { align: 'center' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(percentText, pageWidth - 34.5, yPos + 12, { align: 'center' });
   }
 
-  yPos += 24;
+  yPos += 22;
 
-  data.sections.forEach((section) => {
-    if (yPos > 250) { doc.addPage(); yPos = 20; }
+  // Iterate through ALL sections
+  for (const section of data.sections) {
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
 
+    // Section header: colored bar
+    doc.setFillColor(...BRAND.colors.primaryLight);
+    doc.roundedRect(14, yPos - 4, pageWidth - 28, 10, 2, 2, 'F');
     doc.setFontSize(11);
-    doc.setTextColor(...BRAND.colors.dark);
+    doc.setTextColor(...BRAND.colors.primary);
     doc.setFont('helvetica', 'bold');
-    doc.text(section.title, 14, yPos);
-    yPos += 6;
+    doc.text(section.title, 18, yPos + 3);
+    yPos += 12;
 
-    const tableData = section.fields.map((field) => [field.label, formatFieldValue(field)]);
+    // Build table rows: each field as [label, value] with per-cell styling
+    const tableBody: { content: string; styles?: Record<string, unknown> }[][] = [];
 
-    if (tableData.length > 0) {
+    for (const field of section.fields) {
+      const isImage = field.type === 'file' || field.type === 'image_upload';
+      const displayValue = formatFieldValue(field);
+
+      if (isImage) {
+        // Image fields: show as italic reference
+        tableBody.push([
+          { content: field.label, styles: { fontStyle: 'bold', textColor: BRAND.colors.gray, font: 'helvetica' } },
+          { content: displayValue, styles: { fontStyle: 'italic', textColor: BRAND.colors.gray } },
+        ]);
+        continue;
+      }
+
+      const badgeColor = getValueBadgeColor(field);
+      const valueCell: { content: string; styles?: Record<string, unknown> } = badgeColor
+        ? { content: displayValue, styles: { fillColor: badgeColor } }
+        : { content: displayValue };
+
+      tableBody.push([
+        { content: field.label, styles: { fontStyle: 'bold' } },
+        valueCell,
+      ]);
+    }
+
+    if (tableBody.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [['Campo', 'Valor']],
-        body: tableData,
-        ...BRANDED_TABLE_STYLES,
-        bodyStyles: { ...BRANDED_TABLE_STYLES.bodyStyles, fontSize: 8 },
-        columnStyles: { 0: { cellWidth: 80, fontStyle: 'bold' }, 1: { cellWidth: 100 } },
+        body: tableBody,
+        showHead: false,
+        theme: 'plain',
+        styles: {
+          fontSize: 8,
+          textColor: BRAND.colors.dark,
+          cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+          lineWidth: 0.1,
+          lineColor: [230, 230, 230],
+          overflow: 'linebreak',
+        },
+        columnStyles: {
+          0: { cellWidth: 60, fontStyle: 'bold', textColor: BRAND.colors.gray },
+          1: { cellWidth: pageWidth - 28 - 60 },
+        },
         margin: { left: 14, right: 14 },
       });
 
-      yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+      yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
     }
-  });
+
+    yPos += 2;
+  }
 
   addBrandedFooter(doc);
+  return doc;
+}
+
+export async function exportAuditToPDF(data: AuditExportData): Promise<void> {
+  const doc = await buildAuditPdfDoc(data);
   doc.save(`auditoria_${data.auditNumber}_${formatDate()}.pdf`);
 }
 
@@ -1208,42 +1285,6 @@ export async function generateObjectivesPdfBlob(data: ObjectivesTableExportData)
 }
 
 export async function generateAuditPdfBlob(data: AuditExportData): Promise<Blob> {
-  const { jsPDF, autoTable } = await loadPdfLibraries();
-  const doc = new jsPDF();
-
-  let yPos = addBrandedHeader(doc, data.auditType, `${data.scope} · ${data.status}`);
-
-  doc.setFontSize(10);
-  doc.setTextColor(...BRAND.colors.gray);
-  doc.text(`Referencia: ${data.auditNumber}`, 14, yPos + 2);
-
-  if (data.totalScore && data.totalScore.maximum > 0) {
-    doc.setFontSize(12);
-    doc.setTextColor(...BRAND.colors.primary);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Puntuación: ${data.totalScore.obtained}/${data.totalScore.maximum} (${data.totalScore.percentage}%)`, doc.internal.pageSize.getWidth() - 14, yPos + 2, { align: 'right' });
-  }
-
-  yPos += 16;
-
-  // Only show first section for preview
-  const section = data.sections[0];
-  if (section) {
-    doc.setFontSize(11);
-    doc.setTextColor(...BRAND.colors.dark);
-    doc.setFont('helvetica', 'bold');
-    doc.text(section.title, 14, yPos);
-    yPos += 6;
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Campo', 'Valor']],
-      body: section.fields.slice(0, 5).map((field) => [field.label, formatFieldValue(field)]),
-      ...BRANDED_TABLE_STYLES,
-      bodyStyles: { ...BRANDED_TABLE_STYLES.bodyStyles, fontSize: 8 },
-    });
-  }
-
-  addBrandedFooter(doc);
+  const doc = await buildAuditPdfDoc(data);
   return doc.output('blob');
 }

@@ -438,6 +438,27 @@ export async function updateProfile(
   return mapDbProfileToProfile(data as DbProfile);
 }
 
+/**
+ * Delete a user's profile (admin/superadmin only, owner cannot be deleted)
+ *
+ * Note: This only deletes the profile record, not the auth.users entry.
+ * The user won't be able to access TPHub but their Supabase auth account remains.
+ */
+export async function deleteProfile(profileId: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', profileId);
+
+  if (error) {
+    // Check for owner protection trigger
+    if (error.message?.includes('Cannot delete owner')) {
+      throw new Error('No se puede eliminar la cuenta del Owner');
+    }
+    throw new Error(`Error deleting profile: ${error.message}`);
+  }
+}
+
 // ============================================
 // RESTAURANT KPIs
 // ============================================

@@ -66,6 +66,8 @@ export type {
   DbCrpPortal,
   DbCrpOrderHead,
   DbRestaurantCoordinate,
+  DbHubspotContact,
+  DbHubspotCompanyContact,
   FetchRestaurantsParams,
   FetchCoordinatesParams,
   Portal,
@@ -132,6 +134,10 @@ export type {
   HierarchyDataRow,
   ControllingMetricsRow,
 } from './orders';
+
+// Contacts (HubSpot)
+export { fetchContactsByCompanyId } from './contacts';
+export type { HubspotContact } from './contacts';
 
 // Brand Channels (active channels per brand/restaurant)
 export {

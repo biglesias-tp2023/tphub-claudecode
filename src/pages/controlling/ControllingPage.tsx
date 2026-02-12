@@ -84,10 +84,16 @@ interface ChannelCardProps {
   data: ChannelMetrics;
 }
 
-const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string; accent: string }> = {
-  glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100', accent: 'bg-amber-400' },
-  ubereats: { bg: 'bg-emerald-50/50', border: 'border-emerald-100', accent: 'bg-emerald-500' },
-  justeat: { bg: 'bg-orange-50/50', border: 'border-orange-100', accent: 'bg-orange-400' },
+const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string }> = {
+  glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100' },
+  ubereats: { bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
+  justeat: { bg: 'bg-orange-50/50', border: 'border-orange-100' },
+};
+
+const CHANNEL_LOGOS: Record<ChannelId, string> = {
+  glovo: '/images/channels/glovo.png',
+  ubereats: '/images/channels/ubereats.png',
+  justeat: '/images/channels/justeat.webp',
 };
 
 function ChannelCard({ data }: ChannelCardProps) {
@@ -98,9 +104,13 @@ function ChannelCard({ data }: ChannelCardProps) {
     <div className={cn('rounded-xl border p-5', styles.bg, styles.border)}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className={cn('w-3 h-3 rounded-full', styles.accent)} />
-          <span className="font-semibold text-gray-900">{data.name}</span>
+        <div className="flex items-center gap-3">
+          <img
+            src={CHANNEL_LOGOS[data.channel]}
+            alt={data.name}
+            className="w-7 h-7 rounded-full object-cover"
+          />
+          <span className="text-lg font-semibold text-gray-900">{data.name}</span>
         </div>
         <span className="text-sm text-gray-500 tabular-nums">{data.percentage.toFixed(1)}%</span>
       </div>

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { UserPlus, Users, Mail, Clock } from 'lucide-react';
+import { UserPlus, Users, Mail, Clock, Crown, Shield } from 'lucide-react';
 import { Spinner, Button } from '@/components/ui';
-import { useIsAdmin } from '@/stores/authStore';
+import { useIsAdmin, useCanInviteUsers } from '@/stores/authStore';
 import {
   useUsers,
   UserTable,
@@ -18,12 +18,20 @@ type TabId = 'users' | 'invitations';
 
 export function AdminPage() {
   const isAdmin = useIsAdmin();
+  const canInvite = useCanInviteUsers();
   const { data: users = [], isLoading, error } = useUsers();
   const { data: pendingInvitations = [] } = usePendingInvitations();
   const [editingCompanies, setEditingCompanies] = useState<Profile | null>(null);
   const [editingRole, setEditingRole] = useState<Profile | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('users');
+
+  // Count users by role
+  const ownerCount = users.filter((u) => u.role === 'owner').length;
+  const superadminCount = users.filter((u) => u.role === 'superadmin').length;
+  const adminCount = users.filter((u) => u.role === 'admin').length;
+  const managerCount = users.filter((u) => u.role === 'manager').length;
+  const consultantCount = users.filter((u) => u.role === 'consultant').length;
 
   // Redirect non-admins to dashboard
   if (!isAdmin) {
@@ -69,14 +77,16 @@ export function AdminPage() {
             Gestión de usuarios y asignación de compañías
           </p>
         </div>
-        <Button onClick={() => setShowInviteModal(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Invitar usuario
-        </Button>
+        {canInvite && (
+          <Button onClick={() => setShowInviteModal(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invitar usuario
+          </Button>
+        )}
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary-50 rounded-lg">
@@ -90,14 +100,34 @@ export function AdminPage() {
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Users className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-amber-50 rounded-lg">
+              <Crown className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900">
-                {users.filter((u) => u.role === 'admin').length}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{ownerCount + superadminCount}</div>
+              <div className="text-sm text-gray-500">Owner + Super</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Shield className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{adminCount}</div>
               <div className="text-sm text-gray-500">Administradores</div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-50 rounded-lg">
+              <Users className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{managerCount}</div>
+              <div className="text-sm text-gray-500">Managers</div>
             </div>
           </div>
         </div>
@@ -107,23 +137,21 @@ export function AdminPage() {
               <Users className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900">
-                {users.filter((u) => u.role === 'consultant').length}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{consultantCount}</div>
               <div className="text-sm text-gray-500">Consultores</div>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-50 rounded-lg">
-              <Clock className="w-5 h-5 text-amber-600" />
+            <div className="p-2 bg-gray-50 rounded-lg">
+              <Clock className="w-5 h-5 text-gray-600" />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">
                 {pendingInvitations.length}
               </div>
-              <div className="text-sm text-gray-500">Invitaciones pendientes</div>
+              <div className="text-sm text-gray-500">Invitaciones</div>
             </div>
           </div>
         </div>

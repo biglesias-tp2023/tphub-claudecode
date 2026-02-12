@@ -6,8 +6,9 @@ import { Card, ToastContainer } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
 import { cn } from '@/utils/cn';
-import { AuditCard, AuditCardSkeleton, AuditPdfPreviewModal, AuditExcelPreviewModal, AuditEmailPreviewModal } from '@/features/audits/components';
-import { useAuditsWithDetails, useAuditTypes, useCreateAudit } from '@/features/audits/hooks';
+import { AuditCard, AuditCardSkeleton, DeleteAuditModal } from '@/features/audits/components';
+import { AuditPreviewModal } from '@/features/audits/components/AuditPreviewModal';
+import { useAuditsWithDetails, useAuditTypes, useCreateAudit, useDeleteAudit } from '@/features/audits/hooks';
 import { AUDIT_STATUS_CONFIG, AUDIT_TYPE_CARDS, getAuditScopeLabel, calculateTotalScore, generateAuditNumber } from '@/features/audits/config';
 import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
 import { fetchCrpCompanies, fetchCrpBrands, fetchCrpPortals, fetchCrpCompanyById } from '@/services/crp-portal';
@@ -15,8 +16,6 @@ import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import { useProfile } from '@/stores/authStore';
 import type { Portal } from '@/services/crp-portal';
 import {
-  exportAuditToPDF,
-  exportAuditToExcel,
   type AuditExportData,
   type AuditExportSection,
 } from '@/utils/export';
@@ -51,18 +50,30 @@ function buildAuditExportData(
     delivered: 'Entregada',
   };
 
-  const sections: AuditExportSection[] = auditType.fieldSchema.sections.map((section) => ({
-    title: section.title,
-    icon: section.icon,
-    fields: section.fields.map((field) => ({
+  const sections: AuditExportSection[] = auditType.fieldSchema.sections.map((section) => {
+    const fields = section.fields.map((field) => ({
       key: field.key,
       label: field.label,
       type: field.type,
       value: audit.desFieldData?.[field.key] ?? null,
       maxScore: field.maxScore,
       scoreLabels: field.scoreLabels,
-    })),
-  }));
+    }));
+
+    // Include section suggestions if filled
+    const suggestionsKey = `${section.key}_suggestions`;
+    const suggestionsValue = audit.desFieldData?.[suggestionsKey];
+    if (suggestionsValue && String(suggestionsValue).trim()) {
+      fields.push({
+        key: suggestionsKey,
+        label: 'Comentarios adicionales',
+        type: 'textarea',
+        value: suggestionsValue,
+      });
+    }
+
+    return { title: section.title, icon: section.icon, fields };
+  });
 
   const totalScore = calculateTotalScore(auditType, audit.desFieldData);
 
@@ -725,18 +736,16 @@ interface AuditsListProps {
   audits: AuditWithDetails[];
   isLoading: boolean;
   onEdit: (auditId: string) => void;
-  onExportPdf?: (auditId: string) => void;
-  onExportExcel?: (auditId: string) => void;
-  onSendEmail?: (auditId: string) => void;
+  onPreview?: (auditId: string) => void;
+  onDelete?: (auditId: string, auditNumber: string) => void;
 }
 
 function AuditsList({
   audits,
   isLoading,
   onEdit,
-  onExportPdf,
-  onExportExcel,
-  onSendEmail,
+  onPreview,
+  onDelete,
 }: AuditsListProps) {
   if (isLoading) {
     return (
@@ -763,9 +772,8 @@ function AuditsList({
           key={audit.pkIdAudit}
           audit={audit}
           onEdit={onEdit}
-          onExportPdf={onExportPdf}
-          onExportExcel={onExportExcel}
-          onSendEmail={onSendEmail}
+          onPreview={onPreview}
+          onDelete={onDelete}
         />
       ))}
     </div>
@@ -778,7 +786,7 @@ function AuditsList({
 
 export function AuditsPage() {
   // Toast notifications
-  const { toasts, closeToast, error: showError } = useToast();
+  const { toasts, closeToast, success: showSuccess, error: showError } = useToast();
 
   // State
   const [filters, setFilters] = useState<AuditFilters>({
@@ -791,12 +799,22 @@ export function AuditsPage() {
 
   // Preview modal state
   const [previewModal, setPreviewModal] = useState<{
-    type: 'pdf' | 'excel' | 'email' | null;
+    open: boolean;
     data: AuditExportData | null;
-  }>({ type: null, data: null });
+    companyId: string | null;
+    auditNumber: string;
+  }>({ open: false, data: null, companyId: null, auditNumber: '' });
+
+  // Delete modal state
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean;
+    auditId: string;
+    auditNumber: string;
+  }>({ open: false, auditId: '', auditNumber: '' });
 
   // Data
   const { data: audits = [], isLoading: auditsLoading } = useAuditsWithDetails();
+  const deleteAudit = useDeleteAudit();
   const { data: auditTypes = [] } = useAuditTypes();
 
   // Fetch profiles for consultant filter
@@ -868,49 +886,41 @@ export function AuditsPage() {
     }
   }, []);
 
-  const handleExportPdf = useCallback(async (auditId: string) => {
+  const handlePreview = useCallback(async (auditId: string) => {
     const data = await loadExportData(auditId);
     if (data) {
-      setPreviewModal({ type: 'pdf', data });
+      // Find the audit to get company ID and audit number
+      const audit = audits.find((a) => a.pkIdAudit === auditId);
+      setPreviewModal({
+        open: true,
+        data,
+        companyId: audit?.pfkIdCompany || null,
+        auditNumber: audit?.desAuditNumber || '',
+      });
     }
-  }, [loadExportData]);
-
-  const handleExportExcel = useCallback(async (auditId: string) => {
-    const data = await loadExportData(auditId);
-    if (data) {
-      setPreviewModal({ type: 'excel', data });
-    }
-  }, [loadExportData]);
-
-  const handleSendEmail = useCallback(async (auditId: string) => {
-    const data = await loadExportData(auditId);
-    if (data) {
-      setPreviewModal({ type: 'email', data });
-    }
-  }, [loadExportData]);
+  }, [loadExportData, audits]);
 
   const closePreviewModal = useCallback(() => {
-    setPreviewModal({ type: null, data: null });
+    setPreviewModal({ open: false, data: null, companyId: null, auditNumber: '' });
   }, []);
 
-  const handleDownloadPdf = useCallback(() => {
-    if (previewModal.data) {
-      exportAuditToPDF(previewModal.data);
-    }
-  }, [previewModal.data]);
+  const handleToast = useCallback((message: string, type: 'success' | 'error') => {
+    if (type === 'success') showSuccess(message);
+    else showError(message);
+  }, [showSuccess, showError]);
 
-  const handleDownloadExcel = useCallback(() => {
-    if (previewModal.data) {
-      exportAuditToExcel(previewModal.data);
-    }
-  }, [previewModal.data]);
+  const handleDeleteClick = useCallback((auditId: string, auditNumber: string) => {
+    setDeleteModal({ open: true, auditId, auditNumber });
+  }, []);
 
-  const handleSendEmailAction = useCallback(() => {
-    // Feature: Email sending - Requires backend implementation
-    // See NEXT_STEPS.md for planned email service integration
-    alert('Funcionalidad de envío por email próximamente disponible');
-    closePreviewModal();
-  }, [closePreviewModal]);
+  const handleDeleteConfirm = useCallback(async () => {
+    await deleteAudit.mutateAsync(deleteModal.auditId);
+    showSuccess('Auditoría eliminada correctamente');
+  }, [deleteAudit, deleteModal.auditId, showSuccess]);
+
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModal({ open: false, auditId: '', auditNumber: '' });
+  }, []);
 
   const hasAudits = audits.length > 0;
 
@@ -947,9 +957,8 @@ export function AuditsPage() {
             audits={filteredAudits}
             isLoading={auditsLoading}
             onEdit={handleEditAudit}
-            onExportPdf={handleExportPdf}
-            onExportExcel={handleExportExcel}
-            onSendEmail={handleSendEmail}
+            onPreview={handlePreview}
+            onDelete={handleDeleteClick}
           />
         </Card>
       )}
@@ -961,29 +970,22 @@ export function AuditsPage() {
         onError={showError}
       />
 
-
-      {/* PDF Preview Modal */}
-      <AuditPdfPreviewModal
-        open={previewModal.type === 'pdf'}
-        onClose={closePreviewModal}
-        exportData={previewModal.data}
-        onDownload={handleDownloadPdf}
+      {/* Delete Audit Modal */}
+      <DeleteAuditModal
+        open={deleteModal.open}
+        onClose={closeDeleteModal}
+        onConfirm={handleDeleteConfirm}
+        auditNumber={deleteModal.auditNumber}
       />
 
-      {/* Excel Preview Modal */}
-      <AuditExcelPreviewModal
-        open={previewModal.type === 'excel'}
+      {/* Unified Preview Modal */}
+      <AuditPreviewModal
+        open={previewModal.open}
         onClose={closePreviewModal}
         exportData={previewModal.data}
-        onDownload={handleDownloadExcel}
-      />
-
-      {/* Email Preview Modal */}
-      <AuditEmailPreviewModal
-        open={previewModal.type === 'email'}
-        onClose={closePreviewModal}
-        exportData={previewModal.data}
-        onSend={handleSendEmailAction}
+        companyId={previewModal.companyId}
+        auditNumber={previewModal.auditNumber}
+        onToast={handleToast}
       />
 
       {/* Toast notifications */}

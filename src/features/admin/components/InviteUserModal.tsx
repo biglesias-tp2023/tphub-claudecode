@@ -16,35 +16,27 @@ import {
   Check,
   Search,
   ChevronDown,
+  Shield,
 } from 'lucide-react';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/utils/cn';
 import { useCreateInvitation } from '../hooks/useInvitations';
 import { useCompanies } from '@/features/clients/hooks/useCompanies';
+import { useCurrentRole } from '@/stores/authStore';
 import type { UserRole, Company } from '@/types';
+import { ROLE_LABELS, ROLE_DESCRIPTIONS, getInvitableRoles } from '@/types';
 
 interface InviteUserModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const ROLE_OPTIONS: { value: UserRole; label: string; description: string }[] = [
-  {
-    value: 'consultant',
-    label: 'Consultor',
-    description: 'Acceso a clientes asignados, puede crear y editar datos',
-  },
-  {
-    value: 'viewer',
-    label: 'Visor',
-    description: 'Solo lectura de los datos de clientes asignados',
-  },
-  {
-    value: 'admin',
-    label: 'Administrador',
-    description: 'Acceso completo a todas las funcionalidades',
-  },
-];
+interface RoleOption {
+  value: UserRole;
+  label: string;
+  description: string;
+  icon?: React.ElementType;
+}
 
 // Status tag styles
 const statusConfig: Record<string, { text: string; bg: string }> = {
@@ -77,6 +69,28 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
 
   const { data: companies = [], isLoading: loadingCompanies } = useCompanies();
   const createInvitation = useCreateInvitation();
+  const currentUserRole = useCurrentRole();
+
+  // Get available roles based on current user's permissions
+  const availableRoles = useMemo((): RoleOption[] => {
+    const invitableRoleValues = currentUserRole ? getInvitableRoles(currentUserRole) : [];
+
+    return invitableRoleValues.map((roleValue) => ({
+      value: roleValue,
+      label: ROLE_LABELS[roleValue],
+      description: ROLE_DESCRIPTIONS[roleValue],
+      icon: roleValue === 'superadmin' ? Shield : undefined,
+    }));
+  }, [currentUserRole]);
+
+  // Ensure selected role is valid when available roles change
+  useEffect(() => {
+    if (availableRoles.length > 0 && !availableRoles.some((r) => r.value === role)) {
+      // Default to consultant if available, otherwise first available role
+      const defaultRole = availableRoles.find((r) => r.value === 'consultant')?.value || availableRoles[0].value;
+      setRole(defaultRole);
+    }
+  }, [availableRoles, role]);
 
   // Sort companies alphabetically
   const sortedCompanies = useMemo(() => {
@@ -270,40 +284,55 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Rol
                 </label>
-                <div className="space-y-2">
-                  {ROLE_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className={cn(
-                        'flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
-                        role === option.value
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="role"
-                        value={option.value}
-                        checked={role === option.value}
-                        onChange={() => setRole(option.value)}
-                        className="mt-0.5 text-primary-600 focus:ring-primary-500"
-                      />
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {option.label}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {option.description}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                {availableRoles.length === 0 ? (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm text-gray-500">
+                      No tienes permisos para invitar usuarios.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {availableRoles.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <label
+                          key={option.value}
+                          className={cn(
+                            'flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
+                            role === option.value
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="role"
+                            value={option.value}
+                            checked={role === option.value}
+                            onChange={() => setRole(option.value)}
+                            className="mt-0.5 text-primary-600 focus:ring-primary-500"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">
+                                {option.label}
+                              </span>
+                              {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {option.description}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Companies */}
-              {role !== 'admin' && (
+              {/* Companies - only show for roles that need company assignment */}
+              {/* superadmin and admin have access to everything, no need to assign companies */}
+              {!['superadmin', 'admin'].includes(role) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     <Building2 className="inline-block w-4 h-4 mr-1" />

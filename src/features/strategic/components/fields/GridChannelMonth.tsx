@@ -51,10 +51,10 @@ type Channel = 'glovo' | 'ubereats' | 'justeat';
 // CONSTANTS
 // ============================================
 
-const CHANNELS: { id: Channel; label: string; color: string; dot: string }[] = [
-  { id: 'glovo', label: 'Glovo', color: '#FFC244', dot: 'bg-yellow-400' },
-  { id: 'ubereats', label: 'UberEats', color: '#06C167', dot: 'bg-green-500' },
-  { id: 'justeat', label: 'JustEat', color: '#FF8000', dot: 'bg-orange-500' },
+const CHANNELS: { id: Channel; label: string; color: string; logo: string }[] = [
+  { id: 'glovo', label: 'Glovo', color: '#FFC244', logo: '/images/channels/glovo.png' },
+  { id: 'ubereats', label: 'UberEats', color: '#06C167', logo: '/images/channels/ubereats.png' },
+  { id: 'justeat', label: 'JustEat', color: '#FF8000', logo: '/images/channels/justeat.webp' },
 ];
 
 const DEFAULT_INVESTMENT: InvestmentConfig = { glovo: 0, ubereats: 0, justeat: 0 };
@@ -119,7 +119,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: Tooltip
 
 interface InputRowProps {
   label: string;
-  dotColor: string;
+  logoUrl: string;
   months: { key: string }[];
   values: GridChannelMonthData;
   channel: Channel;
@@ -128,12 +128,12 @@ interface InputRowProps {
   isActual?: boolean;
 }
 
-function InputRow({ label, dotColor, months, values, channel, onChange, total, isActual }: InputRowProps) {
+function InputRow({ label, logoUrl, months, values, channel, onChange, total, isActual }: InputRowProps) {
   return (
     <tr className={cn(isActual && 'bg-emerald-50/50')}>
       <td className="py-1 pr-2">
         <div className="flex items-center gap-1.5">
-          <span className={cn('w-1.5 h-1.5 rounded-full', dotColor)} />
+          <img src={logoUrl} alt={label} className="w-3 h-3 rounded-full object-cover" />
           <span className="text-[11px] text-gray-600">{label}</span>
           {isActual && <span className="text-[9px] text-emerald-600 font-medium">(real)</span>}
         </div>
@@ -352,7 +352,7 @@ export function GridChannelMonth({
                   <InputRow
                     key={ch.id}
                     label={ch.label}
-                    dotColor={ch.dot}
+                    logoUrl={ch.logo}
                     months={months}
                     values={normalizedTarget}
                     channel={ch.id}
@@ -365,7 +365,7 @@ export function GridChannelMonth({
                   <InputRow
                     key={`actual-${ch.id}`}
                     label={ch.label}
-                    dotColor={ch.dot}
+                    logoUrl={ch.logo}
                     months={months}
                     values={normalizedActual}
                     channel={ch.id}
@@ -425,7 +425,7 @@ export function GridChannelMonth({
                         <tr key={ch.id}>
                           <td className="py-1">
                             <div className="flex items-center gap-1">
-                              <span className={cn('w-1 h-1 rounded-full', ch.dot)} />
+                              <img src={ch.logo} alt={ch.label} className="w-3 h-3 rounded-full object-cover" />
                               <span className="text-[10px] text-gray-600">{ch.label}</span>
                             </div>
                           </td>
@@ -485,7 +485,7 @@ export function GridChannelMonth({
                         <tr key={ch.id}>
                           <td className="py-1">
                             <div className="flex items-center gap-1">
-                              <span className={cn('w-1 h-1 rounded-full', ch.dot)} />
+                              <img src={ch.logo} alt={ch.label} className="w-3 h-3 rounded-full object-cover" />
                               <span className="text-[10px] text-gray-600">{ch.label}</span>
                             </div>
                           </td>
