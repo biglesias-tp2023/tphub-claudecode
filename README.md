@@ -2,9 +2,14 @@
 
 Portal interno de analytics para consultores de ThinkPaladar.
 
+![React](https://img.shields.io/badge/React-19-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
+![Vite](https://img.shields.io/badge/Vite-7-purple)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-green)
+
 ## Descripcion
 
-TPHub es un dashboard de analytics disenado para consultores que gestionan multiples clientes de restaurantes en plataformas de delivery (Glovo, UberEats, JustEat). Permite visualizar KPIs, gestionar objetivos estrategicos, analizar pedidos y generar informes brandeados.
+TPHub es un dashboard de analytics diseñado para consultores que gestionan múltiples clientes de restaurantes en plataformas de delivery (Glovo, UberEats, JustEat). Permite visualizar KPIs, gestionar objetivos estratégicos, realizar auditorías, analizar pedidos y generar informes brandeados.
 
 ## Caracteristicas
 
@@ -15,14 +20,14 @@ TPHub es un dashboard de analytics disenado para consultores que gestionan multi
   - Selector de fechas con presets y calendario custom
   - Reset automatico en cascada al cambiar filtros padre
 - **8 secciones principales**:
-  - **Controlling**: KPIs y metricas de rendimiento
-  - **Estrategia**: Objetivos estrategicos (OKRs/KPIs) y tareas con auto-generacion
-  - **Objetivos**: Objetivos de venta por restaurante/canal/mes
-  - **Operaciones**: Gestion operativa (pendiente)
-  - **Clientes**: Gestion de clientes (pendiente)
-  - **Reputacion**: Ratings, reviews y analisis de errores
-  - **Mapas**: Visualizacion geografica
-  - **Mercado**: Analisis de mercado (pendiente)
+  - **Controlling**: KPIs y métricas de rendimiento por canal
+  - **Clientes**: Análisis de clientes, cohortes y CLV
+  - **Operaciones**: Gestión operativa
+  - **Reputación**: Ratings, reviews y análisis de errores
+  - **Tus Objetivos**: Objetivos estratégicos (OKRs/KPIs) con proyecciones
+  - **Calendario**: Campañas de marketing y promociones
+  - **Auditorías**: Mystery Shopper y auditorías de calidad
+  - **Mapas**: Visualización geográfica de pedidos
 - **Objetivos Estrategicos**:
   - ~30 tipos de objetivo organizados en 7 categorias
   - Cards con estado interactivo (dropdown estilo iOS)
@@ -202,11 +207,30 @@ cd infra && npx cdk destroy
 node scripts/test-athena.mjs
 ```
 
-## Documentacion
+## Deploy
 
+El proyecto está configurado para desplegar en **Vercel**:
+
+```bash
+# El deploy es automático al hacer push a main
+git push origin main
+```
+
+Ver [DEPLOY.md](./DEPLOY.md) para instrucciones detalladas de configuración.
+
+### Variables de Entorno en Vercel
+
+| Variable | Requerida | Descripción |
+|----------|-----------|-------------|
+| `VITE_SUPABASE_URL` | ✅ | URL del proyecto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | ✅ | Anon key de Supabase |
+| `VITE_DEV_AUTH_BYPASS` | ✅ | Debe ser `false` en producción |
+| `VITE_CAMPAIGNS_USE_LOCAL_STORAGE` | ✅ | Debe ser `false` en producción |
+
+## Documentación
+
+- [DEPLOY.md](./DEPLOY.md) - Guía de deploy a producción
 - [CLAUDE.md](./CLAUDE.md) - Contexto del proyecto y estado actual
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitectura tecnica detallada
-- [CHANGELOG.md](./CHANGELOG.md) - Historial de cambios
 
 ## Acceso
 
