@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Filter, ClipboardList, Loader2, UserSearch, Rocket, BarChart3, ChevronDown, Check, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Filter, ClipboardList, Loader2, UserSearch, Rocket, BarChart3, ChevronDown, Check, ArrowLeft, X } from 'lucide-react';
 import { Card, ToastContainer } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
@@ -10,6 +10,7 @@ import { AuditCard, AuditCardSkeleton, DeleteAuditModal } from '@/features/audit
 import { AuditPreviewModal } from '@/features/audits/components/AuditPreviewModal';
 import { useAuditsWithDetails, useAuditTypes, useCreateAudit, useDeleteAudit } from '@/features/audits/hooks';
 import { AUDIT_STATUS_CONFIG, AUDIT_TYPE_CARDS, getAuditScopeLabel, calculateTotalScore, generateAuditNumber } from '@/features/audits/config';
+import { MYSTERY_SHOPPER_SECTIONS } from '@/features/audits/config/mysteryShopperSchema';
 import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
 import { fetchCrpCompanies, fetchCrpBrands, fetchCrpPortals, fetchCrpCompanyById } from '@/services/crp-portal';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
@@ -18,6 +19,7 @@ import type { Portal } from '@/services/crp-portal';
 import {
   type AuditExportData,
   type AuditExportSection,
+  type AuditExportField,
 } from '@/utils/export';
 import type { AuditStatus, AuditWithDetails, AuditType, Profile, AuditTypeSlug } from '@/types';
 
@@ -50,12 +52,37 @@ function buildAuditExportData(
     delivered: 'Entregada',
   };
 
-  const sections: AuditExportSection[] = auditType.fieldSchema.sections.map((section) => {
+  // Use MYSTERY_SHOPPER_SECTIONS for mystery shopper audits (hardcoded schema with all fields)
+  const isMysteryShopper = auditType.slug === 'mystery_shopper';
+  const schemaSections = isMysteryShopper
+    ? MYSTERY_SHOPPER_SECTIONS.map((s) => ({
+        key: s.id,
+        title: s.title,
+        icon: undefined as string | undefined,
+        fields: s.fields.map((f) => ({
+          key: f.key,
+          label: f.label,
+          type: f.type as string,
+          maxScore: f.max,
+          scoreLabels: undefined as string[] | undefined,
+        })),
+      }))
+    : auditType.fieldSchema.sections;
+
+  // Read-only fields that are stored on the audit record, not in desFieldData
+  const readOnlyOverrides: Record<string, unknown> = {
+    general_brand: audit.brand?.name,
+    general_platform: audit.portal?.name,
+    general_consultant: audit.desConsultant,
+    general_kam: audit.desKamEvaluator,
+  };
+
+  const sections: AuditExportSection[] = schemaSections.map((section) => {
     const fields = section.fields.map((field) => ({
       key: field.key,
       label: field.label,
-      type: field.type,
-      value: audit.desFieldData?.[field.key] ?? null,
+      type: field.type as AuditExportField['type'],
+      value: readOnlyOverrides[field.key] ?? audit.desFieldData?.[field.key] ?? null,
       maxScore: field.maxScore,
       scoreLabels: field.scoreLabels,
     }));
@@ -67,8 +94,10 @@ function buildAuditExportData(
       fields.push({
         key: suggestionsKey,
         label: 'Comentarios adicionales',
-        type: 'textarea',
+        type: 'textarea' as const,
         value: suggestionsValue,
+        maxScore: undefined,
+        scoreLabels: undefined,
       });
     }
 
@@ -445,6 +474,15 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        {/* Close button - floating top-right */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute -top-3 -right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-md hover:bg-gray-100 hover:scale-110 transition-all"
+        >
+          <X className="w-4 h-4 text-gray-600" />
+        </button>
+
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           {step === 'form' && (
@@ -824,9 +862,19 @@ export function AuditsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Global company filter
+  const globalCompanyIds = useGlobalFiltersStore((s) => s.companyIds);
+
   // Filter audits
   const filteredAudits = useMemo(() => {
     return audits.filter((audit) => {
+      // Global company filter (empty = all companies)
+      if (globalCompanyIds.length > 0) {
+        if (!audit.pfkIdCompany || !globalCompanyIds.includes(audit.pfkIdCompany)) {
+          return false;
+        }
+      }
+
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -863,7 +911,7 @@ export function AuditsPage() {
 
       return true;
     });
-  }, [audits, filters, profiles]);
+  }, [audits, filters, profiles, globalCompanyIds]);
 
   // Navigation
   const navigate = useNavigate();

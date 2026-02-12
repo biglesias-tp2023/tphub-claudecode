@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, Download, Mail, Loader2, Send, ChevronDown, Check } from 'lucide-react';
+import { X, Download, Mail, Loader2, Send, ChevronDown, Check, ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/utils/cn';
 import { generateAuditPdfBlob, exportAuditToPDF, type AuditExportData } from '@/utils/export';
@@ -122,6 +122,147 @@ function ContactDropdown({
   );
 }
 
+// ============================================
+// IMAGE VIEWER MODAL
+// ============================================
+
+interface ImageGroup {
+  sectionTitle: string;
+  fieldLabel: string;
+  images: { name: string; url: string }[];
+}
+
+function extractImagesFromExportData(data: AuditExportData): ImageGroup[] {
+  const groups: ImageGroup[] = [];
+  for (const section of data.sections) {
+    for (const field of section.fields) {
+      if ((field.type === 'image_upload' || field.type === 'file') && Array.isArray(field.value) && field.value.length > 0) {
+        groups.push({
+          sectionTitle: section.title,
+          fieldLabel: field.label,
+          images: field.value as { name: string; url: string }[],
+        });
+      }
+    }
+  }
+  return groups;
+}
+
+function ImageViewerModal({
+  open,
+  onClose,
+  imageGroups,
+}: {
+  open: boolean;
+  onClose: () => void;
+  imageGroups: ImageGroup[];
+}) {
+  const allImages = useMemo(() => {
+    return imageGroups.flatMap((g) =>
+      g.images.map((img) => ({ ...img, section: g.sectionTitle, field: g.fieldLabel }))
+    );
+  }, [imageGroups]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (open) setCurrentIndex(0);
+  }, [open]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setCurrentIndex((i) => Math.min(i + 1, allImages.length - 1));
+      else if (e.key === 'ArrowLeft') setCurrentIndex((i) => Math.max(i - 1, 0));
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, allImages.length, onClose]);
+
+  if (!open || allImages.length === 0) return null;
+
+  const current = allImages[currentIndex];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900 truncate">{current.section}</h3>
+            <p className="text-xs text-gray-500 truncate">{current.field} — {current.name}</p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-xs text-gray-400">{currentIndex + 1} / {allImages.length}</span>
+            <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* Image */}
+        <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 min-h-0 overflow-hidden relative">
+          {/* Nav arrows */}
+          {currentIndex > 0 && (
+            <button
+              type="button"
+              onClick={() => setCurrentIndex((i) => i - 1)}
+              className="absolute left-3 z-10 p-2 rounded-full bg-white/90 shadow-md hover:bg-white transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-gray-700" />
+            </button>
+          )}
+          {currentIndex < allImages.length - 1 && (
+            <button
+              type="button"
+              onClick={() => setCurrentIndex((i) => i + 1)}
+              className="absolute right-3 z-10 p-2 rounded-full bg-white/90 shadow-md hover:bg-white transition-colors"
+            >
+              <ChevronRight className="w-5 h-5 text-gray-700" />
+            </button>
+          )}
+
+          <img
+            src={current.url}
+            alt={current.name}
+            className="max-w-full max-h-[60vh] object-contain rounded-lg"
+          />
+        </div>
+
+        {/* Thumbnail strip */}
+        {allImages.length > 1 && (
+          <div className="px-4 py-3 border-t border-gray-200 overflow-x-auto">
+            <div className="flex gap-2">
+              {allImages.map((img, idx) => (
+                <button
+                  key={`${img.url}-${idx}`}
+                  type="button"
+                  onClick={() => setCurrentIndex(idx)}
+                  className={cn(
+                    'flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all',
+                    idx === currentIndex
+                      ? 'border-primary-500 ring-1 ring-primary-500'
+                      : 'border-transparent hover:border-gray-300'
+                  )}
+                >
+                  <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// AUDIT PREVIEW MODAL
+// ============================================
+
 export function AuditPreviewModal({
   open,
   onClose,
@@ -136,6 +277,13 @@ export function AuditPreviewModal({
   const [selectedContact, setSelectedContact] = useState<HubspotContact | null>(null);
   const [emailBody, setEmailBody] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+
+  const imageGroups = useMemo(
+    () => (exportData ? extractImagesFromExportData(exportData) : []),
+    [exportData]
+  );
+  const totalImages = useMemo(() => imageGroups.reduce((sum, g) => sum + g.images.length, 0), [imageGroups]);
 
   // Generate default email body
   const getDefaultEmailBody = useCallback(
@@ -260,14 +408,20 @@ ThinkPaladar`;
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-5xl h-[85vh] flex flex-col">
+        {/* Close button - floating top-right */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute -top-3 -right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-md hover:bg-gray-100 hover:scale-110 transition-all"
+        >
+          <X className="w-4 h-4 text-gray-600" />
+        </button>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
             Preview — {auditNumber}
           </h2>
-          <Button variant="ghost" size="sm" iconOnly onClick={onClose}>
-            <X className="w-5 h-5" />
-          </Button>
         </div>
 
         {/* Body: 2 columns */}
@@ -290,7 +444,7 @@ ThinkPaladar`;
           {/* Right: Actions panel (30%) */}
           <div className="w-[30%] border-l border-gray-200 flex flex-col overflow-y-auto">
             {/* Download PDF */}
-            <div className="p-4 border-b border-gray-100">
+            <div className="p-4 border-b border-gray-100 space-y-2">
               <Button
                 onClick={handleDownloadPdf}
                 leftIcon={<Download className="w-4 h-4" />}
@@ -298,6 +452,17 @@ ThinkPaladar`;
               >
                 Descargar PDF
               </Button>
+
+              {totalImages > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setImageViewerOpen(true)}
+                  leftIcon={<ImageIcon className="w-4 h-4" />}
+                  className="w-full !bg-orange-500 !text-white !border-orange-500 hover:!bg-orange-600"
+                >
+                  Ver imágenes adjuntas ({totalImages})
+                </Button>
+              )}
             </div>
 
             {/* Send by Email */}
@@ -356,6 +521,13 @@ ThinkPaladar`;
           </div>
         </div>
       </div>
+
+      {/* Image Viewer */}
+      <ImageViewerModal
+        open={imageViewerOpen}
+        onClose={() => setImageViewerOpen(false)}
+        imageGroups={imageGroups}
+      />
     </div>
   );
 }

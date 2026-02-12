@@ -86,31 +86,74 @@ const BRAND = {
     gray: [100, 116, 139] as [number, number, number],
     lightGray: [243, 247, 249] as [number, number, number],  // #f3f7f9 - Background
   },
-  logoText: 'TP',
 };
 
+// ThinkPaladar pictogram SVG rendered to PNG data URL (cached)
+let cachedLogoDataUrl: string | null = null;
+
+async function loadLogoImage(): Promise<string> {
+  if (cachedLogoDataUrl) return cachedLogoDataUrl;
+
+  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128">
+    <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a6ba8"/>
+      <stop offset="100%" style="stop-color:#095789"/>
+    </linearGradient></defs>
+    <rect width="32" height="32" rx="6" fill="url(#g)"/>
+    <g transform="translate(4,5) scale(0.028)">
+      <path fill="white" d="m304.81,209.81v-104.9h-120.87v104.9H63.58v135.66h120.36v194.79c0,120.88,84.35,205.23,205.23,205.23h187.73c120.88,0,205.23-84.35,205.23-205.23V209.81h-477.32Zm356.45,316.54c0,54.78-42.61,81.74-84.36,81.74h-187.73c-41.74,0-84.36-26.95-84.36-81.74v-180.88h118.04v109.38c0,33.24,26.94,60.18,60.18,60.18h0c33.24,0,60.18-26.94,60.18-60.18v-109.38h118.04v180.88Z"/>
+    </g>
+  </svg>`;
+
+  const blob = new Blob([svgString], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+
+  const img = new Image();
+  img.src = url;
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = reject;
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, 128, 128);
+  URL.revokeObjectURL(url);
+
+  cachedLogoDataUrl = canvas.toDataURL('image/png');
+  return cachedLogoDataUrl;
+}
+
 /**
- * Añade header con branding de ThinkPaladar al PDF
+ * Añade header con branding de ThinkPaladar al PDF.
+ * If logoDataUrl is provided, uses the pictogram image instead of text.
  */
-function addBrandedHeader(doc: jsPDF, title: string, subtitle?: string): number {
+function addBrandedHeader(doc: jsPDF, title: string, subtitle?: string, logoDataUrl?: string): number {
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  doc.setFillColor(...BRAND.colors.primary);
-  doc.circle(22, 18, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text(BRAND.logoText, 22, 20, { align: 'center' });
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'PNG', 14, 10, 14, 14);
+  } else {
+    // Fallback: draw circle with "TP" text
+    doc.setFillColor(...BRAND.colors.primary);
+    doc.circle(22, 18, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TP', 22, 20, { align: 'center' });
+  }
 
   doc.setTextColor(...BRAND.colors.dark);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text(BRAND.name, 34, 16);
+  doc.text(BRAND.name, 32, 16);
 
   doc.setTextColor(...BRAND.colors.gray);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(BRAND.tagline, 34, 21);
+  doc.text(BRAND.tagline, 32, 21);
 
   doc.setDrawColor(...BRAND.colors.primary);
   doc.setLineWidth(0.5);
@@ -1100,12 +1143,15 @@ function getValueBadgeColor(field: AuditExportField): [number, number, number] |
  * Shared builder: creates the audit PDF document with clean question+answer layout.
  */
 async function buildAuditPdfDoc(data: AuditExportData): Promise<jsPDF> {
-  const { jsPDF: JsPDF, autoTable } = await loadPdfLibraries();
+  const [{ jsPDF: JsPDF, autoTable }, logoDataUrl] = await Promise.all([
+    loadPdfLibraries(),
+    loadLogoImage().catch(() => undefined),
+  ]);
   const doc = new JsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
   const subtitle = `${data.scope} · ${data.status}`;
-  let yPos = addBrandedHeader(doc, data.auditType, subtitle);
+  let yPos = addBrandedHeader(doc, data.auditType, subtitle, logoDataUrl);
 
   // Reference and metadata
   doc.setFontSize(9);

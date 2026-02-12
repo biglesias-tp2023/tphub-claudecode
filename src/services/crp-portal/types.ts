@@ -257,7 +257,7 @@ export interface DbCrpOrderHead {
  * Represents a HubSpot contact.
  */
 export interface DbHubspotContact {
-  pk_id_contact: number;
+  pk_id_contact: string;
   des_first_name: string;
   des_last_name: string;
   des_email: string;
@@ -269,7 +269,7 @@ export interface DbHubspotContact {
  * Maps HubSpot contacts to companies.
  */
 export interface DbHubspotCompanyContact {
-  pk_id_contact: number;
-  pk_id_company: number;
+  pk_id_contact: string;
+  pk_id_company: string;
   pk_ts_month: string;
 }

@@ -47,7 +47,7 @@ export async function fetchContactsByCompanyId(companyId: string): Promise<Hubsp
   const { data: companyContacts, error: contactsError } = await supabase
     .from('crp_hubspot__lt_company_contact_mp')
     .select('pk_id_contact')
-    .eq('pk_id_company', parseInt(companyId, 10))
+    .eq('pk_id_company', companyId)
     .eq('pk_ts_month', pkTsMonth);
 
   if (contactsError || !companyContacts?.length) {

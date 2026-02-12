@@ -48,18 +48,10 @@ export function useProducts({
   limit = 100,
   enabled = true,
 }: UseProductsParams) {
-  console.log('[useProducts] Hook called with:', {
-    companyId,
-    platform,
-    addressId,
-    enabled: enabled && !!companyId && !!platform,
-  });
-
   return useQuery<CrpProduct[], Error>({
     queryKey: ['crp-products', companyId, platform, addressId, search, limit],
     queryFn: async () => {
       if (!companyId || !platform) {
-        console.log('[useProducts] Missing companyId or platform, returning empty');
         return [];
       }
 

@@ -99,24 +99,13 @@ interface FetchProductsParams {
  * When addressIds array is provided, products from those specific addresses are aggregated.
  */
 export async function fetchCrpProducts(params: FetchProductsParams): Promise<CrpProduct[]> {
-  const { companyId, platform, addressId, addressIds, search, limit = 100 } = params;
-
-  console.log('[Products] Fetching products with params:', {
-    companyId,
-    platform,
-    addressId,
-    addressIds,
-    search,
-    limit,
-  });
+  // Note: addressId and addressIds are kept for future use but not currently used
+  const { companyId, platform, search, limit = 100 } = params;
 
   const portalIds = getPortalIdsForPlatform(platform);
   if (!portalIds || portalIds.length === 0) {
-    console.warn(`[Products] No portal IDs found for platform: ${platform}`);
     return [];
   }
-
-  console.log('[Products] Using portal IDs:', portalIds);
 
   // Query to get unique products with their most recent price
   // We use a subquery to get distinct products
@@ -146,19 +135,11 @@ export async function fetchCrpProducts(params: FetchProductsParams): Promise<Crp
 
   const { data, error } = await query;
 
-  console.log('[Products] Query result:', {
-    dataCount: data?.length ?? 0,
-    error: error?.message,
-    firstItem: data?.[0],
-  });
-
   if (error) {
-    console.error('[Products] Error fetching products:', error);
     throw new Error(`Error fetching products: ${error.message}`);
   }
 
   if (!data || data.length === 0) {
-    console.log('[Products] No products found for the given filters');
     return [];
   }
 
