@@ -1352,7 +1352,6 @@ function buildHierarchyFromRPCMetrics(
     }
   }
 
-  // DEBUG: Log address-to-store mapping
   if (import.meta.env.DEV) {
     console.log('[buildHierarchyFromRPCMetrics] Address-to-store mapping size:', addressToStoreMap.size);
     console.log('[buildHierarchyFromRPCMetrics] Addresses in dimensions:', addresses.length);
@@ -1517,7 +1516,6 @@ export async function fetchHierarchyDataRPC(
   // Step 1: Fetch ALL dimensions for selected companies (for names)
   const dimensions = await fetchAllDimensions(numericCompanyIds, companyIds);
 
-  // DEBUG: Log dimensions counts
   if (import.meta.env.DEV) {
     console.log('[fetchHierarchyDataRPC] Dimensions loaded:', {
       companies: dimensions.companies.length,
@@ -1536,7 +1534,6 @@ export async function fetchHierarchyDataRPC(
     fetchControllingMetricsRPC(companyIds, previousStartDate, previousEndDate),
   ]);
 
-  // DEBUG: Log metrics counts
   if (import.meta.env.DEV) {
     console.log('[fetchHierarchyDataRPC] Metrics loaded:', {
       currentMetrics: currentMetrics.length,
@@ -1551,7 +1548,6 @@ export async function fetchHierarchyDataRPC(
   const currentAgg = aggregateRPCMetrics(currentMetrics);
   const previousAgg = aggregateRPCMetrics(previousMetrics);
 
-  // DEBUG: Log aggregation counts
   if (import.meta.env.DEV) {
     console.log('[fetchHierarchyDataRPC] Aggregation results:', {
       byPortal: currentAgg.byPortal.size,
@@ -1569,7 +1565,6 @@ export async function fetchHierarchyDataRPC(
   // Step 4: Build complete hierarchy from dimensions and aggregated metrics
   const result = buildHierarchyFromRPCMetrics(dimensions, currentAgg, previousAgg);
 
-  // DEBUG: Log hierarchy result breakdown
   if (import.meta.env.DEV) {
     const levelCounts = result.reduce((acc, row) => {
       acc[row.level] = (acc[row.level] || 0) + 1;

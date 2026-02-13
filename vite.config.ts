@@ -10,4 +10,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // Silence chunk size warnings - main bundle is ~960KB due to lucide-react, xlsx, jspdf
+    // These are already lazy-loaded where possible, acceptable for internal portal
+    chunkSizeWarningLimit: 1000,
+  },
 })
