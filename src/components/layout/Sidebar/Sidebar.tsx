@@ -29,17 +29,18 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   to: string;
+  tag?: { text: string; color: 'green' | 'gray' };
 }
 
 const navItems: NavItem[] = [
   { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
-  { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS },
-  { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS },
-  { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION },
-  { label: 'Tus objetivos', icon: Target, to: ROUTES.STRATEGIC },
+  { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Soon!', color: 'gray' } },
+  { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
+  { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'Soon!', color: 'gray' } },
+  { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
   { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR },
   { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
-  { label: 'Mapas', icon: Map, to: ROUTES.MAPS },
+  { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
 ];
 
 export function Sidebar() {
@@ -187,7 +188,21 @@ export function Sidebar() {
                   title={isSidebarCollapsed ? item.label : undefined}
                 >
                   <item.icon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && <span>{item.label}</span>}
+                  {!isSidebarCollapsed && (
+                    <>
+                      <span>{item.label}</span>
+                      {item.tag && (
+                        <span className={cn(
+                          'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                          item.tag.color === 'green'
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : 'bg-gray-100 text-gray-400'
+                        )}>
+                          {item.tag.text}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </NavLink>
               </li>
             ))}
