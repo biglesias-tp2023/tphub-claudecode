@@ -4,7 +4,7 @@
  * Utiliza la configuración dinámica de objectiveConfig.ts para renderizar
  * los campos apropiados según el tipo de objetivo seleccionado.
  */
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Calendar, Trash2 } from 'lucide-react';
 import { Modal, Button, Input, Select } from '@/components/ui';
 import { cn } from '@/utils/cn';
@@ -13,10 +13,12 @@ import { EntityScopeSelector } from '@/components/common';
 import {
   CATEGORIES,
   RESPONSIBLES,
+  OBJECTIVE_TYPE_KPI_MAP,
   getObjectiveTypesForCategory,
   getObjectiveTypeConfig,
   getDefaultObjectiveType,
 } from '../config';
+import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
 import type {
   StrategicObjective,
   StrategicObjectiveInput,
@@ -171,6 +173,25 @@ function ObjectiveForm({
   const objectiveTypes = getObjectiveTypesForCategory(formData.category);
   const currentTypeConfig = getObjectiveTypeConfig(formData.objectiveTypeId);
 
+  // Fetch actual revenue when type is incremento_facturacion and scope is selected
+  const shouldFetchRevenue = formData.objectiveTypeId === 'incremento_facturacion' && !!formData.companyId;
+  const { revenueByMonth: autoActualRevenue, lastMonthRevenue } = useActualRevenueByMonth({
+    companyId: shouldFetchRevenue ? formData.companyId : null,
+    brandIds: formData.brandId ? [formData.brandId] : undefined,
+    addressIds: formData.addressId ? [formData.addressId] : undefined,
+  });
+
+  // Auto-populate baseline value with last month's revenue when data loads
+  useEffect(() => {
+    if (shouldFetchRevenue && lastMonthRevenue > 0 && !formData.kpiTargetValue) {
+      setFormData((prev) => ({
+        ...prev,
+        linkedKpiId: prev.linkedKpiId || 'revenue',
+        kpiTargetValue: prev.kpiTargetValue || null,
+      }));
+    }
+  }, [shouldFetchRevenue, lastMonthRevenue, formData.kpiTargetValue]);
+
   // Update field helper
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -195,11 +216,17 @@ function ObjectiveForm({
   // Handle objective type change
   const handleTypeChange = (typeId: string) => {
     const typeConfig = getObjectiveTypeConfig(typeId);
+    const kpiMapping = OBJECTIVE_TYPE_KPI_MAP[typeId];
+
     setFormData((prev) => ({
       ...prev,
       objectiveTypeId: typeId,
       responsible: typeConfig?.defaultResponsible || prev.responsible,
       fieldData: {}, // Reset field data
+      // Auto-configure KPI if mapping exists
+      ...(kpiMapping
+        ? { linkedKpiId: kpiMapping.kpiType, kpiTargetValue: prev.kpiTargetValue }
+        : {}),
     }));
   };
 
@@ -340,6 +367,7 @@ function ObjectiveForm({
             config={currentTypeConfig}
             fieldData={formData.fieldData}
             onChange={(fieldData) => updateField('fieldData', fieldData)}
+            autoActualRevenue={shouldFetchRevenue ? autoActualRevenue : undefined}
           />
         )}
 
@@ -492,6 +520,9 @@ export function StrategicObjectiveEditor({
     const defaultCategory: ObjectiveCategory = (objective?.category as ObjectiveCategory) || propDefaultCategory || 'finanzas';
     const defaultType = getDefaultObjectiveType(defaultCategory);
 
+    const objectiveTypeId = objective?.objectiveTypeId || defaultType?.id || '';
+    const kpiMapping = OBJECTIVE_TYPE_KPI_MAP[objectiveTypeId];
+
     return {
       companyId: objective?.companyId || defaultCompanyId || null,
       brandId: objective?.brandId || null,
@@ -499,11 +530,11 @@ export function StrategicObjectiveEditor({
       title: objective?.title || '',
       description: objective?.description || '',
       category: defaultCategory,
-      objectiveTypeId: objective?.objectiveTypeId || defaultType?.id || '',
+      objectiveTypeId,
       responsible: (objective?.responsible as ObjectiveResponsible) || defaultType?.defaultResponsible || 'thinkpaladar',
       deadline: objective?.evaluationDate ? objective.evaluationDate.split('T')[0] : '',
       fieldData: objective?.fieldData || {},
-      linkedKpiId: objective?.kpiType || null,
+      linkedKpiId: objective?.kpiType || (kpiMapping ? kpiMapping.kpiType : null),
       kpiTargetValue: objective?.kpiTargetValue || null,
     };
   };

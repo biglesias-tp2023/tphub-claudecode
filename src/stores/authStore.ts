@@ -151,9 +151,10 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           await supabase.auth.signOut();
-
-          // Clear all stored data on logout for security
-          localStorage.clear();
+        } catch (error) {
+          console.error('Error signing out:', error);
+        } finally {
+          // Always clear state, even if signOut fails
           sessionStorage.clear();
 
           set({
@@ -162,11 +163,6 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             error: null,
-          });
-        } catch (error) {
-          set({
-            error: error instanceof Error ? error.message : 'Error al cerrar sesión',
-            isLoading: false,
           });
         }
       },
@@ -265,7 +261,15 @@ export const useAuthStore = create<AuthState>()(
 // Listener for auth state changes in Supabase
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
-    useAuthStore.getState().logout();
+    // Only clear local state — do NOT call logout() to avoid infinite loop
+    // (logout -> signOut -> SIGNED_OUT event -> logout -> ...)
+    useAuthStore.setState({
+      user: null,
+      profile: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    });
   } else if (event === 'SIGNED_IN' && session) {
     useAuthStore.getState().checkSession();
   }

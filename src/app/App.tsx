@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { AppProviders } from './providers';
 import { router } from './routes';
 import { useAuthStore } from '@/stores/authStore';
+import { ChunkLoadErrorBoundary } from '@/components/common';
 
 /**
  * AuthInitializer - Handles authentication state initialization
@@ -33,10 +34,12 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
  */
 export function App() {
   return (
-    <AppProviders>
-      <AuthInitializer>
-        <RouterProvider router={router} />
-      </AuthInitializer>
-    </AppProviders>
+    <ChunkLoadErrorBoundary>
+      <AppProviders>
+        <AuthInitializer>
+          <RouterProvider router={router} />
+        </AuthInitializer>
+      </AppProviders>
+    </ChunkLoadErrorBoundary>
   );
 }

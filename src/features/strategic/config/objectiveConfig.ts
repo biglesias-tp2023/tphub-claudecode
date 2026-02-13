@@ -833,6 +833,22 @@ export function getTaskTemplatesForObjective(objectiveTypeId: string): TaskTempl
 }
 
 // ============================================
+// OBJECTIVE TYPE → KPI AUTO-CONFIGURATION
+// ============================================
+
+/**
+ * Maps objective types to their default KPI configuration.
+ * When a user selects one of these types, the KPI fields are auto-configured.
+ */
+export const OBJECTIVE_TYPE_KPI_MAP: Record<string, {
+  kpiType: string;
+  kpiUnit: string;
+  targetDirection: 'increase' | 'decrease';
+}> = {
+  incremento_facturacion: { kpiType: 'revenue', kpiUnit: '€', targetDirection: 'increase' },
+};
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 

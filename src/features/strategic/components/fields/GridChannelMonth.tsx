@@ -32,6 +32,8 @@ interface GridChannelMonthProps {
   onActualAdsChange?: (value: GridChannelMonthData) => void;
   actualPromos?: GridChannelMonthData;
   onActualPromosChange?: (value: GridChannelMonthData) => void;
+  /** Auto-fetched actual revenue from CRP Portal (read-only when provided) */
+  autoActualRevenue?: GridChannelMonthData;
   unit: ObjectiveUnit;
   label?: string;
   description?: string;
@@ -97,9 +99,10 @@ interface InputRowProps {
   onChange: (month: string, val: string) => void;
   total: number;
   isActual?: boolean;
+  readOnly?: boolean;
 }
 
-function InputRow({ label, logoUrl, months, values, channel, onChange, total, isActual }: InputRowProps) {
+function InputRow({ label, logoUrl, months, values, channel, onChange, total, isActual, readOnly }: InputRowProps) {
   return (
     <tr className={cn(isActual && 'bg-emerald-50/50')}>
       <td className="py-1 pr-2">
@@ -111,19 +114,28 @@ function InputRow({ label, logoUrl, months, values, channel, onChange, total, is
       </td>
       {months.map((m) => (
         <td key={m.key} className="py-0.5 px-0.5">
-          <input
-            type="number"
-            value={values[m.key]?.[channel] || ''}
-            onChange={(e) => onChange(m.key, e.target.value)}
-            placeholder="0"
-            className={cn(
-              'w-full text-center text-[11px] py-1 px-0.5 border rounded',
-              'focus:outline-none focus:ring-1',
-              isActual
-                ? 'border-emerald-200 focus:ring-emerald-300 focus:border-emerald-300 bg-white'
-                : 'border-gray-200 focus:ring-blue-300 focus:border-blue-300 bg-white'
-            )}
-          />
+          {readOnly ? (
+            <div className={cn(
+              'w-full text-center text-[11px] py-1 px-0.5 rounded',
+              'bg-emerald-50 text-emerald-700 font-medium tabular-nums'
+            )}>
+              {fmt(values[m.key]?.[channel] || 0)}
+            </div>
+          ) : (
+            <input
+              type="number"
+              value={values[m.key]?.[channel] || ''}
+              onChange={(e) => onChange(m.key, e.target.value)}
+              placeholder="0"
+              className={cn(
+                'w-full text-center text-[11px] py-1 px-0.5 border rounded',
+                'focus:outline-none focus:ring-1',
+                isActual
+                  ? 'border-emerald-200 focus:ring-emerald-300 focus:border-emerald-300 bg-white'
+                  : 'border-gray-200 focus:ring-blue-300 focus:border-blue-300 bg-white'
+              )}
+            />
+          )}
         </td>
       ))}
       <td className="py-1 pl-2 text-right">
@@ -153,6 +165,7 @@ export function GridChannelMonth({
   onActualAdsChange: _onActualAdsChange,
   actualPromos: _actualPromos = {},
   onActualPromosChange: _onActualPromosChange,
+  autoActualRevenue,
   unit: _unit,
 }: GridChannelMonthProps) {
   // Suppress unused variable warnings for future features
@@ -161,6 +174,10 @@ export function GridChannelMonth({
   void _actualPromos;
   void _onActualPromosChange;
   void _unit;
+
+  // When autoActualRevenue is provided, use it instead of manual actualRevenue
+  const hasAutoData = autoActualRevenue && Object.keys(autoActualRevenue).length > 0;
+  const effectiveActualRevenue = hasAutoData ? autoActualRevenue : actualRevenue;
   const months = useMemo(() => getMonths(6), []);
   const [showActual, setShowActual] = useState(false);
   const [expandedSections, setExpandedSections] = useState({ revenue: true, ads: true, promos: true });
@@ -175,12 +192,12 @@ export function GridChannelMonth({
   }, [value, months]);
 
   const normalizedActual = useMemo(() => {
-    const r = { ...actualRevenue };
+    const r = { ...effectiveActualRevenue };
     months.forEach((m) => {
       if (!r[m.key]) r[m.key] = { glovo: 0, ubereats: 0, justeat: 0 };
     });
     return r;
-  }, [actualRevenue, months]);
+  }, [effectiveActualRevenue, months]);
 
   // Update handlers
   const updateTarget = (month: string, ch: Channel, val: string) => {
@@ -263,7 +280,9 @@ export function GridChannelMonth({
           )}
         >
           {showActual ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-          {showActual ? 'Ocultando real' : 'Ver real'}
+          {showActual
+            ? (hasAutoData ? 'Datos reales CRP' : 'Ocultando real')
+            : 'Ver real'}
         </button>
       </div>
 
@@ -355,6 +374,7 @@ export function GridChannelMonth({
                     onChange={(m, v) => updateActual(m, ch.id, v)}
                     total={getChannelTotal(normalizedActual, ch.id)}
                     isActual
+                    readOnly={!!hasAutoData}
                   />
                 ))}
                 {/* Total row */}

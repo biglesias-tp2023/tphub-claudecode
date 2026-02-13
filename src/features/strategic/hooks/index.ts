@@ -38,6 +38,9 @@ export { useObjectiveKpiValue } from './useObjectiveKpiValue';
 // Objective progress calculation (health status, velocity, projections)
 export { useObjectiveProgress } from './useObjectiveProgress';
 
+// Actual revenue by month (auto-populate financial objectives)
+export { useActualRevenueByMonth } from './useActualRevenueByMonth';
+
 // Share links for objectives
 export {
   useShareLink,

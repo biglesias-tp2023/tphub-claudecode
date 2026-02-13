@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { MainLayout, AuthLayout } from '@/components/layout';
 import { ProtectedRoute } from '@/components/common';
 import { ControllingPage } from '@/pages/controlling';
@@ -7,19 +7,20 @@ import { CustomersPage } from '@/pages/customers';
 import { ReputationPage } from '@/pages/reputation';
 import { LoginPage } from '@/pages/auth';
 import { AdminPage } from '@/pages/admin/AdminPage';
+import { lazyWithRetry } from '@/utils/lazyWithRetry';
 
-// Lazy load heavy pages to reduce initial bundle size
+// Lazy load heavy pages with retry logic for chunk load errors after deploys
 // Maps: uses leaflet (~180KB)
-const MapsPage = lazy(() => import('@/pages/maps').then(m => ({ default: m.MapsPage })));
+const MapsPage = lazyWithRetry(() => import('@/pages/maps').then(m => ({ default: m.MapsPage })));
 // Calendar: uses react-day-picker and complex scheduling logic
-const CalendarPage = lazy(() => import('@/pages/calendar').then(m => ({ default: m.CalendarPage })));
+const CalendarPage = lazyWithRetry(() => import('@/pages/calendar').then(m => ({ default: m.CalendarPage })));
 // Strategic: large page with charts and projections
-const StrategicPage = lazy(() => import('@/pages/strategic').then(m => ({ default: m.StrategicPage })));
+const StrategicPage = lazyWithRetry(() => import('@/pages/strategic').then(m => ({ default: m.StrategicPage })));
 // Audits: large pages with extensive forms
-const AuditsPage = lazy(() => import('@/pages/audits').then(m => ({ default: m.AuditsPage })));
-const AuditDetailPage = lazy(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
+const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditsPage })));
+const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
 // Public shared pages
-const SharedObjectivePage = lazy(() => import('@/pages/shared/SharedObjectivePage'));
+const SharedObjectivePage = lazyWithRetry(() => import('@/pages/shared/SharedObjectivePage'));
 
 // Loading spinner for lazy-loaded pages
 function PageLoader() {

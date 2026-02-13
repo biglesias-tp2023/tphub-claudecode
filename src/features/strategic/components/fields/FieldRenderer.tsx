@@ -32,6 +32,8 @@ interface FieldRendererProps {
   config: ObjectiveTypeConfig;
   fieldData: ObjectiveFieldData;
   onChange: (fieldData: ObjectiveFieldData) => void;
+  /** Auto-fetched actual revenue from CRP Portal (for grid_channel_month fields) */
+  autoActualRevenue?: GridChannelMonthData;
 }
 
 // ============================================
@@ -66,7 +68,7 @@ function getEmptyEmailAction(): EmailActionData {
 // COMPONENT
 // ============================================
 
-export function FieldRenderer({ config, fieldData, onChange }: FieldRendererProps) {
+export function FieldRenderer({ config, fieldData, onChange, autoActualRevenue }: FieldRendererProps) {
   const { fieldType, defaultUnit, allowedUnits, dropdownOptions, description } = config;
 
   // Helper to update specific field data
@@ -93,6 +95,7 @@ export function FieldRenderer({ config, fieldData, onChange }: FieldRendererProp
           onActualAdsChange={(actualAds) => updateFieldData({ actualAds })}
           actualPromos={fieldData.actualPromos || getEmptyGridData()}
           onActualPromosChange={(actualPromos) => updateFieldData({ actualPromos })}
+          autoActualRevenue={autoActualRevenue}
           unit={defaultUnit}
           label={`Objetivos de ${config.label.toLowerCase()}`}
           description={description}

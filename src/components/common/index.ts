@@ -1,4 +1,5 @@
 export { ProtectedRoute } from './ProtectedRoute';
+export { ChunkLoadErrorBoundary } from './ChunkLoadErrorBoundary';
 export { ExportButtons } from './ExportButtons';
 export { ExportPreviewModal } from './ExportPreviewModal';
 export { EntityScopeSelector, AuditScopeSelector } from './EntityScopeSelector';
