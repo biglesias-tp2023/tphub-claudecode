@@ -8,9 +8,11 @@
  *
  * @module features/strategic/components/SalesProjectionSetup
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Sparkles, Calendar, Edit3 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
 import type { SalesChannel, SalesInvestmentMode, SalesProjectionConfig, GridChannelMonthData, ChannelMonthEntry } from '@/types';
 
 // ============================================
@@ -234,13 +236,14 @@ function InvestmentCard({
 
 /** Step 3: Baseline (punto de partida) */
 function BaselineStep({
-  channels, baseline, onChange, isEditing, onToggleEdit,
+  channels, baseline, onChange, isEditing, onToggleEdit, isLoadingRevenue,
 }: {
   channels: SalesChannel[];
   baseline: ChannelMonthEntry;
   onChange: (ch: SalesChannel, v: number) => void;
   isEditing: boolean;
   onToggleEdit: () => void;
+  isLoadingRevenue?: boolean;
 }) {
   const total = channels.reduce((sum, ch) => sum + (baseline[ch] || 0), 0);
 
@@ -305,7 +308,12 @@ function BaselineStep({
       </div>
 
       {!isEditing && <p className="text-center text-sm text-gray-500">¿Es correcto? Si no, pulsa <span className="font-medium text-gray-700">Editar</span>.</p>}
-      {total === 0 && (
+      {isLoadingRevenue && total === 0 && (
+        <div className="text-center py-3 bg-primary-50 rounded-lg border border-primary-100">
+          <p className="text-sm text-primary-700">Cargando datos reales del CRP Portal...</p>
+        </div>
+      )}
+      {!isLoadingRevenue && total === 0 && (
         <div className="text-center py-3 bg-amber-50 rounded-lg border border-amber-100">
           <p className="text-sm text-amber-700">No tenemos datos del mes pasado. Puedes introducirlos manualmente.</p>
         </div>
@@ -316,19 +324,22 @@ function BaselineStep({
 
 /** Step 4: Objetivos de venta */
 function TargetsStep({
-  channels, targets, onChange, baseline,
+  channels, targets, onChange, baseline, actualRevenue,
 }: {
   channels: SalesChannel[];
   targets: GridChannelMonthData;
   onChange: (month: string, ch: SalesChannel, v: number) => void;
   baseline: ChannelMonthEntry;
+  actualRevenue?: GridChannelMonthData;
 }) {
   const months = useMemo(() => getMonths(6), []);
   const getChannelTotal = (ch: SalesChannel) => months.reduce((sum, m) => sum + (targets[m.key]?.[ch] || 0), 0);
   const getMonthTotal = (key: string) => channels.reduce((sum, ch) => sum + (targets[key]?.[ch] || 0), 0);
+  const getActualMonthTotal = (key: string) => channels.reduce((sum, ch) => sum + (actualRevenue?.[key]?.[ch] || 0), 0);
   const grandTotal = months.reduce((sum, m) => sum + getMonthTotal(m.key), 0);
   const baselineTotal = channels.reduce((sum, ch) => sum + (baseline[ch] || 0), 0);
   const growth = baselineTotal > 0 ? Math.round(((grandTotal / 6 - baselineTotal) / baselineTotal) * 100) : 0;
+  const hasActualData = actualRevenue && Object.values(actualRevenue).some((m) => m && (m.glovo > 0 || m.ubereats > 0 || m.justeat > 0));
 
   return (
     <div className="space-y-4">
@@ -374,11 +385,42 @@ function TargetsStep({
                 </tr>
               );
             })}
+            {/* Actual revenue rows (read-only) */}
+            {hasActualData && channels.map((ch) => {
+              const channel = CHANNELS.find((c) => c.id === ch);
+              const channelActualTotal = months.reduce((sum, m) => sum + (actualRevenue?.[m.key]?.[ch] || 0), 0);
+              return (
+                <tr key={`actual-${ch}`} className="bg-emerald-50/50">
+                  <td className="py-1.5">
+                    <div className="flex items-center gap-2">
+                      {channel && <img src={channel.logoUrl} alt={channel.name} className="w-4 h-4 rounded-full object-cover opacity-60" />}
+                      <span className="text-xs text-emerald-600 font-medium">{channel?.name} <span className="text-[10px]">(real)</span></span>
+                    </div>
+                  </td>
+                  {months.map((m) => {
+                    const val = actualRevenue?.[m.key]?.[ch] || 0;
+                    return (
+                      <td key={m.key} className="py-1 px-1">
+                        <div className="w-full text-center text-xs py-1.5 rounded bg-emerald-50 text-emerald-700 font-medium tabular-nums">
+                          {val > 0 ? fmt(val) : '-'}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="py-1.5 text-right">
+                    <span className="text-xs font-semibold text-emerald-600 tabular-nums">{fmt(channelActualTotal)}€</span>
+                  </td>
+                </tr>
+              );
+            })}
             <tr className="border-t border-gray-200">
               <td className="py-2 text-sm font-semibold text-gray-900">Total</td>
               {months.map((m) => (
                 <td key={m.key} className="py-2 text-center">
                   <span className="text-sm font-semibold text-primary-600 tabular-nums">{fmt(getMonthTotal(m.key))}€</span>
+                  {hasActualData && getActualMonthTotal(m.key) > 0 && (
+                    <span className="block text-[10px] text-emerald-600 tabular-nums">{fmt(getActualMonthTotal(m.key))}€</span>
+                  )}
                 </td>
               ))}
               <td className="py-2 text-right">
@@ -388,6 +430,13 @@ function TargetsStep({
           </tbody>
         </table>
       </div>
+
+      {hasActualData && (
+        <div className="flex items-center gap-2 text-[10px] text-gray-400 justify-center">
+          <span className="w-2 h-2 rounded-sm bg-emerald-400" />
+          <span>Datos reales del CRP Portal (mes actual hasta ayer)</span>
+        </div>
+      )}
 
       {grandTotal > 0 && (
         <div className="text-center py-3 bg-primary-50 rounded-lg">
@@ -416,8 +465,44 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   const [ads, setAds] = useState<number | Record<SalesChannel, number>>(5);
   const [promos, setPromos] = useState<number | Record<SalesChannel, number>>(5);
   const [baseline, setBaseline] = useState<ChannelMonthEntry>(lastMonthRevenue || { glovo: 0, ubereats: 0, justeat: 0 });
+  const [baselineLoaded, setBaselineLoaded] = useState(false);
   const [editingBaseline, setEditingBaseline] = useState(false);
   const [targets, setTargets] = useState<GridChannelMonthData>({});
+
+  // Fetch real revenue from CRP Portal for baseline auto-population
+  const { companyIds: globalCompanyIds } = useGlobalFiltersStore();
+  const firstCompanyId = globalCompanyIds.length > 0 ? globalCompanyIds[0] : null;
+  const { revenueByMonth: autoRevenue, lastMonthRevenue: autoLastMonthRevenue, isLoading: isLoadingRevenue } = useActualRevenueByMonth({
+    companyId: isOpen ? firstCompanyId : null,
+    monthsCount: 6,
+  });
+
+  // Auto-populate baseline when CRP data arrives (only once per wizard open)
+  useEffect(() => {
+    if (!baselineLoaded && autoLastMonthRevenue > 0 && !lastMonthRevenue) {
+      // Get last month's key to extract channel breakdown
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      const lastMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const lastMonthData = autoRevenue[lastMonthKey];
+
+      if (lastMonthData) {
+        setBaseline({
+          glovo: lastMonthData.glovo || 0,
+          ubereats: lastMonthData.ubereats || 0,
+          justeat: lastMonthData.justeat || 0,
+        });
+        setBaselineLoaded(true);
+      }
+    }
+  }, [autoRevenue, autoLastMonthRevenue, baselineLoaded, lastMonthRevenue]);
+
+  // Reset baselineLoaded when wizard closes/opens
+  useEffect(() => {
+    if (!isOpen) {
+      setBaselineLoaded(false);
+    }
+  }, [isOpen]);
 
   const months = useMemo(() => getMonths(6), []);
   const steps: Step[] = ['channels', 'investment', 'baseline', 'targets'];
@@ -488,9 +573,9 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
             <InvestmentStep channels={channels} mode={mode} onModeChange={setMode} ads={ads} promos={promos} onAdsChange={setAds} onPromosChange={setPromos} />
           )}
           {step === 'baseline' && (
-            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} />
+            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} />
           )}
-          {step === 'targets' && <TargetsStep channels={channels} targets={targets} onChange={handleTargetChange} baseline={baseline} />}
+          {step === 'targets' && <TargetsStep channels={channels} targets={targets} onChange={handleTargetChange} baseline={baseline} actualRevenue={autoRevenue} />}
         </div>
 
         {/* Footer */}

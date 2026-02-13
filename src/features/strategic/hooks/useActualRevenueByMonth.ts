@@ -2,8 +2,8 @@
  * useActualRevenueByMonth - Fetches real revenue from CRP Portal
  * broken down by channel and month for the GridChannelMonth component.
  *
- * Uses fetchCrpOrdersAggregated to get revenue per month for the last 6 months,
- * returning data in GridChannelMonthData format compatible with the grid.
+ * Uses fetchCrpOrdersAggregated to get revenue per month.
+ * Includes past closed months AND the current month (up to yesterday).
  */
 import { useQuery } from '@tanstack/react-query';
 import { fetchCrpOrdersAggregated } from '@/services/crp-portal';
@@ -16,14 +16,14 @@ interface UseActualRevenueParams {
   brandIds?: string[];
   /** CRP address IDs (optional - for filtering by address/restaurant) */
   addressIds?: string[];
-  /** Number of months to fetch (default: 6) */
+  /** Number of past months to fetch (default: 6). Current month is always included. */
   monthsCount?: number;
 }
 
 interface ActualRevenueResult {
-  /** Revenue by month×channel in GridChannelMonthData format */
+  /** Revenue by month×channel in GridChannelMonthData format (includes current month) */
   revenueByMonth: GridChannelMonthData;
-  /** Total revenue of the last complete month (for baseline) */
+  /** Total revenue of the last complete (closed) month (for baseline) */
   lastMonthRevenue: number;
   /** Whether data is loading */
   isLoading: boolean;
@@ -31,7 +31,7 @@ interface ActualRevenueResult {
 
 /**
  * Gets the start/end dates for a given month offset from today.
- * offset=0 = current month, offset=-1 = last month, etc.
+ * offset=0 = current month (end = yesterday), offset=-1 = last month, etc.
  */
 function getMonthRange(offset: number): { start: string; end: string; key: string } {
   const d = new Date();
@@ -43,9 +43,17 @@ function getMonthRange(offset: number): { start: string; end: string; key: strin
 
   const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
 
-  // End = last day of the month
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  const end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  let end: string;
+  if (offset === 0) {
+    // Current month: end = yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    end = yesterday.toISOString().split('T')[0];
+  } else {
+    // Past months: end = last day of the month
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
 
   const key = `${year}-${String(month + 1).padStart(2, '0')}`;
 
@@ -69,11 +77,13 @@ export function useActualRevenueByMonth({
       const numericBrandIds = brandIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericAddressIds = addressIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
 
-      // Fetch data for each of the last 6 months (past months only, not current)
-      const months = Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i)));
+      // Past months + current month (offset 0)
+      const pastMonths = Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i)));
+      const currentMonth = getMonthRange(0);
+      const allMonths = [...pastMonths, currentMonth];
 
       const results = await Promise.all(
-        months.map((m) =>
+        allMonths.map((m) =>
           fetchCrpOrdersAggregated({
             companyIds,
             brandIds: numericBrandIds?.length ? numericBrandIds : undefined,
@@ -94,7 +104,7 @@ export function useActualRevenueByMonth({
         };
       }
 
-      // Last complete month revenue (offset -1)
+      // Last complete (closed) month revenue (offset -1)
       const lastMonth = getMonthRange(-1);
       const lastMonthData = results.find((r) => r.key === lastMonth.key);
       const lastMonthRevenue = lastMonthData ? Math.round(lastMonthData.agg.totalRevenue) : 0;
