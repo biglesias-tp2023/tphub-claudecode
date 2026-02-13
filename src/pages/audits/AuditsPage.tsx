@@ -921,32 +921,23 @@ export function AuditsPage() {
     navigate(`/audits/${auditId}`);
   }, [navigate]);
 
-  // Helper to load export data
-  const loadExportData = useCallback(async (auditId: string): Promise<AuditExportData | null> => {
+  const handlePreview = useCallback(async (auditId: string) => {
     try {
       const audit = await fetchAuditWithDetailsById(auditId);
-      if (!audit) return null;
+      if (!audit) return;
       const auditType = await fetchAuditTypeById(audit.pfkIdAuditType);
-      if (!auditType) return null;
-      return buildAuditExportData(audit, auditType);
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const handlePreview = useCallback(async (auditId: string) => {
-    const data = await loadExportData(auditId);
-    if (data) {
-      // Find the audit to get company ID and audit number
-      const audit = audits.find((a) => a.pkIdAudit === auditId);
+      if (!auditType) return;
+      const data = buildAuditExportData(audit, auditType);
       setPreviewModal({
         open: true,
         data,
-        companyId: audit?.pfkIdCompany || null,
-        auditNumber: audit?.desAuditNumber || '',
+        companyId: audit.pfkIdCompany || audit.brand?.companyId || null,
+        auditNumber: audit.desAuditNumber || '',
       });
+    } catch (error) {
+      console.error('Error loading preview data:', error);
     }
-  }, [loadExportData, audits]);
+  }, []);
 
   const closePreviewModal = useCallback(() => {
     setPreviewModal({ open: false, data: null, companyId: null, auditNumber: '' });

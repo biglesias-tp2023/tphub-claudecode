@@ -8,6 +8,7 @@
 
 import { supabase } from '../supabase';
 import type { DbHubspotContact, DbHubspotCompanyContact } from './types';
+import { deduplicateBy } from './utils';
 
 export interface HubspotContact {
   id: string;
@@ -28,48 +29,55 @@ export interface HubspotContact {
  * @returns Array of HubSpot contacts with id, name, and email
  */
 export async function fetchContactsByCompanyId(companyId: string): Promise<HubspotContact[]> {
-  // Step 1: Get the latest pk_ts_month
+  // Step 1: Get the latest pk_ts_month for THIS company
   const { data: latestMonth, error: monthError } = await supabase
     .from('crp_hubspot__lt_company_contact_mp')
     .select('pk_ts_month')
+    .eq('pk_id_company', companyId)
     .order('pk_ts_month', { ascending: false })
     .limit(1)
     .single();
 
   if (monthError || !latestMonth) {
-    console.error('Error fetching latest month for contacts:', monthError);
+    console.error('No month found for company:', companyId, monthError);
     return [];
   }
 
   const pkTsMonth = latestMonth.pk_ts_month;
 
   // Step 2: Get contact IDs linked to this company
-  const { data: companyContacts, error: contactsError } = await supabase
+  let step2Query = supabase
     .from('crp_hubspot__lt_company_contact_mp')
     .select('pk_id_contact')
-    .eq('pk_id_company', companyId)
-    .eq('pk_ts_month', pkTsMonth);
+    .eq('pk_id_company', companyId);
+  step2Query = pkTsMonth == null
+    ? step2Query.is('pk_ts_month', null)
+    : step2Query.eq('pk_ts_month', pkTsMonth);
+  const { data: companyContacts, error: contactsError } = await step2Query;
 
   if (contactsError || !companyContacts?.length) {
-    if (contactsError) console.error('Error fetching company contacts:', contactsError);
+    console.error('No contacts for company:', companyId, contactsError);
     return [];
   }
 
   const contactIds = (companyContacts as DbHubspotCompanyContact[]).map((c) => c.pk_id_contact);
 
-  // Step 3: Fetch contact details
+  // Step 3: Fetch contact details (use latest month from contacts table, may differ from mapping table)
   const { data: contacts, error: detailsError } = await supabase
     .from('crp_hubspot__dt_contact_mp')
     .select('pk_id_contact, des_first_name, des_last_name, des_email, pk_ts_month')
     .in('pk_id_contact', contactIds)
-    .eq('pk_ts_month', pkTsMonth);
+    .order('pk_ts_month', { ascending: false });
 
   if (detailsError || !contacts?.length) {
-    if (detailsError) console.error('Error fetching contact details:', detailsError);
+    console.error('No contact details found', detailsError);
     return [];
   }
 
-  return (contacts as DbHubspotContact[]).map((c) => ({
+  // Deduplicate by contact ID (ordered by pk_ts_month DESC, so first = most recent)
+  const uniqueContacts = deduplicateBy(contacts as DbHubspotContact[], (c) => c.pk_id_contact);
+
+  return uniqueContacts.map((c) => ({
     id: String(c.pk_id_contact),
     firstName: c.des_first_name || '',
     lastName: c.des_last_name || '',
