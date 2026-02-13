@@ -13,10 +13,8 @@ import {
   TrendingUp, Eye, EyeOff, Megaphone, Percent,
   Calendar, Edit3, ChevronDown, Settings2,
 } from 'lucide-react';
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, ReferenceLine, CartesianGrid,
-} from 'recharts';
+import { AreaChart } from '@/components/charts/rosen/AreaChart';
+import type { AreaSeriesConfig, ReferenceLineConfig } from '@/components/charts/rosen/types';
 import { cn } from '@/utils/cn';
 import { ExportButtons, type ExportFormat } from '@/components/common';
 import {
@@ -179,29 +177,6 @@ function Scorecard({
   );
 }
 
-/** Tooltip del chart */
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ payload: Record<string, number> }>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-
-  return (
-    <div className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg rounded-xl border border-gray-100 text-xs">
-      <p className="font-semibold text-gray-900 mb-2">{label}</p>
-      <div className="space-y-1.5">
-        <Row label="Ventas objetivo" value={d.targetRevenue} color="text-primary-600" />
-        {d.actualRevenue > 0 && <Row label="Ventas real" value={d.actualRevenue} color="text-emerald-600" />}
-        <div className="border-t border-gray-100 pt-1.5 mt-1.5">
-          <Row label="ADS objetivo" value={d.targetAds} color="text-amber-600" />
-          {d.actualAds > 0 && <Row label="ADS real" value={d.actualAds} color="text-amber-500" />}
-        </div>
-        <div className="border-t border-gray-100 pt-1.5 mt-1.5">
-          <Row label="Promos objetivo" value={d.targetPromos} color="text-purple-600" />
-          {d.actualPromos > 0 && <Row label="Promos real" value={d.actualPromos} color="text-purple-500" />}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Row({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -471,29 +446,46 @@ export function SalesProjection({
       {/* Chart */}
       <div className="px-5 py-4 border-b border-gray-100">
         <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="targetGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#095789" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#095789" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} tickFormatter={fmtK} />
-              <Tooltip content={<ChartTooltip />} />
-              <Area type="monotone" dataKey="targetRevenue" stroke="#095789" strokeWidth={2} fill="url(#targetGrad)" dot={{ r: 3, fill: '#095789' }} />
-              {showActual && <Area type="monotone" dataKey="actualRevenue" stroke="#10B981" strokeWidth={2} fill="url(#actualGrad)" dot={{ r: 3, fill: '#10B981' }} />}
-              {currentMonthIndex >= 0 && (
-                <ReferenceLine x={months[currentMonthIndex].label} stroke="#6366F1" strokeDasharray="4 4" label={{ value: 'Hoy', fontSize: 10, fill: '#6366F1', position: 'top' }} />
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
+          <AreaChart
+            data={chartData}
+            xKey="month"
+            series={[
+              { dataKey: 'targetRevenue', name: 'Objetivo', color: '#095789', gradientOpacity: [0.15, 0], strokeWidth: 2 },
+              ...(showActual ? [{ dataKey: 'actualRevenue', name: 'Real', color: '#10B981', gradientOpacity: [0.15, 0] as [number, number], strokeWidth: 2 }] : []),
+            ] satisfies AreaSeriesConfig[]}
+            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            gridVertical={false}
+            tickFontSize={10}
+            tickColor="#9CA3AF"
+            yTickFormatter={fmtK}
+            referenceLines={currentMonthIndex >= 0 ? [{
+              x: months[currentMonthIndex].label,
+              stroke: '#6366F1',
+              strokeDasharray: '4 4',
+              label: 'Hoy',
+              labelColor: '#6366F1',
+            } satisfies ReferenceLineConfig] : []}
+            renderTooltip={(dataPoint, xLabel) => {
+              const d = dataPoint as Record<string, number>;
+              return (
+                <div className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg rounded-xl border border-gray-100 text-xs">
+                  <p className="font-semibold text-gray-900 mb-2">{xLabel}</p>
+                  <div className="space-y-1.5">
+                    <Row label="Ventas objetivo" value={d.targetRevenue} color="text-primary-600" />
+                    {d.actualRevenue > 0 && <Row label="Ventas real" value={d.actualRevenue} color="text-emerald-600" />}
+                    <div className="border-t border-gray-100 pt-1.5 mt-1.5">
+                      <Row label="ADS objetivo" value={d.targetAds} color="text-amber-600" />
+                      {d.actualAds > 0 && <Row label="ADS real" value={d.actualAds} color="text-amber-500" />}
+                    </div>
+                    <div className="border-t border-gray-100 pt-1.5 mt-1.5">
+                      <Row label="Promos objetivo" value={d.targetPromos} color="text-purple-600" />
+                      {d.actualPromos > 0 && <Row label="Promos real" value={d.actualPromos} color="text-purple-500" />}
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
+          />
         </div>
         <div className="flex items-center justify-center gap-6 mt-3 text-[10px]">
           <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-primary-500 rounded" /><span className="text-gray-500">Objetivo ventas</span></div>

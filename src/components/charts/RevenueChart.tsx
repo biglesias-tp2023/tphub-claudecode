@@ -1,17 +1,10 @@
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
+import { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { AreaChart } from '@/components/charts/rosen/AreaChart';
 import { formatCurrency } from '@/utils/formatters';
 import type { DailyRevenue } from '@/features/dashboard/hooks/useDashboardData';
+import type { AreaSeriesConfig } from '@/components/charts/rosen/types';
 
 interface RevenueChartProps {
   data: DailyRevenue[];
@@ -24,147 +17,97 @@ const CHANNEL_COLORS = {
   justeat: '#FF8000',
 };
 
-interface TooltipEntry {
-  dataKey: string;
-  name: string;
-  value: number;
-  color: string;
-}
+const SINGLE_SERIES: AreaSeriesConfig[] = [
+  {
+    dataKey: 'revenue',
+    name: 'Ingresos',
+    color: '#3B82F6',
+    gradientOpacity: [0.3, 0],
+    strokeWidth: 2,
+    showDots: false,
+  },
+];
 
-interface TooltipProps {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: string;
-}
-
-// Tooltip component defined outside render to avoid re-creation
-function CustomTooltip({ active, payload, label }: TooltipProps) {
-  if (!active || !payload?.length) return null;
-
-  return (
-    <div className="bg-white p-3 shadow-lg rounded-lg border border-gray-200">
-      <p className="font-medium text-gray-900 mb-2">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} className="text-sm" style={{ color: entry.color }}>
-          {entry.name}: {formatCurrency(entry.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
+const CHANNEL_SERIES: AreaSeriesConfig[] = [
+  {
+    dataKey: 'glovo',
+    name: 'Glovo',
+    color: CHANNEL_COLORS.glovo,
+    gradientOpacity: [0.3, 0],
+    strokeWidth: 2,
+    stackId: 'channels',
+    showDots: false,
+  },
+  {
+    dataKey: 'ubereats',
+    name: 'Uber Eats',
+    color: CHANNEL_COLORS.ubereats,
+    gradientOpacity: [0.3, 0],
+    strokeWidth: 2,
+    stackId: 'channels',
+    showDots: false,
+  },
+  {
+    dataKey: 'justeat',
+    name: 'Just Eat',
+    color: CHANNEL_COLORS.justeat,
+    gradientOpacity: [0.3, 0],
+    strokeWidth: 2,
+    stackId: 'channels',
+    showDots: false,
+  },
+];
 
 /**
  * Area chart showing revenue over time.
  * Can display total revenue or breakdown by channel.
  */
 export function RevenueChart({ data, showByChannel = false }: RevenueChartProps) {
-  // Format data for display
-  const chartData = data.map((d) => ({
-    ...d,
-    dateFormatted: format(parseISO(d.date), 'd MMM', { locale: es }),
-  }));
+  const chartData = useMemo(
+    () => data.map((d) => ({
+      ...d,
+      dateFormatted: format(parseISO(d.date), 'd MMM', { locale: es }),
+    })),
+    [data],
+  );
 
-  if (showByChannel) {
-    return (
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorGlovo" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHANNEL_COLORS.glovo} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={CHANNEL_COLORS.glovo} stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="colorUbereats" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHANNEL_COLORS.ubereats} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={CHANNEL_COLORS.ubereats} stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="colorJusteat" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHANNEL_COLORS.justeat} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={CHANNEL_COLORS.justeat} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-          <XAxis
-            dataKey="dateFormatted"
-            tick={{ fontSize: 12, fill: '#6B7280' }}
-            tickLine={false}
-            axisLine={{ stroke: '#E5E7EB' }}
-          />
-          <YAxis
-            tick={{ fontSize: 12, fill: '#6B7280' }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            wrapperStyle={{ fontSize: 12 }}
-            iconType="circle"
-            iconSize={8}
-          />
-          <Area
-            type="monotone"
-            dataKey="glovo"
-            name="Glovo"
-            stackId="1"
-            stroke={CHANNEL_COLORS.glovo}
-            fill="url(#colorGlovo)"
-            strokeWidth={2}
-          />
-          <Area
-            type="monotone"
-            dataKey="ubereats"
-            name="Uber Eats"
-            stackId="1"
-            stroke={CHANNEL_COLORS.ubereats}
-            fill="url(#colorUbereats)"
-            strokeWidth={2}
-          />
-          <Area
-            type="monotone"
-            dataKey="justeat"
-            name="Just Eat"
-            stackId="1"
-            stroke={CHANNEL_COLORS.justeat}
-            fill="url(#colorJusteat)"
-            strokeWidth={2}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    );
-  }
+  const series = showByChannel ? CHANNEL_SERIES : SINGLE_SERIES;
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <defs>
-          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-        <XAxis
-          dataKey="dateFormatted"
-          tick={{ fontSize: 12, fill: '#6B7280' }}
-          tickLine={false}
-          axisLine={{ stroke: '#E5E7EB' }}
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1">
+        <AreaChart
+          data={chartData}
+          xKey="dateFormatted"
+          series={series}
+          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+          yTickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+          renderTooltip={(dataPoint, xLabel) => (
+            <div className="bg-white p-3 shadow-lg rounded-lg border border-gray-200">
+              <p className="font-medium text-gray-900 mb-2">{xLabel}</p>
+              {series.map((s) => {
+                const val = Number(dataPoint[s.dataKey]) || 0;
+                if (val === 0) return null;
+                return (
+                  <p key={s.dataKey} className="text-sm" style={{ color: s.color }}>
+                    {s.name}: {formatCurrency(val)}
+                  </p>
+                );
+              })}
+            </div>
+          )}
         />
-        <YAxis
-          tick={{ fontSize: 12, fill: '#6B7280' }}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-        />
-        <Tooltip content={<CustomTooltip />} />
-        <Area
-          type="monotone"
-          dataKey="revenue"
-          name="Ingresos"
-          stroke="#3B82F6"
-          fill="url(#colorRevenue)"
-          strokeWidth={2}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+      </div>
+      {showByChannel && (
+        <div className="flex items-center justify-center gap-4 mt-2" style={{ fontSize: 12 }}>
+          {CHANNEL_SERIES.map((s) => (
+            <div key={s.dataKey} className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+              <span className="text-gray-600">{s.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

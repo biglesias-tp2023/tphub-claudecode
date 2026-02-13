@@ -9,16 +9,8 @@
  */
 import { useState, useMemo } from 'react';
 import { TrendingUp, Eye, EyeOff, Megaphone, Percent, ChevronDown, ChevronRight } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  ReferenceLine,
-} from 'recharts';
+import { BarChart } from '@/components/charts/rosen/BarChart';
+import type { BarChartDataItem } from '@/components/charts/rosen/types';
 import { cn } from '@/utils/cn';
 import type { GridChannelMonthData, InvestmentConfig, ObjectiveUnit } from '@/types';
 
@@ -89,29 +81,8 @@ function fmtK(n: number): string {
 }
 
 // ============================================
-// CHART TOOLTIP
+// CHART TOOLTIP (inline in renderTooltip)
 // ============================================
-
-interface TooltipPayload {
-  value: number;
-  dataKey: string;
-  payload: { name: string; target: number; actual: number };
-}
-
-function ChartTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-
-  return (
-    <div className="bg-white px-3 py-2 shadow-lg rounded-lg border border-gray-100 text-xs">
-      <p className="font-medium text-gray-900 mb-1">{d.name}</p>
-      <div className="space-y-0.5">
-        <p className="text-blue-600">Objetivo: {fmt(d.target)}€</p>
-        {d.actual > 0 && <p className="text-emerald-600">Real: {fmt(d.actual)}€</p>}
-      </div>
-    </div>
-  );
-}
 
 // ============================================
 // COMPACT INPUT ROW
@@ -242,12 +213,27 @@ export function GridChannelMonth({
 
   const calcInvestment = (revenue: number, pct: number) => Math.round((revenue * pct) / 100);
 
-  // Chart data
-  const chartData = useMemo(() => months.map((m) => ({
-    name: m.short,
-    target: getMonthTotal(normalizedTarget, m.key),
-    actual: getMonthTotal(normalizedActual, m.key),
-  })), [months, normalizedTarget, normalizedActual]);
+  // Chart data - interleave target/actual bars per month
+  const barChartData: BarChartDataItem[] = useMemo(() => {
+    const items: BarChartDataItem[] = [];
+    months.forEach((m) => {
+      items.push({
+        label: m.short,
+        value: getMonthTotal(normalizedTarget, m.key),
+        color: '#3B82F6',
+        opacity: 0.8,
+      });
+      if (showActual && grandActualTotal > 0) {
+        items.push({
+          label: `${m.short} `,
+          value: getMonthTotal(normalizedActual, m.key),
+          color: '#10B981',
+          opacity: 0.8,
+        });
+      }
+    });
+    return items;
+  }, [months, normalizedTarget, normalizedActual, showActual, grandActualTotal]);
 
   const hasData = grandTargetTotal > 0;
   const hasActualData = grandActualTotal > 0;
@@ -285,22 +271,19 @@ export function GridChannelMonth({
       <div className="bg-white rounded-lg border border-gray-100 p-3">
         {hasData ? (
           <div className="h-28">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }} barGap={2}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#9CA3AF' }} tickLine={false} axisLine={false} tickFormatter={fmtK} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="target" radius={[3, 3, 0, 0]} maxBarSize={24}>
-                  {chartData.map((_, i) => <Cell key={i} fill="#3B82F6" fillOpacity={0.8} />)}
-                </Bar>
-                {showActual && hasActualData && (
-                  <Bar dataKey="actual" radius={[3, 3, 0, 0]} maxBarSize={24}>
-                    {chartData.map((_, i) => <Cell key={i} fill="#10B981" fillOpacity={0.8} />)}
-                  </Bar>
-                )}
-                {hasData && <ReferenceLine y={0} stroke="#E5E7EB" />}
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart
+              data={barChartData}
+              margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+              barRadius={3}
+              tickFontSize={9}
+              tickColor="#9CA3AF"
+              renderTooltip={(item) => (
+                <div className="bg-white px-3 py-2 shadow-lg rounded-lg border border-gray-100 text-xs">
+                  <p className="font-medium text-gray-900 mb-1">{item.label.trim()}</p>
+                  <p style={{ color: item.color }}>{fmt(item.value)}€</p>
+                </div>
+              )}
+            />
           </div>
         ) : (
           <div className="h-20 flex items-center justify-center text-gray-400 text-xs">

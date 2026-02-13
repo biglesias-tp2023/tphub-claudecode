@@ -29,7 +29,7 @@
 |------|------------|
 | Frontend | React 19 + TypeScript 5.9 + Vite 7 |
 | Estilos | TailwindCSS 4 |
-| Charts | Recharts |
+| Charts | RosenCharts (D3 + Tailwind) |
 | Auth + Data | Supabase |
 | State (cliente) | Zustand |
 | State (servidor) | React Query |
@@ -49,7 +49,7 @@ src/
 ├── components/
 │   ├── ui/         # Primitivos (Button, Card, Input...)
 │   ├── layout/     # TopBar, Sidebar, MainLayout
-│   ├── charts/     # Wrappers de Recharts
+│   ├── charts/     # RosenCharts (D3 + Tailwind)
 │   └── common/     # MetricCard, ProtectedRoute
 ├── features/
 │   ├── strategic/  # Proyeccion de ventas, objetivos

@@ -1,6 +1,7 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart } from '@/components/charts/rosen/BarChart';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import type { SpendDistribution, SpendSegment } from '@/services/crp-portal';
+import type { BarChartDataItem } from '@/components/charts/rosen/types';
 
 interface SpendHistogramProps {
   data: SpendDistribution;
@@ -27,10 +28,11 @@ export function SpendHistogram({ data }: SpendHistogramProps) {
     );
   }
 
-  const chartData = buckets.map((b, i) => ({
-    name: `${formatCurrency(b.min, { compact: true })}-${formatCurrency(b.max, { compact: true })}`,
-    count: b.count,
-    index: i,
+  const chartData: BarChartDataItem[] = buckets.map((b, i) => ({
+    label: `${formatCurrency(b.min, { compact: true })}-${formatCurrency(b.max, { compact: true })}`,
+    value: b.count,
+    color: '#095789',
+    opacity: 0.7 + (i / buckets.length) * 0.3,
   }));
 
   const totalCustomers = segments.reduce((sum, s) => sum + s.count, 0);
@@ -41,38 +43,17 @@ export function SpendHistogram({ data }: SpendHistogramProps) {
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <h4 className="text-sm font-semibold text-gray-900 mb-4">Distribución de Gasto</h4>
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 10, fill: '#6b7280' }}
-                tickLine={false}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: '#6b7280' }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                }}
-                formatter={(value) => [formatNumber(value as number), 'Clientes']}
-              />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill="#095789" fillOpacity={0.7 + (index / chartData.length) * 0.3} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <BarChart
+            data={chartData}
+            margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+            barRadius={4}
+            renderTooltip={(item) => (
+              <div className="bg-white p-2 shadow-lg rounded-lg border border-gray-200 text-xs">
+                <p className="font-medium text-gray-900">{item.label}</p>
+                <p className="text-gray-600">Clientes: {formatNumber(item.value)}</p>
+              </div>
+            )}
+          />
         </div>
 
         {/* Stats */}
