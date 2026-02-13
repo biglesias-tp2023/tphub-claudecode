@@ -186,20 +186,29 @@ export async function hasPendingInvitation(email: string): Promise<boolean> {
 // CREATE INVITATION
 // ============================================
 
+// Allowed email domain for invitations
+const ALLOWED_EMAIL_DOMAIN = '@thinkpaladar.com';
+
 /**
  * Create an invitation and send Magic Link email
  *
  * Flow:
- * 1. Save invitation with pre-configured role and companies
- * 2. Send Magic Link via Supabase Auth
- * 3. When user clicks link, profile is created
- * 4. Trigger applies role/companies from invitation
+ * 1. Validate email domain (backend validation - security critical)
+ * 2. Save invitation with pre-configured role and companies
+ * 3. Send Magic Link via Supabase Auth
+ * 4. When user clicks link, profile is created
+ * 5. Trigger applies role/companies from invitation
  */
 export async function createInvitation(input: InvitationInput): Promise<UserInvitation> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Must be authenticated to create invitations');
 
   const email = input.email.toLowerCase().trim();
+
+  // Security: Validate email domain (server-side validation)
+  if (!email.endsWith(ALLOWED_EMAIL_DOMAIN)) {
+    throw new Error(`Solo se permiten invitaciones a emails del dominio ${ALLOWED_EMAIL_DOMAIN}`);
+  }
 
   // Check for existing pending invitation
   const hasPending = await hasPendingInvitation(email);
@@ -325,9 +334,9 @@ export async function resendInvitation(id: string): Promise<UserInvitation> {
     throw new Error('Solo se pueden reenviar invitaciones pendientes');
   }
 
-  // Extend expiry
+  // Extend expiry (24 hours for security)
   const newExpiry = new Date();
-  newExpiry.setDate(newExpiry.getDate() + 7);
+  newExpiry.setHours(newExpiry.getHours() + 24);
 
   const { data, error } = await supabase
     .from('user_invitations')

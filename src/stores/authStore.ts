@@ -14,7 +14,6 @@ import type { User, Profile } from '@/types';
  * - isLoading: Loading state during auth operations
  * - isInitialized: True after first session check (prevents flash)
  * - error: Current error message if any
- * - isDevMode: Development bypass flag
  *
  * Actions:
  * - login: Email/password authentication
@@ -22,36 +21,8 @@ import type { User, Profile } from '@/types';
  * - logout: Sign out user
  * - checkSession: Verify existing session and load profile
  * - clearError: Reset error state
- * - devLogin: Development-only bypass
  * - refreshProfile: Reload profile from Supabase
  */
-
-// Check if dev auth bypass is enabled
-const isDevBypass = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
-
-// Mock user for development
-const createDevUser = (email: string): User => ({
-  id: 'dev-user-001',
-  email: email || 'dev@thinkpaladar.com',
-  name: email ? email.split('@')[0] : 'Dev User',
-  avatarUrl: undefined,
-  role: 'admin',
-  assignedCompanyIds: [],
-  createdAt: new Date().toISOString(),
-  lastLoginAt: new Date().toISOString(),
-});
-
-// Mock profile for development
-const createDevProfile = (): Profile => ({
-  id: 'dev-user-001',
-  email: 'dev@thinkpaladar.com',
-  fullName: 'Dev User',
-  avatarUrl: null,
-  role: 'admin',
-  assignedCompanyIds: [], // Admin sees all
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
 
 interface AuthState {
   user: User | null;
@@ -60,7 +31,6 @@ interface AuthState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
-  isDevMode: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -68,7 +38,6 @@ interface AuthState {
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
   clearError: () => void;
-  devLogin: (email?: string) => void;
   refreshProfile: () => Promise<void>;
 }
 
@@ -97,42 +66,9 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       isInitialized: false,
       error: null,
-      isDevMode: isDevBypass,
-
-      // Dev login - bypass authentication
-      devLogin: (email?: string) => {
-        if (!isDevBypass) {
-          set({ error: 'Modo desarrollo no está habilitado' });
-          return;
-        }
-        const devUser = createDevUser(email || 'dev@thinkpaladar.com');
-        const devProfile = createDevProfile();
-        set({
-          user: devUser,
-          profile: devProfile,
-          isAuthenticated: true,
-          isLoading: false,
-          isInitialized: true,
-          error: null,
-        });
-      },
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
-
-        // Dev mode bypass
-        if (isDevBypass) {
-          const devUser = createDevUser(email);
-          const devProfile = createDevProfile();
-          set({
-            user: devUser,
-            profile: devProfile,
-            isAuthenticated: true,
-            isLoading: false,
-            isInitialized: true,
-          });
-          return;
-        }
 
         try {
           const { data, error } = await supabase.auth.signInWithPassword({
@@ -214,6 +150,11 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           await supabase.auth.signOut();
+
+          // Clear all stored data on logout for security
+          localStorage.clear();
+          sessionStorage.clear();
+
           set({
             user: null,
             profile: null,

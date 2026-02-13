@@ -67,10 +67,11 @@ export function FileUploadField({
       }
 
       try {
-        // Generate unique filename
+        // Generate unique filename with sanitized name to prevent path traversal
         const timestamp = Date.now();
         const folder = auditId || 'temp';
-        const path = `audits/${folder}/${timestamp}-${file.name}`;
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const path = `audits/${folder}/${timestamp}-${sanitizedName}`;
 
         // Upload to Supabase Storage
         const { data, error: uploadError } = await supabase.storage

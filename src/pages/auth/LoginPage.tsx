@@ -27,7 +27,7 @@ import { cn } from '@/utils/cn';
  */
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, isAuthenticated, isLoading, error, clearError, isDevMode, devLogin } = useAuthStore();
+  const { login, loginWithGoogle, isAuthenticated, isLoading, error, clearError } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,8 +52,9 @@ export function LoginPage() {
       setLocalError('El correo electrónico es requerido');
       return false;
     }
-    // Validar formato básico de email
-    if (!emailToValidate.includes('@')) {
+    // Validate email format with regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToValidate)) {
       setLocalError('Introduce un correo electrónico válido');
       return false;
     }
@@ -66,7 +67,7 @@ export function LoginPage() {
 
     if (!validateEmail(email)) return;
 
-    if (!isDevMode && !password) {
+    if (!password) {
       setLocalError('La contraseña es requerida');
       return;
     }
@@ -76,11 +77,7 @@ export function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLocalError(null);
-    if (isDevMode) {
-      devLogin('google@thinkpaladar.com');
-    } else {
-      await loginWithGoogle();
-    }
+    await loginWithGoogle();
   };
 
   const displayError = localError || error;

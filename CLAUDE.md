@@ -1074,4 +1074,93 @@ const USE_LOCAL_STORAGE = false;  // Activar Supabase
 
 ---
 
-*Enero 2026 - Sistema de Invitaciones de Usuarios y Tracking de Acciones*
+## Seguridad - Riesgos Aceptados
+
+### jsPDF - Vulnerabilidades Conocidas
+
+**Estado**: RIESGO ACEPTADO
+
+**Vulnerabilidades documentadas**:
+- GHSA-pqxr-3g65-p328: PDF Injection → Arbitrary JavaScript Execution
+- GHSA-95fx-jjr5-f39c: DoS via BMP
+- GHSA-vm32-vv63-w422: XMP Metadata Injection
+- GHSA-cjw8-79x6-5cj4: Race Condition
+
+**Análisis de riesgo**:
+- TPHub **solo exporta** PDFs con datos internos de la aplicación
+- Los datos provienen de la BD de Supabase (confiables)
+- No hay entrada de usuario que vaya directamente al PDF
+- Las vulnerabilidades requieren datos maliciosos en la fuente (improbable en portal interno)
+
+**Mitigación aplicada**:
+- Datos sanitizados antes de llegar al PDF
+- Solo usuarios autenticados pueden exportar
+- No se procesan PDFs externos
+
+**Reevaluar si**: Se agrega funcionalidad de importar/subir PDFs.
+
+### XLSX (SheetJS) - Vulnerabilidades Conocidas
+
+**Estado**: RIESGO ACEPTADO
+
+**Vulnerabilidades documentadas**:
+- GHSA-4r6h-8v6p-xvw6: Prototype Pollution
+- GHSA-5pgg-2g8v-p4x9: ReDoS
+
+**Análisis de riesgo**:
+- TPHub **solo exporta** archivos Excel
+- Las vulnerabilidades afectan al **PARSEAR** archivos (importar), no exportar
+- No existe funcionalidad de importar Excel en TPHub
+
+**Mitigación aplicada**:
+- No hay funcionalidad de importar archivos Excel
+- Solo usuarios autenticados pueden exportar
+
+**Reevaluar si**: Se agrega funcionalidad de importar/subir archivos Excel.
+
+### Decisión Documentada
+
+Fecha: 2026-02-13
+Decisor: Equipo de desarrollo
+Razón: Bajo riesgo real dado el contexto de uso (portal interno, solo exportación)
+
+---
+
+## Auditoría de Seguridad - Implementaciones
+
+### Febrero 2026 - Hardening de Seguridad
+
+**Cambios implementados**:
+
+1. **Eliminado bypass de autenticación** (`authStore.ts`)
+   - Removido `devLogin()`, `createDevUser()`, `createDevProfile()`
+   - Removida variable `VITE_DEV_AUTH_BYPASS`
+   - Agregado `localStorage.clear()` y `sessionStorage.clear()` en logout
+
+2. **Sanitización de archivos** (`FileUploadField.tsx`)
+   - Nombres de archivo sanitizados: `file.name.replace(/[^a-zA-Z0-9.-]/g, '_')`
+   - Previene path traversal attacks
+
+3. **Validación de dominio en invitaciones** (`invitations.ts`)
+   - Solo permite emails `@thinkpaladar.com` (validación backend)
+   - Expiración reducida a 24 horas (antes 7 días)
+
+4. **Validación de email mejorada** (`LoginPage.tsx`)
+   - Regex: `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
+
+5. **Content Security Policy** (`index.html`)
+   - CSP header agregado para prevenir XSS
+
+6. **Migración SQL de seguridad** (`20260213_security_audit_log.sql`)
+   - Tabla `audit_log` para tracking de cambios de rol
+   - Constraint de email en `user_invitations`
+   - Política RLS explícita para `anon`
+   - Rate limiting de invitaciones (10/hora por admin)
+
+**Pendiente (requiere acción manual en consolas externas)**:
+- Revocar AWS credentials expuestas (AWS IAM Console)
+- Regenerar Supabase anon key si JWT expira en 60 años
+
+---
+
+*Febrero 2026 - Auditoría de Seguridad y Hardening*
