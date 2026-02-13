@@ -60,6 +60,8 @@ interface SalesProjectionProps {
   realSalesData?: RealSalesData;
   /** Loading state for real sales data */
   isLoadingRealData?: boolean;
+  /** Real revenue by month×channel from CRP Portal for grid rows */
+  realRevenueByMonth?: GridChannelMonthData;
 }
 
 interface MonthInfo {
@@ -252,6 +254,7 @@ export function SalesProjection({
   restaurantName = 'Restaurante',
   realSalesData,
   isLoadingRealData = false,
+  realRevenueByMonth,
 }: SalesProjectionProps) {
   const [showActual, setShowActual] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
@@ -259,6 +262,10 @@ export function SalesProjection({
 
   const months = useMemo(() => getMonthsFromConfig(config), [config]);
   const { activeChannels } = config;
+
+  // Use CRP Portal data for actual revenue when available, fallback to localStorage
+  const hasRealRevenue = !!realRevenueByMonth && Object.keys(realRevenueByMonth).length > 0;
+  const effectiveActualRevenue = hasRealRevenue ? realRevenueByMonth! : actualRevenue;
 
   // Memoized calculations
   const calculations = useMemo(() => {
@@ -269,7 +276,7 @@ export function SalesProjection({
       months.reduce((sum, m) => sum + (data[m.key]?.[ch] || 0), 0);
 
     const grandTarget = months.reduce((sum, m) => sum + getMonthTotal(targetRevenue, m.key), 0);
-    const grandActual = months.reduce((sum, m) => sum + getMonthTotal(actualRevenue, m.key), 0);
+    const grandActual = months.reduce((sum, m) => sum + getMonthTotal(effectiveActualRevenue, m.key), 0);
 
     const calcTargetAds = (key: string, ch: SalesChannel) =>
       calcInvestment(targetRevenue[key]?.[ch] || 0, getPercent(config.maxAdsPercent, ch));
@@ -287,19 +294,19 @@ export function SalesProjection({
       getMonthTotal, getChannelTotal, grandTarget, grandActual,
       calcTargetAds, calcTargetPromos, totalTargetAds, totalTargetPromos, totalActualAds, totalActualPromos,
     };
-  }, [months, activeChannels, targetRevenue, actualRevenue, actualAds, actualPromos, config]);
+  }, [months, activeChannels, targetRevenue, effectiveActualRevenue, actualAds, actualPromos, config]);
 
   // Chart data
   const chartData = useMemo(() => months.map((m) => ({
     month: m.label,
     targetRevenue: calculations.getMonthTotal(targetRevenue, m.key),
-    actualRevenue: calculations.getMonthTotal(actualRevenue, m.key),
+    actualRevenue: calculations.getMonthTotal(effectiveActualRevenue, m.key),
     targetAds: activeChannels.reduce((sum, ch) => sum + calculations.calcTargetAds(m.key, ch), 0),
     actualAds: calculations.getMonthTotal(actualAds, m.key),
     targetPromos: activeChannels.reduce((sum, ch) => sum + calculations.calcTargetPromos(m.key, ch), 0),
     actualPromos: calculations.getMonthTotal(actualPromos, m.key),
     isCurrent: m.isCurrent,
-  })), [months, targetRevenue, actualRevenue, actualAds, actualPromos, activeChannels, calculations]);
+  })), [months, targetRevenue, effectiveActualRevenue, actualAds, actualPromos, activeChannels, calculations]);
 
   const currentMonthIndex = months.findIndex((m) => m.isCurrent);
   const daysRemaining = useMemo(() => {
@@ -568,11 +575,12 @@ export function SalesProjection({
                             label={channel?.name || ch}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
-                            values={actualRevenue}
+                            values={effectiveActualRevenue}
                             channel={ch}
-                            onChange={(m, v) => updateActualRevenue(m, ch, v)}
-                            total={calculations.getChannelTotal(actualRevenue, ch)}
+                            onChange={hasRealRevenue ? undefined : (m, v) => updateActualRevenue(m, ch, v)}
+                            total={calculations.getChannelTotal(effectiveActualRevenue, ch)}
                             variant="actual"
+                            readOnly={hasRealRevenue}
                           />
                         );
                       })}
@@ -582,7 +590,7 @@ export function SalesProjection({
                           <td key={m.key} className={cn('py-2 text-center', m.isCurrent && 'bg-primary-50')}>
                             <span className="text-xs font-bold text-primary-600 tabular-nums">{fmt(calculations.getMonthTotal(targetRevenue, m.key))}€</span>
                             {showActual && calculations.grandActual > 0 && (
-                              <span className="block text-[10px] font-medium text-emerald-600 tabular-nums">{fmt(calculations.getMonthTotal(actualRevenue, m.key))}€</span>
+                              <span className="block text-[10px] font-medium text-emerald-600 tabular-nums">{fmt(calculations.getMonthTotal(effectiveActualRevenue, m.key))}€</span>
                             )}
                           </td>
                         ))}

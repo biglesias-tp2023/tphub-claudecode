@@ -15,6 +15,7 @@ import {
   useDeleteStrategicTask,
   useGenerateTasksForObjective,
   useProfiles,
+  useActualRevenueByMonth,
 } from '@/features/strategic/hooks';
 import {
   exportObjectivesToPDF,
@@ -154,6 +155,13 @@ export function useStrategicPageState() {
     channelIds: filterChannelIds.length > 0 ? filterChannelIds : undefined,
     dateRange,
     datePreset,
+  });
+
+  // Real revenue by month for the SalesProjection grid rows
+  const { revenueByMonth: realRevenueByMonth } = useActualRevenueByMonth({
+    companyIds: effectiveCompanyIds,
+    brandIds: filterBrandIds.length > 0 ? filterBrandIds : undefined,
+    addressIds: filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined,
   });
 
   // Mutations - Objectives
@@ -500,6 +508,7 @@ export function useStrategicPageState() {
     taskStats,
     taskCountByObjectiveId,
     realSalesData,
+    realRevenueByMonth,
     salesProjection,
     defaultRestaurantId,
 
