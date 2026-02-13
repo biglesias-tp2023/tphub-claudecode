@@ -256,6 +256,13 @@ CREATE POLICY "Admins can delete profiles"
     AND role != 'owner'
   );
 
+-- INSERT: Users can insert their own profile (needed for handle_new_user trigger)
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+CREATE POLICY "Users can insert own profile"
+  ON profiles FOR INSERT
+  TO authenticated
+  WITH CHECK (id = auth.uid());
+
 -- 3.4 Create RLS policies for user_invitations using the same function
 CREATE POLICY "Admins can view all invitations"
 ON public.user_invitations FOR SELECT

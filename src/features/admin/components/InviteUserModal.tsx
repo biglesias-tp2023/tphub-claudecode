@@ -228,7 +228,7 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
                 Invitar usuario
               </h2>
               <p className="text-sm text-gray-500">
-                Envía una invitación por email
+                Pre-registra un usuario con rol y accesos
               </p>
             </div>
           </div>
@@ -247,11 +247,11 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
               <Check className="w-8 h-8 text-green-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Invitación enviada
+              Invitación creada
             </h3>
             <p className="text-gray-500">
-              Se ha enviado un email a <strong>{email}</strong> con un enlace
-              para acceder a TPHub.
+              <strong>{email}</strong> ya puede acceder a TPHub con su cuenta de Google.
+              Avísale que puede entrar.
             </p>
           </div>
         ) : (
@@ -275,7 +275,7 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
                   />
                 </div>
                 <p className="mt-1.5 text-xs text-gray-500">
-                  El usuario recibirá un enlace para crear su cuenta
+                  El usuario podrá acceder con su cuenta de Google
                 </p>
               </div>
 
@@ -461,7 +461,7 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
                   <div className="text-sm text-red-700">
                     {createInvitation.error instanceof Error
                       ? createInvitation.error.message
-                      : 'Error al enviar la invitación'}
+                      : 'Error al crear la invitación'}
                   </div>
                 </div>
               )}
@@ -482,8 +482,8 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
                 disabled={!canSubmit}
                 isLoading={createInvitation.isPending}
               >
-                <Mail className="w-4 h-4 mr-2" />
-                Enviar invitación
+                <UserPlus className="w-4 h-4 mr-2" />
+                Crear invitación
               </Button>
             </div>
           </form>

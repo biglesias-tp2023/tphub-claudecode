@@ -128,8 +128,8 @@ export const useAuthStore = create<AuthState>()(
             provider: 'google',
             options: {
               queryParams: {
-                // Restrict to thinkpaladar.com domain
-                hd: 'thinkpaladar.com',
+                // Show account selector every time
+                prompt: 'select_account',
               },
             },
           });

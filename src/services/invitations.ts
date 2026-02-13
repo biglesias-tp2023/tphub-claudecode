@@ -190,6 +190,9 @@ export async function hasPendingInvitation(email: string): Promise<boolean> {
 // Allowed email domain for invitations
 const ALLOWED_EMAIL_DOMAIN = '@thinkpaladar.com';
 
+// Allowed specific emails (for testing/development)
+const ALLOWED_EMAILS = ['briglesias21@gmail.com'];
+
 /**
  * Create an invitation for a user
  *
@@ -206,8 +209,11 @@ export async function createInvitation(input: InvitationInput): Promise<UserInvi
 
   const email = input.email.toLowerCase().trim();
 
-  // Security: Validate email domain (server-side validation)
-  if (!email.endsWith(ALLOWED_EMAIL_DOMAIN)) {
+  // Security: Validate email domain or allowed list (server-side validation)
+  const isAllowedDomain = email.endsWith(ALLOWED_EMAIL_DOMAIN);
+  const isAllowedEmail = ALLOWED_EMAILS.includes(email);
+
+  if (!isAllowedDomain && !isAllowedEmail) {
     throw new Error(`Solo se permiten invitaciones a emails del dominio ${ALLOWED_EMAIL_DOMAIN}`);
   }
 
