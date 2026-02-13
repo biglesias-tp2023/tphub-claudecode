@@ -88,25 +88,21 @@ const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Se
 // UTILS (Pure functions)
 // ============================================
 
-/** Genera array de meses desde config */
-function getMonthsFromConfig(config: SalesProjectionConfig): MonthInfo[] {
-  const months: MonthInfo[] = [];
+/** Genera ventana fija de 6 meses: 2 anteriores + actual (HOY) + 3 futuros */
+function getFixedMonthWindow(): MonthInfo[] {
   const today = new Date();
   const currentKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  const start = new Date(config.startDate);
-  const end = new Date(config.endDate);
-  const current = new Date(start.getFullYear(), start.getMonth(), 1);
+  const offsets = [-2, -1, 0, 1, 2, 3];
 
-  while (current <= end) {
-    const key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
-    months.push({
+  return offsets.map((offset) => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return {
       key,
-      label: `${MONTH_NAMES[current.getMonth()]} ${String(current.getFullYear()).slice(-2)}`,
+      label: `${MONTH_NAMES[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`,
       isCurrent: key === currentKey,
-    });
-    current.setMonth(current.getMonth() + 1);
-  }
-  return months;
+    };
+  });
 }
 
 /** Formatea número con separador de miles */
@@ -260,7 +256,7 @@ export function SalesProjection({
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
   const [showTable, setShowTable] = useState(false);
 
-  const months = useMemo(() => getMonthsFromConfig(config), [config]);
+  const months = useMemo(() => getFixedMonthWindow(), []);
   const { activeChannels } = config;
 
   // Use CRP Portal data for actual revenue when available, fallback to localStorage
