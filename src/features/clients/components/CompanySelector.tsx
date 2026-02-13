@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import Fuse from 'fuse.js';
 import { Search, Building2, Check, X, ChevronDown } from 'lucide-react';
@@ -503,7 +503,7 @@ const statusLabels: Record<string, string> = {
 };
 
 // Company Item Component
-function CompanyItem({
+const CompanyItem = memo(function CompanyItem({
   company,
   isSelected,
   isHighlighted,
@@ -583,7 +583,7 @@ function CompanyItem({
       </div>
     </button>
   );
-}
+});
 
 // Multi-select Filter Dropdown Component
 function FilterDropdown({

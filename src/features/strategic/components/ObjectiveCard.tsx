@@ -30,7 +30,7 @@
  * └─────────────────────────────────────────┘
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import {
   Clock,
   ChevronDown,
@@ -239,7 +239,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
 // MAIN COMPONENT
 // ============================================
 
-export function ObjectiveCard({
+export const ObjectiveCard = memo(function ObjectiveCard({
   objective,
   onClick,
   onStatusChange,
@@ -578,7 +578,7 @@ export function ObjectiveCard({
       </div>
     </div>
   );
-}
+});
 
 // ============================================
 // ADD OBJECTIVE CARD

@@ -2,14 +2,17 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Suspense } from 'react';
 import { MainLayout, AuthLayout } from '@/components/layout';
 import { ProtectedRoute } from '@/components/common';
-import { ControllingPage } from '@/pages/controlling';
-import { CustomersPage } from '@/pages/customers';
-import { ReputationPage } from '@/pages/reputation';
 import { LoginPage } from '@/pages/auth';
 import { AdminPage } from '@/pages/admin/AdminPage';
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
 
 // Lazy load heavy pages with retry logic for chunk load errors after deploys
+// Controlling: dashboard with charts and data
+const ControllingPage = lazyWithRetry(() => import('@/pages/controlling').then(m => ({ default: m.ControllingPage })));
+// Customers: large table with filtering
+const CustomersPage = lazyWithRetry(() => import('@/pages/customers').then(m => ({ default: m.CustomersPage })));
+// Reputation: reviews and ratings
+const ReputationPage = lazyWithRetry(() => import('@/pages/reputation').then(m => ({ default: m.ReputationPage })));
 // Maps: uses leaflet (~180KB)
 const MapsPage = lazyWithRetry(() => import('@/pages/maps').then(m => ({ default: m.MapsPage })));
 // Calendar: uses react-day-picker and complex scheduling logic
@@ -60,11 +63,11 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/controlling" replace /> },
-      { path: 'controlling', element: <ControllingPage /> },
-      { path: 'customers', element: <CustomersPage /> },
+      { path: 'controlling', element: <LazyPage><ControllingPage /></LazyPage> },
+      { path: 'customers', element: <LazyPage><CustomersPage /></LazyPage> },
       { path: 'operations', element: <PlaceholderPage title="Operaciones" /> },
       { path: 'clients', element: <PlaceholderPage title="Clientes" /> },
-      { path: 'reputation', element: <ReputationPage /> },
+      { path: 'reputation', element: <LazyPage><ReputationPage /></LazyPage> },
       { path: 'strategic', element: <LazyPage><StrategicPage /></LazyPage> },
       { path: 'calendar', element: <LazyPage><CalendarPage /></LazyPage> },
       { path: 'audits', element: <LazyPage><AuditsPage /></LazyPage> },

@@ -388,23 +388,28 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
 
   // Fetch KAM from company when company changes
   useEffect(() => {
+    let isMounted = true;
     async function fetchKamFromCompany() {
       if (selectedCompany?.id) {
         try {
           const companyDetails = await fetchCrpCompanyById(selectedCompany.id);
+          if (!isMounted) return;
           if (companyDetails?.keyAccountManager) {
             setKamName(companyDetails.keyAccountManager);
           } else {
             setKamName('');
           }
         } catch {
-          setKamName('');
+          if (isMounted) setKamName('');
         }
       } else {
         setKamName('');
       }
     }
     fetchKamFromCompany();
+    return () => {
+      isMounted = false;
+    };
   }, [selectedCompany?.id]);
 
   const handleTypeSelect = (slug: AuditTypeSlug) => {

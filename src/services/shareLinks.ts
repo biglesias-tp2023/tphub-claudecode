@@ -327,7 +327,9 @@ export async function recordShareLinkAccess(token: string): Promise<void> {
 
   if (error) {
     // Fallback to manual update if RPC doesn't exist
-    console.warn('RPC not available, using manual update:', error);
+    if (import.meta.env.DEV) {
+      console.warn('RPC not available, using manual update:', error);
+    }
     await supabase
       .from('objective_share_links')
       .update({ last_accessed_at: now })

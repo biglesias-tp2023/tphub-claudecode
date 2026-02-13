@@ -1970,14 +1970,21 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
     return { id: String(data[0].pk_id_portal), name: data[0].des_portal };
   };
 
+  const fetchCreatorProfile = async () => {
+    if (!audit.pfkCreatedBy) return null;
+    try {
+      return await supabase.from('profiles').select('full_name, avatar_url').eq('id', audit.pfkCreatedBy).single();
+    } catch {
+      return null;
+    }
+  };
+
   const [auditType, company, brand, portal, creator] = await Promise.all([
-    fetchAuditTypeById(audit.pfkIdAuditType),
-    audit.pfkIdCompany ? fetchCrpCompanyById(audit.pfkIdCompany) : null,
-    audit.pfkIdStore ? fetchBrandById(audit.pfkIdStore) : null,
-    audit.pfkIdPortal ? fetchPortalById(audit.pfkIdPortal) : null,
-    audit.pfkCreatedBy
-      ? supabase.from('profiles').select('full_name, avatar_url').eq('id', audit.pfkCreatedBy).single()
-      : null,
+    fetchAuditTypeById(audit.pfkIdAuditType).catch(() => null),
+    audit.pfkIdCompany ? fetchCrpCompanyById(audit.pfkIdCompany).catch(() => null) : null,
+    audit.pfkIdStore ? fetchBrandById(audit.pfkIdStore).catch(() => null) : null,
+    audit.pfkIdPortal ? fetchPortalById(audit.pfkIdPortal).catch(() => null) : null,
+    fetchCreatorProfile(),
   ]);
 
   return {

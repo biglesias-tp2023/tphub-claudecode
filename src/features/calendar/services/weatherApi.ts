@@ -127,7 +127,9 @@ export async function fetchHistoricalWeather(
   if (!response.ok) {
     // Archive API may not have data for very recent dates
     if (response.status === 400) {
-      console.warn('Historical weather not available for these dates');
+      if (import.meta.env.DEV) {
+        console.warn('Historical weather not available for these dates');
+      }
       return [];
     }
     throw new Error(`Weather Archive API error: ${response.status}`);
