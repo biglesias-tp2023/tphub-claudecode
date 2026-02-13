@@ -128,8 +128,9 @@ export const useAuthStore = create<AuthState>()(
             provider: 'google',
             options: {
               queryParams: {
-                // Show account selector every time
-                prompt: 'select_account',
+                // Force account selector and consent screen
+                prompt: 'select_account consent',
+                access_type: 'offline',
               },
             },
           });
