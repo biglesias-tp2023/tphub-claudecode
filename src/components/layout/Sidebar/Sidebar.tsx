@@ -322,39 +322,6 @@ export function Sidebar() {
                   </button>
                 </div>
 
-                {/* User profile footer */}
-                <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    {user?.avatarUrl ? (
-                      <img
-                        src={user.avatarUrl}
-                        alt={user.name || 'Usuario'}
-                        className="w-9 h-9 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-sm font-medium text-white">
-                        {getInitials()}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {getInitials()}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        ThinkPaladar SL
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Invite from footer */}
-                  <button
-                    onClick={handleInvite}
-                    className="mt-3 w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Invitar a miembros del equipo</span>
-                  </button>
-                </div>
               </div>
             )}
           </div>
