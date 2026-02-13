@@ -11,7 +11,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Sparkles, Calendar, Edit3 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
 import type { SalesChannel, SalesInvestmentMode, SalesProjectionConfig, GridChannelMonthData, ChannelMonthEntry } from '@/types';
 
@@ -24,6 +24,12 @@ interface SalesProjectionSetupProps {
   onClose: () => void;
   onComplete: (config: SalesProjectionConfig, targetRevenue: GridChannelMonthData, baselineRevenue: ChannelMonthEntry) => void;
   lastMonthRevenue?: ChannelMonthEntry;
+  /** Effective company IDs for fetching CRP data (from page state) */
+  companyIds?: string[];
+  /** Brand IDs for filtering (from dashboard filters) */
+  brandIds?: string[];
+  /** Address/restaurant IDs for filtering (from dashboard filters) */
+  addressIds?: string[];
 }
 
 type Step = 'channels' | 'investment' | 'baseline' | 'targets';
@@ -458,7 +464,7 @@ function TargetsStep({
 // MAIN COMPONENT
 // ============================================
 
-export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue }: SalesProjectionSetupProps) {
+export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds }: SalesProjectionSetupProps) {
   const [step, setStep] = useState<Step>('channels');
   const [channels, setChannels] = useState<SalesChannel[]>(['glovo', 'ubereats', 'justeat']);
   const [mode, setMode] = useState<SalesInvestmentMode>('global');
@@ -470,10 +476,16 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   const [targets, setTargets] = useState<GridChannelMonthData>({});
 
   // Fetch real revenue from CRP Portal for baseline auto-population
+  // Use props (from parent page) first, then fallback to store values
   const { companyIds: globalCompanyIds } = useGlobalFiltersStore();
-  const firstCompanyId = globalCompanyIds.length > 0 ? globalCompanyIds[0] : null;
+  const { brandIds: filterBrandIds, restaurantIds: filterRestaurantIds } = useDashboardFiltersStore();
+  const effectiveCompanyIds = propCompanyIds?.length ? propCompanyIds : (globalCompanyIds.length > 0 ? globalCompanyIds : []);
+  const effectiveBrandIds = propBrandIds?.length ? propBrandIds : (filterBrandIds.length > 0 ? filterBrandIds : undefined);
+  const effectiveAddressIds = propAddressIds?.length ? propAddressIds : (filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined);
   const { revenueByMonth: autoRevenue, lastMonthRevenue: autoLastMonthRevenue, isLoading: isLoadingRevenue } = useActualRevenueByMonth({
-    companyId: isOpen ? firstCompanyId : null,
+    companyIds: isOpen ? effectiveCompanyIds : [],
+    brandIds: effectiveBrandIds,
+    addressIds: effectiveAddressIds,
     monthsCount: 6,
   });
 

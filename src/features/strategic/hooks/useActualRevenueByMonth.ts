@@ -10,8 +10,10 @@ import { fetchCrpOrdersAggregated } from '@/services/crp-portal';
 import type { GridChannelMonthData } from '@/types';
 
 interface UseActualRevenueParams {
-  /** CRP company ID (required) */
-  companyId: string | null;
+  /** CRP company ID (single, for backward compat) */
+  companyId?: string | null;
+  /** CRP company IDs (array, preferred) */
+  companyIds?: string[];
   /** CRP brand IDs (optional - for filtering by brand) */
   brandIds?: string[];
   /** CRP address IDs (optional - for filtering by address/restaurant) */
@@ -62,18 +64,25 @@ function getMonthRange(offset: number): { start: string; end: string; key: strin
 
 export function useActualRevenueByMonth({
   companyId,
+  companyIds: companyIdsProp,
   brandIds,
   addressIds,
   monthsCount = 6,
 }: UseActualRevenueParams): ActualRevenueResult {
-  const enabled = !!companyId;
+  // Support both single companyId and array companyIds
+  const resolvedCompanyIds = companyIdsProp?.length
+    ? companyIdsProp
+    : companyId
+      ? [companyId]
+      : [];
+  const enabled = resolvedCompanyIds.length > 0;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['actual-revenue-by-month', companyId, brandIds, addressIds, monthsCount],
+    queryKey: ['actual-revenue-by-month', resolvedCompanyIds, brandIds, addressIds, monthsCount],
     queryFn: async () => {
-      if (!companyId) return null;
+      if (resolvedCompanyIds.length === 0) return null;
 
-      const companyIds = [parseInt(companyId, 10)].filter((n) => !isNaN(n));
+      const companyIds = resolvedCompanyIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericBrandIds = brandIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericAddressIds = addressIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
 
