@@ -1,8 +1,9 @@
 /**
  * User Invitations Service
  *
- * Handles inviting external users (consultants) to TPHub.
- * Uses Magic Link for authentication - no service role key required.
+ * Handles inviting users to TPHub with pre-configured roles.
+ * Works with Google OAuth - admin creates invitation, user logs in with Google,
+ * and the trigger apply_invitation_config applies the role automatically.
  *
  * @module services/invitations
  */
@@ -190,14 +191,14 @@ export async function hasPendingInvitation(email: string): Promise<boolean> {
 const ALLOWED_EMAIL_DOMAIN = '@thinkpaladar.com';
 
 /**
- * Create an invitation and send Magic Link email
+ * Create an invitation for a user
  *
- * Flow:
+ * Flow (with Google OAuth):
  * 1. Validate email domain (backend validation - security critical)
  * 2. Save invitation with pre-configured role and companies
- * 3. Send Magic Link via Supabase Auth
- * 4. When user clicks link, profile is created
- * 5. Trigger applies role/companies from invitation
+ * 3. Admin notifies user they can access TPHub
+ * 4. User logs in with Google OAuth
+ * 5. Trigger apply_invitation_config applies role/companies from invitation
  */
 export async function createInvitation(input: InvitationInput): Promise<UserInvitation> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -244,23 +245,10 @@ export async function createInvitation(input: InvitationInput): Promise<UserInvi
 
   if (error) throw new Error(`Error creating invitation: ${error.message}`);
 
-  // Send Magic Link
-  const redirectUrl = `${window.location.origin}/auth/callback`;
-  const { error: authError } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: redirectUrl,
-      data: {
-        invitation_id: data.id,
-      },
-    },
-  });
-
-  if (authError) {
-    // Rollback: delete the invitation if email fails
-    await supabase.from('user_invitations').delete().eq('id', data.id);
-    throw new Error(`Error sending invitation email: ${authError.message}`);
-  }
+  // Note: With Google OAuth, we don't send magic links.
+  // The user will login with Google, and the trigger apply_invitation_config
+  // will automatically apply the role and assigned companies.
+  // Just inform the user they can now access TPHub with their Google account.
 
   return mapDbInvitation(data as DbUserInvitation);
 }
@@ -324,7 +312,8 @@ export async function cancelInvitation(id: string): Promise<UserInvitation> {
 // ============================================
 
 /**
- * Resend invitation email (extends expiry)
+ * Extend invitation expiry
+ * With Google OAuth, there's no email to resend - just extend the expiry.
  */
 export async function resendInvitation(id: string): Promise<UserInvitation> {
   // Fetch current invitation
@@ -334,9 +323,9 @@ export async function resendInvitation(id: string): Promise<UserInvitation> {
     throw new Error('Solo se pueden reenviar invitaciones pendientes');
   }
 
-  // Extend expiry (24 hours for security)
+  // Extend expiry (7 days)
   const newExpiry = new Date();
-  newExpiry.setHours(newExpiry.getHours() + 24);
+  newExpiry.setDate(newExpiry.getDate() + 7);
 
   const { data, error } = await supabase
     .from('user_invitations')
@@ -350,19 +339,8 @@ export async function resendInvitation(id: string): Promise<UserInvitation> {
 
   if (error) throw new Error(`Error updating invitation: ${error.message}`);
 
-  // Resend Magic Link
-  const redirectUrl = `${window.location.origin}/auth/callback`;
-  const { error: authError } = await supabase.auth.signInWithOtp({
-    email: invitation.email,
-    options: {
-      emailRedirectTo: redirectUrl,
-      data: {
-        invitation_id: id,
-      },
-    },
-  });
-
-  if (authError) throw new Error(`Error resending invitation: ${authError.message}`);
+  // With Google OAuth, no magic link needed.
+  // Just notify the user they can login with Google.
 
   return mapDbInvitation(data as DbUserInvitation);
 }
