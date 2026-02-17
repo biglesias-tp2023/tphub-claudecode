@@ -1,14 +1,33 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getDateRangeFromPreset } from '@/utils/formatters';
-import type { ChannelId, DateRange, DatePreset } from '@/types';
+import type { ChannelId, DateRange, DatePreset, UserRole } from '@/types';
+
+// ============================================
+// ROLES SIN RESTRICCIÓN DE COMPAÑÍAS
+// ============================================
+const UNRESTRICTED_ROLES: UserRole[] = ['owner', 'superadmin', 'admin'];
+
+/**
+ * Check if a role has unrestricted access to all companies.
+ */
+export function isUnrestrictedRole(role: UserRole | undefined): boolean {
+  return !!role && UNRESTRICTED_ROLES.includes(role);
+}
 
 // ============================================
 // GLOBAL FILTERS STORE (Navbar - Compañías)
 // ============================================
 interface GlobalFiltersState {
-  // Compañías seleccionadas (vacío = todas)
+  // Compañías seleccionadas (vacío = todas para admins)
   companyIds: string[];
+
+  // Compañías asignadas al usuario (del perfil). Vacío = sin restricción.
+  _assignedCompanyIds: string[];
+  // Rol del usuario
+  _userRole: UserRole | undefined;
+  // Flag: ya se inicializó desde el perfil
+  _initialized: boolean;
 
   // Actions
   setCompanyIds: (ids: string[]) => void;
@@ -17,17 +36,38 @@ interface GlobalFiltersState {
   toggleCompanyId: (id: string) => void;
   selectAllCompanies: () => void;
   clearCompanies: () => void;
+
+  // Inicialización desde perfil de usuario
+  initializeFromProfile: (assignedCompanyIds: string[], role: UserRole) => void;
+  resetOnLogout: () => void;
 }
 
 export const useGlobalFiltersStore = create<GlobalFiltersState>()(
   persist(
     (set, get) => ({
       companyIds: [],
+      _assignedCompanyIds: [],
+      _userRole: undefined,
+      _initialized: false,
 
-      setCompanyIds: (ids) => set({ companyIds: ids }),
+      setCompanyIds: (ids) => {
+        const { _assignedCompanyIds, _userRole } = get();
+        // Usuarios restringidos solo pueden seleccionar compañías asignadas
+        if (!isUnrestrictedRole(_userRole) && _assignedCompanyIds.length > 0) {
+          const allowed = new Set(_assignedCompanyIds);
+          const filtered = ids.filter((id) => allowed.has(id));
+          set({ companyIds: filtered });
+        } else {
+          set({ companyIds: ids });
+        }
+      },
 
       addCompanyId: (id) => {
-        const { companyIds } = get();
+        const { companyIds, _assignedCompanyIds, _userRole } = get();
+        // Bloquear si no es una compañía asignada (para usuarios restringidos)
+        if (!isUnrestrictedRole(_userRole) && _assignedCompanyIds.length > 0 && !_assignedCompanyIds.includes(id)) {
+          return;
+        }
         if (!companyIds.includes(id)) {
           set({ companyIds: [...companyIds, id] });
         }
@@ -39,20 +79,74 @@ export const useGlobalFiltersStore = create<GlobalFiltersState>()(
       },
 
       toggleCompanyId: (id) => {
-        const { companyIds } = get();
+        const { companyIds, _assignedCompanyIds, _userRole } = get();
         if (companyIds.includes(id)) {
           set({ companyIds: companyIds.filter((cid) => cid !== id) });
         } else {
+          // Bloquear si no es una compañía asignada (para usuarios restringidos)
+          if (!isUnrestrictedRole(_userRole) && _assignedCompanyIds.length > 0 && !_assignedCompanyIds.includes(id)) {
+            return;
+          }
           set({ companyIds: [...companyIds, id] });
         }
       },
 
-      selectAllCompanies: () => set({ companyIds: [] }), // Vacío = todas
+      selectAllCompanies: () => {
+        const { _assignedCompanyIds, _userRole } = get();
+        // Para usuarios restringidos, "todas" = sus compañías asignadas
+        if (!isUnrestrictedRole(_userRole) && _assignedCompanyIds.length > 0) {
+          set({ companyIds: _assignedCompanyIds });
+        } else {
+          set({ companyIds: [] }); // Vacío = todas para admins
+        }
+      },
 
-      clearCompanies: () => set({ companyIds: [] }),
+      clearCompanies: () => {
+        const { _assignedCompanyIds, _userRole } = get();
+        // Para usuarios restringidos, no se puede deseleccionar todo
+        if (!isUnrestrictedRole(_userRole) && _assignedCompanyIds.length > 0) {
+          set({ companyIds: _assignedCompanyIds });
+        } else {
+          set({ companyIds: [] });
+        }
+      },
+
+      initializeFromProfile: (assignedCompanyIds, role) => {
+        const isRestricted = !isUnrestrictedRole(role);
+
+        if (isRestricted && assignedCompanyIds.length > 0) {
+          // Usuario restringido: forzar sus compañías asignadas
+          set({
+            companyIds: assignedCompanyIds,
+            _assignedCompanyIds: assignedCompanyIds,
+            _userRole: role,
+            _initialized: true,
+          });
+        } else {
+          // Admin/owner: mantener selección actual (o vacío = todas)
+          set({
+            _assignedCompanyIds: assignedCompanyIds,
+            _userRole: role,
+            _initialized: true,
+          });
+        }
+      },
+
+      resetOnLogout: () => {
+        set({
+          companyIds: [],
+          _assignedCompanyIds: [],
+          _userRole: undefined,
+          _initialized: false,
+        });
+      },
     }),
     {
       name: 'tphub-global-filters',
+      partialize: (state) => ({
+        // Solo persistir companyIds, no el estado interno
+        companyIds: state.companyIds,
+      }),
     }
   )
 );

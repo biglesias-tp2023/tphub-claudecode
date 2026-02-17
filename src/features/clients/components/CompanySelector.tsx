@@ -4,7 +4,8 @@ import Fuse from 'fuse.js';
 import { Search, Building2, Check, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useGlobalFiltersStore, useDashboardFiltersStore, isUnrestrictedRole } from '@/stores/filtersStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useCompanies } from '../hooks/useCompanies';
 import type { Company } from '@/types';
 
@@ -33,13 +34,23 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   const { data: companies = [], isLoading } = useCompanies();
   const { companyIds, toggleCompanyId, setCompanyIds, clearCompanies } = useGlobalFiltersStore();
   const { resetDashboardFilters } = useDashboardFiltersStore();
+  const profile = useAuthStore((s) => s.profile);
+
+  // Filter companies by user's assigned companies (restricted users only)
+  const allowedCompanies = useMemo(() => {
+    if (isUnrestrictedRole(profile?.role)) return companies;
+    const assigned = profile?.assignedCompanyIds;
+    if (!assigned || assigned.length === 0) return companies;
+    const allowedSet = new Set(assigned);
+    return companies.filter((c) => allowedSet.has(c.id));
+  }, [companies, profile?.role, profile?.assignedCompanyIds]);
 
   // Sort companies alphabetically (immutable order)
   const sortedCompanies = useMemo(() => {
-    return [...companies].sort((a, b) =>
+    return [...allowedCompanies].sort((a, b) =>
       a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
     );
-  }, [companies]);
+  }, [allowedCompanies]);
 
   // Extract unique status values
   const uniqueStatuses = useMemo(() => {
@@ -256,15 +267,16 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   );
 
   // Display text for trigger button
+  const isRestricted = !isUnrestrictedRole(profile?.role) && (profile?.assignedCompanyIds?.length ?? 0) > 0;
   const displayText = useMemo(() => {
     if (companyIds.length === 0) {
-      return 'Todos los negocios';
+      return isRestricted ? 'Mis compañías' : 'Todos los negocios';
     }
     if (companyIds.length === 1) {
       return selectedCompanies[0]?.name || 'Compañía seleccionada';
     }
     return `${companyIds.length} compañías`;
-  }, [companyIds.length, selectedCompanies]);
+  }, [companyIds.length, selectedCompanies, isRestricted]);
 
   return (
     <>

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/services/supabase';
 import { fetchCurrentProfile } from '@/services/supabase-data';
+import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import type { User, Profile } from '@/types';
 
 /**
@@ -90,6 +91,11 @@ export const useAuthStore = create<AuthState>()(
                 isAuthenticated: true,
                 isLoading: false,
               });
+              // Initialize company filters from profile
+              useGlobalFiltersStore.getState().initializeFromProfile(
+                profile.assignedCompanyIds,
+                profile.role
+              );
             } else {
               // Profile doesn't exist yet (trigger should have created it)
               // Create a fallback user
@@ -156,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           // Always clear state, even if signOut fails
           sessionStorage.clear();
+          useGlobalFiltersStore.getState().resetOnLogout();
 
           set({
             user: null,
@@ -190,6 +197,11 @@ export const useAuthStore = create<AuthState>()(
                 isLoading: false,
                 isInitialized: true,
               });
+              // Initialize company filters from profile
+              useGlobalFiltersStore.getState().initializeFromProfile(
+                profile.assignedCompanyIds,
+                profile.role
+              );
             } else {
               // Profile doesn't exist yet
               const user: User = {
@@ -263,6 +275,7 @@ supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
     // Only clear local state — do NOT call logout() to avoid infinite loop
     // (logout -> signOut -> SIGNED_OUT event -> logout -> ...)
+    useGlobalFiltersStore.getState().resetOnLogout();
     useAuthStore.setState({
       user: null,
       profile: null,

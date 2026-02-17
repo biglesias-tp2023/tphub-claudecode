@@ -206,7 +206,9 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  const canSubmit = isValidEmail(email) && !createInvitation.isPending;
+  // Roles that need company assignment (not superadmin/admin who see everything)
+  const needsCompanyAssignment = !['owner', 'superadmin', 'admin'].includes(role);
+  const canSubmit = isValidEmail(email) && !createInvitation.isPending && (!needsCompanyAssignment || selectedCompanyIds.length > 0);
 
   if (!isOpen) return null;
 
@@ -413,9 +415,9 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
 
                   {/* Selection actions */}
                   <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-gray-500">
+                    <p className={cn('text-xs', selectedCompanyIds.length === 0 ? 'text-red-500 font-medium' : 'text-gray-500')}>
                       {selectedCompanyIds.length === 0
-                        ? 'Selecciona al menos una compañía'
+                        ? '⚠ Debes asignar al menos una compañía'
                         : `${selectedCompanyIds.length} compañía(s) seleccionada(s)`}
                     </p>
                     <div className="flex items-center gap-2">
