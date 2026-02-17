@@ -9,7 +9,7 @@ const STORAGE_KEY = 'tphub_last_data_refresh';
  * Format a timestamp as relative time in Spanish
  */
 function formatRelativeTime(ts: number): string {
-  if (ts === 0) return '';
+  if (ts === 0) return 'Ahora mismo';
 
   const diffMs = Date.now() - ts;
   const diffSec = Math.floor(diffMs / 1000);
@@ -37,9 +37,13 @@ export function DataFreshnessIndicator() {
   const [lastRefresh, setLastRefresh] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? parseInt(stored, 10) : 0;
+      if (stored) return parseInt(stored, 10);
+      // First visit: initialize with current time
+      const now = Date.now();
+      localStorage.setItem(STORAGE_KEY, String(now));
+      return now;
     } catch {
-      return 0;
+      return Date.now();
     }
   });
   const [relativeTime, setRelativeTime] = useState(() => formatRelativeTime(lastRefresh));
@@ -49,7 +53,7 @@ export function DataFreshnessIndicator() {
     const update = () => {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        const ts = stored ? parseInt(stored, 10) : 0;
+        const ts = stored ? parseInt(stored, 10) : Date.now();
         setLastRefresh(ts);
         setRelativeTime(formatRelativeTime(ts));
       } catch {
@@ -77,8 +81,6 @@ export function DataFreshnessIndicator() {
   }, [queryClient]);
 
   const isLoading = isFetching > 0;
-
-  if (lastRefresh === 0) return null;
 
   return (
     <div className="flex items-center gap-1.5">
