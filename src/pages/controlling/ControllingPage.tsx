@@ -16,7 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
-import { ExportButtons, type ExportFormat, type PreviewTableData } from '@/components/common';
+import { ExportButtons, DataFreshnessIndicator, type ExportFormat, type PreviewTableData } from '@/components/common';
 import { DashboardFilters } from '@/features/dashboard';
 import { useControllingData } from '@/features/controlling';
 import type { HierarchyRow, ChannelMetrics } from '@/features/controlling';
@@ -846,13 +846,16 @@ export function ControllingPage() {
             <span className="italic text-gray-400 ml-1.5">vs. {periodLabels.comparison}</span>
           </p>
         </div>
-        <ExportButtons
-          onExport={handleExport}
-          getPreviewData={getPreviewData}
-          generatePdfBlob={generatePdfBlob}
-          previewTitle="Controlling"
-          previewSubtitle={`${periodLabels.current} vs. ${periodLabels.comparison}`}
-        />
+        <div className="flex items-center gap-3">
+          <DataFreshnessIndicator />
+          <ExportButtons
+            onExport={handleExport}
+            getPreviewData={getPreviewData}
+            generatePdfBlob={generatePdfBlob}
+            previewTitle="Controlling"
+            previewSubtitle={`${periodLabels.current} vs. ${periodLabels.comparison}`}
+          />
+        </div>
       </div>
 
       {/* Filters - exclude Just Eat since no data available yet */}
