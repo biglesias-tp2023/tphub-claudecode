@@ -35,19 +35,21 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
+  { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
+  { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
+  { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
+  { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR },
   { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Soon!', color: 'gray' } },
   { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
   { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'Soon!', color: 'gray' } },
-  { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
-  { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR },
-  { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
-  { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
   { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
 ];
 
 export function Sidebar() {
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
-  const { user, logout } = useAuthStore();
+  const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const [isToggleHovered, setIsToggleHovered] = useState(false);
