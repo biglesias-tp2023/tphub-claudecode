@@ -12,7 +12,7 @@ import { useAuditsWithDetails, useAuditTypes, useCreateAudit, useDeleteAudit } f
 import { AUDIT_STATUS_CONFIG, AUDIT_TYPE_CARDS, getAuditScopeLabel, calculateTotalScore, generateAuditNumber } from '@/features/audits/config';
 import { MYSTERY_SHOPPER_SECTIONS } from '@/features/audits/config/mysteryShopperSchema';
 import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
-import { fetchCrpCompanies, fetchCrpBrands, fetchCrpPortals, fetchCrpCompanyById } from '@/services/crp-portal';
+import { fetchCrpCompanies, fetchCrpBrands, fetchCrpPortals } from '@/services/crp-portal';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import { useProfile } from '@/stores/authStore';
 import type { Portal } from '@/services/crp-portal';
@@ -267,6 +267,7 @@ interface NewAuditModalProps {
 
 function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
   const navigate = useNavigate();
+  const profile = useProfile();
   const { data: auditTypes = [], isLoading: auditTypesLoading } = useAuditTypes();
   const createAudit = useCreateAudit();
 
@@ -386,31 +387,16 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
     }
   }, [isBrandAutoLocked, filteredBrands, selectedBrand]);
 
-  // Fetch KAM from company when company changes
+  // KAM evaluador = logged-in user who creates the audit
   useEffect(() => {
-    let isMounted = true;
-    async function fetchKamFromCompany() {
-      if (selectedCompany?.id) {
-        try {
-          const companyDetails = await fetchCrpCompanyById(selectedCompany.id);
-          if (!isMounted) return;
-          if (companyDetails?.keyAccountManager) {
-            setKamName(companyDetails.keyAccountManager);
-          } else {
-            setKamName('');
-          }
-        } catch {
-          if (isMounted) setKamName('');
-        }
-      } else {
-        setKamName('');
-      }
+    if (profile?.fullName) {
+      setKamName(profile.fullName);
+    } else if (profile?.email) {
+      setKamName(profile.email.split('@')[0]);
+    } else {
+      setKamName('');
     }
-    fetchKamFromCompany();
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedCompany?.id]);
+  }, [profile?.fullName, profile?.email]);
 
   const handleTypeSelect = (slug: AuditTypeSlug) => {
     // Only Mystery Shopper is active for now
