@@ -78,9 +78,9 @@ export const AUDIT_TYPE_CARDS: AuditTypeCardConfig[] = [
   {
     slug: 'onboarding',
     name: 'Onboarding',
-    description: 'Auditoría inicial del cliente',
+    description: 'Ficha de cliente: competencia, horarios, perfiles y marketing',
     icon: 'Rocket',
-    isActive: false,
+    isActive: true,
     color: 'text-green-600',
     bgColor: 'bg-green-100',
   },

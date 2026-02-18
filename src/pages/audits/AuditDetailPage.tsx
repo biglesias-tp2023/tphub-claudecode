@@ -13,10 +13,15 @@ import { useAuditWithDetails, useUpdateAudit, useCompleteAudit, useDeleteAudit }
 import { DeleteAuditModal } from '@/features/audits/components';
 import { AUDIT_STATUS_CONFIG } from '@/features/audits/config';
 import { MysteryShopperForm } from '@/features/audits/components/MysteryShopperForm';
+import { OnboardingForm } from '@/features/audits/components/OnboardingForm';
 import {
   calculateMysteryShopperCompletion,
   validateMysteryShopperForm,
 } from '@/features/audits/config/mysteryShopperSchema';
+import {
+  calculateOnboardingCompletion,
+  validateOnboardingForm,
+} from '@/features/audits/config/onboardingSchema';
 import { cn } from '@/utils/cn';
 
 export function AuditDetailPage() {
@@ -41,11 +46,19 @@ export function AuditDetailPage() {
   // Form state - use audit ID as part of the key to reset on audit change
   const auditId = audit?.pkIdAudit;
 
+  // Determine audit type slug
+  const auditTypeSlug = audit?.auditType?.slug || 'mystery_shopper';
+  const isOnboarding = auditTypeSlug === 'onboarding';
+
   // Initialize field data from audit
   // Read-only fields prefer CRP-fetched data, falling back to desFieldData values
   const initialFieldData = useMemo(() => {
     if (!audit) return {};
     const saved = (audit.desFieldData || {}) as Record<string, string>;
+    // Only inject read-only general fields for mystery_shopper
+    if (audit.auditType?.slug === 'onboarding') {
+      return { ...saved };
+    }
     return {
       ...saved,
       general_brand: audit.brand?.name || saved.general_brand || '',
@@ -58,12 +71,14 @@ export function AuditDetailPage() {
   // Strip consultant/KAM from saves (reliably available from audit record).
   // Keep general_brand and general_platform as persistent fallbacks
   // in case the CRP Portal lookup fails on future loads.
+  // Onboarding has no read-only fields to strip.
   const stripReadOnlyFields = useCallback((data: Record<string, unknown>) => {
+    if (isOnboarding) return data;
     const cleaned = { ...data };
     delete cleaned.general_consultant;
     delete cleaned.general_kam;
     return cleaned;
-  }, []);
+  }, [isOnboarding]);
 
   const [fieldData, setFieldData] = useState<Record<string, unknown>>(initialFieldData);
   const [hasChanges, setHasChanges] = useState(false);
@@ -166,8 +181,10 @@ export function AuditDetailPage() {
   const handleComplete = useCallback(async () => {
     if (!audit || !id) return;
 
-    // Validate required fields
-    const validation = validateMysteryShopperForm(fieldData);
+    // Validate required fields based on audit type
+    const validation = isOnboarding
+      ? validateOnboardingForm(fieldData)
+      : validateMysteryShopperForm(fieldData);
     if (!validation.valid) {
       // Scroll to first missing field
       if (validation.missingFields.length > 0) {
@@ -183,8 +200,8 @@ export function AuditDetailPage() {
 
     // Then complete
     try {
-      // Get final_score for amt_score_total
-      const finalScore = fieldData.final_score as number | undefined;
+      // Get final_score for amt_score_total (mystery_shopper only)
+      const finalScore = isOnboarding ? undefined : (fieldData.final_score as number | undefined);
 
       await updateAudit.mutateAsync({
         id: audit.pkIdAudit,
@@ -199,7 +216,7 @@ export function AuditDetailPage() {
     } catch {
       setSaveStatus('error');
     }
-  }, [audit, id, fieldData, hasChanges, handleSave, scrollToField, updateAudit, navigate]);
+  }, [audit, id, fieldData, isOnboarding, hasChanges, handleSave, scrollToField, updateAudit, navigate, stripReadOnlyFields]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -208,8 +225,10 @@ export function AuditDetailPage() {
     navigate('/audits');
   }, [audit, deleteAudit, navigate]);
 
-  // Calculate completion
-  const completion = calculateMysteryShopperCompletion(fieldData);
+  // Calculate completion based on audit type
+  const completion = isOnboarding
+    ? calculateOnboardingCompletion(fieldData)
+    : calculateMysteryShopperCompletion(fieldData);
   const canComplete = completion === 100;
 
   // Loading state
@@ -278,7 +297,7 @@ export function AuditDetailPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 truncate">
-                  Mystery Shopper · {audit.desConsultant || 'Sin consultor'}
+                  {audit.auditType?.name || 'Auditoría'} · {audit.desConsultant || 'Sin consultor'}
                 </p>
               </div>
             </div>
@@ -356,14 +375,24 @@ export function AuditDetailPage() {
 
       {/* Form content */}
       <main className="max-w-4xl mx-auto px-4 py-6 pb-20">
-        <MysteryShopperForm
-          fieldData={fieldData}
-          onChange={handleFieldDataChange}
-          disabled={isReadOnly}
-          auditId={audit.pkIdAudit}
-          autoSave={!isReadOnly}
-          onAutoSave={handleAutoSave}
-        />
+        {isOnboarding ? (
+          <OnboardingForm
+            fieldData={fieldData}
+            onChange={handleFieldDataChange}
+            disabled={isReadOnly}
+            autoSave={!isReadOnly}
+            onAutoSave={handleAutoSave}
+          />
+        ) : (
+          <MysteryShopperForm
+            fieldData={fieldData}
+            onChange={handleFieldDataChange}
+            disabled={isReadOnly}
+            auditId={audit.pkIdAudit}
+            autoSave={!isReadOnly}
+            onAutoSave={handleAutoSave}
+          />
+        )}
       </main>
 
       {/* Unsaved changes warning (mobile-friendly) */}
