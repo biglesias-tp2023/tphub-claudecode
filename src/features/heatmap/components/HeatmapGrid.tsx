@@ -211,6 +211,32 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
               </tr>
               );
             })}
+            {/* Summary row */}
+            <tr>
+              <td className="text-xs font-semibold text-gray-600 text-right pr-2 py-0 whitespace-nowrap">
+                Total
+              </td>
+              {Array.from({ length: 7 }, (_, dow) => {
+                let dayRevenue = 0;
+                let dayOrders = 0;
+                for (let h = START_HOUR; h < 24; h++) {
+                  dayRevenue += data[h][dow].revenue;
+                  dayOrders += data[h][dow].orders;
+                }
+                const summaryValue =
+                  metric === 'avgTicket'
+                    ? dayOrders > 0 ? dayRevenue / dayOrders : 0
+                    : metric === 'revenue' ? dayRevenue : dayOrders;
+
+                return (
+                  <td key={dow} className="p-0 border border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-center h-8 min-w-[80px] text-[11px] font-semibold tabular-nums text-gray-700">
+                      {summaryValue > 0 ? formatTooltipValue(summaryValue, metric) : ''}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
           </tbody>
         </table>
       </div>
