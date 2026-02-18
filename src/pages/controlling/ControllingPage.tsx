@@ -671,7 +671,11 @@ function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoadin
                     {weeklyRevenueLoading ? (
                       <div className="inline-block w-[90px] h-[28px] bg-gray-100 rounded animate-pulse" />
                     ) : (
-                      <Sparkline data={weeklyRevenue.get(row.id) || []} />
+                      <Sparkline
+                        data={weeklyRevenue.get(row.id) || []}
+                        color={row.level === 'company' ? '#095789' : '#9ca3af'}
+                        areaOpacity={row.level === 'company' ? 0.1 : 0.06}
+                      />
                     )}
                   </td>
                   <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.pedidos)}</td>
