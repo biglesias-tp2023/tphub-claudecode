@@ -11,7 +11,8 @@ import type { HeatmapMatrix, HeatmapMetric, HeatmapCell } from '../types';
 const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const WEEKEND_INDICES = new Set([5, 6]);
 
-const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+const START_HOUR = 10;
+const HOUR_LABELS = Array.from({ length: 24 - START_HOUR }, (_, i) => `${i + START_HOUR}:00`);
 
 const METRIC_LABELS: Record<HeatmapMetric, string> = {
   revenue: 'Ventas',
@@ -65,7 +66,7 @@ function Tooltip({ cell, x, y }: TooltipData) {
       style={{ left: x + 12, top: y - 10 }}
     >
       <p className="font-medium mb-1">
-        {DAY_LABELS[cell.dayOfWeek]} {HOUR_LABELS[cell.hour]}
+        {DAY_LABELS[cell.dayOfWeek]} {cell.hour}:00
       </p>
       <div className="space-y-0.5">
         <p>Ventas: {formatTooltipValue(cell.revenue, 'revenue')}</p>
@@ -108,9 +109,9 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // Compute max value for the selected metric
+  // Compute max value for the selected metric (only visible hours)
   let maxValue = 0;
-  for (let h = 0; h < 24; h++) {
+  for (let h = START_HOUR; h < 24; h++) {
     for (let d = 0; d < 7; d++) {
       const val = getCellValue(data[h][d], metric);
       if (val > maxValue) maxValue = val;
@@ -177,7 +178,9 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
             </tr>
           </thead>
           <tbody>
-            {HOUR_LABELS.map((hourLabel, hour) => (
+            {HOUR_LABELS.map((hourLabel, idx) => {
+              const hour = idx + START_HOUR;
+              return (
               <tr key={hour}>
                 <td className="text-xs text-gray-400 text-right pr-2 py-0 whitespace-nowrap font-mono">
                   {hourLabel}
@@ -206,7 +209,8 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
