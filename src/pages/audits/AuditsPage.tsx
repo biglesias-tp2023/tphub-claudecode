@@ -399,8 +399,6 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
   }, [profile?.fullName, profile?.email]);
 
   const handleTypeSelect = (slug: AuditTypeSlug) => {
-    // Only Mystery Shopper is active for now
-    if (slug !== 'mystery_shopper') return;
     setSelectedTypeSlug(slug);
     setStep('form');
   };
