@@ -83,12 +83,14 @@ function PortfolioCard({ title, value, change, icon: Icon, subtitle }: Portfolio
 
 interface ChannelCardProps {
   data: ChannelMetrics;
+  weeklyData?: number[];
+  weeklyLoading?: boolean;
 }
 
-const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string }> = {
-  glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100' },
-  ubereats: { bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
-  justeat: { bg: 'bg-orange-50/50', border: 'border-orange-100' },
+const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string; sparkline: string }> = {
+  glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100', sparkline: '#d97706' },
+  ubereats: { bg: 'bg-emerald-50/50', border: 'border-emerald-100', sparkline: '#059669' },
+  justeat: { bg: 'bg-orange-50/50', border: 'border-orange-100', sparkline: '#ea580c' },
 };
 
 const CHANNEL_LOGOS: Record<ChannelId, string> = {
@@ -97,7 +99,7 @@ const CHANNEL_LOGOS: Record<ChannelId, string> = {
   justeat: '/images/channels/justeat.webp',
 };
 
-function ChannelCard({ data }: ChannelCardProps) {
+function ChannelCard({ data, weeklyData, weeklyLoading }: ChannelCardProps) {
   const isPositive = data.revenueChange >= 0;
   const styles = CHANNEL_STYLES[data.channel];
 
@@ -116,15 +118,30 @@ function ChannelCard({ data }: ChannelCardProps) {
         <span className="text-sm text-gray-500 tabular-nums">{data.percentage.toFixed(1)}%</span>
       </div>
 
-      {/* Main metric */}
-      <div className="mb-5">
-        <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatCurrency(data.revenue)}</p>
-        <span className={cn(
-          'text-sm font-medium tabular-nums',
-          isPositive ? 'text-emerald-600' : 'text-red-500'
-        )}>
-          {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{data.revenueChange.toFixed(1)}%
-        </span>
+      {/* Main metric + sparkline */}
+      <div className="flex items-end justify-between mb-5">
+        <div>
+          <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatCurrency(data.revenue)}</p>
+          <span className={cn(
+            'text-sm font-medium tabular-nums',
+            isPositive ? 'text-emerald-600' : 'text-red-500'
+          )}>
+            {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{data.revenueChange.toFixed(1)}%
+          </span>
+        </div>
+        <div>
+          {weeklyLoading ? (
+            <div className="w-[120px] h-[36px] bg-white/50 rounded animate-pulse" />
+          ) : (
+            <Sparkline
+              data={weeklyData || []}
+              width={120}
+              height={36}
+              color={styles.sparkline}
+              areaOpacity={0.12}
+            />
+          )}
+        </div>
       </div>
 
       {/* Stats grid - Top row */}
@@ -728,7 +745,7 @@ export function ControllingPage() {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange } = useDashboardFiltersStore();
   const { data, isLoading, error } = useControllingData();
-  const { weeklyRevenue, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
+  const { weeklyRevenue, channelWeeklyRevenue, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 
   // Period labels for comparison - use actual dateRange values
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
@@ -936,7 +953,12 @@ export function ControllingPage() {
         <h2 className="text-sm font-semibold text-gray-900 mb-3">Rendimiento por Canal</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {channels.map((channel) => (
-            <ChannelCard key={channel.channel} data={channel} />
+            <ChannelCard
+              key={channel.channel}
+              data={channel}
+              weeklyData={channelWeeklyRevenue.get(channel.channel)}
+              weeklyLoading={weeklyRevenueLoading}
+            />
           ))}
         </div>
       </section>

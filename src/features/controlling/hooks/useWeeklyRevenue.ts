@@ -13,8 +13,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
-import { fetchControllingMetricsRPC } from '@/services/crp-portal';
+import { fetchControllingMetricsRPC, PORTAL_IDS } from '@/services/crp-portal';
 import type { ControllingMetricsRow } from '@/services/crp-portal';
+import type { ChannelId } from '@/types';
 
 // ============================================
 // HELPERS
@@ -77,20 +78,30 @@ function getLast6Weeks(): WeekRange[] {
 }
 
 /**
- * Aggregate RPC metrics rows into a Map of hierarchy row ID → total revenue.
- *
- * Builds the same IDs used by the HierarchyTable:
- * - company-{pfk_id_company}
- * - brand::{pfk_id_company}::{pfk_id_store}
- * - address::{pfk_id_company}::{pfk_id_store_address}
- * - channel::{pfk_id_company}::{pfk_id_store_address}::{pfk_id_portal}
+ * Maps a portal ID to a channel ID.
  */
-function aggregateRevenueByRowId(rows: ControllingMetricsRow[]): Map<string, number> {
-  const result = new Map<string, number>();
+function portalToChannel(portalId: string): ChannelId | null {
+  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
+  if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
+  return null;
+}
 
-  // Helper to add revenue to a key
-  const add = (key: string, amount: number) => {
-    result.set(key, (result.get(key) || 0) + amount);
+interface AggregatedWeek {
+  byRowId: Map<string, number>;
+  byChannel: Map<ChannelId, number>;
+}
+
+/**
+ * Aggregate RPC metrics rows into:
+ * - byRowId: hierarchy row ID → total revenue
+ * - byChannel: channel ID → total revenue (for channel cards)
+ */
+function aggregateRevenueByRowId(rows: ControllingMetricsRow[]): AggregatedWeek {
+  const byRowId = new Map<string, number>();
+  const byChannel = new Map<ChannelId, number>();
+
+  const addRow = (key: string, amount: number) => {
+    byRowId.set(key, (byRowId.get(key) || 0) + amount);
   };
 
   for (const row of rows) {
@@ -101,19 +112,25 @@ function aggregateRevenueByRowId(rows: ControllingMetricsRow[]): Map<string, num
     const portalId = row.pfk_id_portal;
 
     // Company level
-    add(`company-${companyId}`, revenue);
+    addRow(`company-${companyId}`, revenue);
 
     // Brand/store level
-    add(`brand::${companyId}::${storeId}`, revenue);
+    addRow(`brand::${companyId}::${storeId}`, revenue);
 
     // Address level
-    add(`address::${companyId}::${addressId}`, revenue);
+    addRow(`address::${companyId}::${addressId}`, revenue);
 
     // Channel/portal level
-    add(`channel::${companyId}::${addressId}::${portalId}`, revenue);
+    addRow(`channel::${companyId}::${addressId}::${portalId}`, revenue);
+
+    // Channel aggregate (for channel cards)
+    const channelId = portalToChannel(portalId);
+    if (channelId) {
+      byChannel.set(channelId, (byChannel.get(channelId) || 0) + revenue);
+    }
   }
 
-  return result;
+  return { byRowId, byChannel };
 }
 
 // ============================================
@@ -132,37 +149,51 @@ export function useWeeklyRevenue() {
   // Stable week ranges (recalculated only when component mounts)
   const weeks = useMemo(() => getLast6Weeks(), []);
 
-  const query = useQuery<Map<string, number[]>>({
+  interface WeeklyRevenueData {
+    byRowId: Map<string, number[]>;
+    byChannel: Map<ChannelId, number[]>;
+  }
+
+  const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', companyIds.sort().join(',')],
     queryFn: async () => {
-      // Fetch all 6 weeks in parallel
+      // Fetch all 8 weeks in parallel
       const weeklyResults = await Promise.all(
         weeks.map((week) =>
           fetchControllingMetricsRPC(companyIds, week.start, week.end)
         )
       );
 
-      // Aggregate each week's data by row ID
-      const weeklyMaps = weeklyResults.map(aggregateRevenueByRowId);
+      // Aggregate each week's data
+      const weeklyAggs = weeklyResults.map(aggregateRevenueByRowId);
 
-      // Collect all unique row IDs across all weeks
+      // Build row-level map: rowId → [week1, ..., week8]
       const allRowIds = new Set<string>();
-      for (const weekMap of weeklyMaps) {
-        for (const key of weekMap.keys()) {
+      for (const agg of weeklyAggs) {
+        for (const key of agg.byRowId.keys()) {
           allRowIds.add(key);
         }
       }
 
-      // Build the final Map: rowId → [week1, week2, ..., week6]
-      const result = new Map<string, number[]>();
+      const byRowId = new Map<string, number[]>();
       for (const rowId of allRowIds) {
-        result.set(
+        byRowId.set(
           rowId,
-          weeklyMaps.map((weekMap) => weekMap.get(rowId) || 0)
+          weeklyAggs.map((agg) => agg.byRowId.get(rowId) || 0)
         );
       }
 
-      return result;
+      // Build channel-level map: channelId → [week1, ..., week8]
+      const channelIds: ChannelId[] = ['glovo', 'ubereats', 'justeat'];
+      const byChannel = new Map<ChannelId, number[]>();
+      for (const ch of channelIds) {
+        byChannel.set(
+          ch,
+          weeklyAggs.map((agg) => agg.byChannel.get(ch) || 0)
+        );
+      }
+
+      return { byRowId, byChannel };
     },
     enabled: companyIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -170,7 +201,8 @@ export function useWeeklyRevenue() {
   });
 
   return {
-    weeklyRevenue: query.data || new Map<string, number[]>(),
+    weeklyRevenue: query.data?.byRowId || new Map<string, number[]>(),
+    channelWeeklyRevenue: query.data?.byChannel || new Map<ChannelId, number[]>(),
     isLoading: query.isLoading,
   };
 }
