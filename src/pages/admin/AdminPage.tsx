@@ -219,6 +219,7 @@ export function AdminPage() {
               <PendingInvitations showAll />
             </>
           )}
+
         </div>
       </div>
 

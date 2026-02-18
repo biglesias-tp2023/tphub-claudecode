@@ -72,6 +72,7 @@ export const router = createBrowserRouter([
       { path: 'reputation', element: <LazyPage><ReputationPage /></LazyPage> },
       { path: 'strategic', element: <LazyPage><StrategicPage /></LazyPage> },
       { path: 'calendar', element: <LazyPage><CalendarPage /></LazyPage> },
+      { path: 'compset', element: <PlaceholderPage title="Compset" /> },
       { path: 'heatmap', element: <LazyPage><HeatmapPage /></LazyPage> },
       { path: 'audits', element: <LazyPage><AuditsPage /></LazyPage> },
       { path: 'audits/:id', element: <LazyPage><AuditDetailPage /></LazyPage> },
