@@ -35,3 +35,4 @@ supabase/.temp/
 
 # Reference files (not for production)
 referencias-tphub/
+.vercel

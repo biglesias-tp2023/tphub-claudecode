@@ -13,6 +13,7 @@ export const ROUTES = {
   CLIENTS: '/clients',
   REPUTATION: '/reputation',
   STRATEGIC: '/strategic',
+  COMPSET: '/compset',
   CALENDAR: '/calendar',
   HEATMAP: '/heatmap',
   AUDITS: '/audits',
