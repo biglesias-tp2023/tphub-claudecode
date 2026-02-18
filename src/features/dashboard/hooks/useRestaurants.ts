@@ -9,7 +9,14 @@ import {
 } from '@/services/crp-portal';
 import { useBrands } from './useBrands';
 import { useAreas } from './useAreas';
-import type { Restaurant, RestaurantWithDetails } from '@/types';
+import type { Brand, Area, Restaurant, RestaurantWithDetails } from '@/types';
+
+/** Build O(1) lookup maps for brands and areas */
+function buildLookupMaps(brands: Brand[], areas: Area[]) {
+  const brandMap = new Map(brands.map((b) => [b.id, b]));
+  const areaMap = new Map(areas.map((a) => [a.id, a]));
+  return { brandMap, areaMap };
+}
 
 /**
  * Fetches restaurants from CRP Portal (crp_portal__dt_address table).
@@ -44,7 +51,7 @@ export function useRestaurants() {
   }, [brandIds, brands, globalCompanyIds]);
 
   return useQuery({
-    queryKey: queryKeys.restaurants.list({ brandIds, areaIds, companyIds: effectiveCompanyIds }),
+    queryKey: queryKeys.restaurants.list({ areaIds, companyIds: effectiveCompanyIds }),
     queryFn: () =>
       fetchCrpRestaurants({
         companyIds: effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined,
@@ -86,20 +93,22 @@ export function useRestaurantWithDetails(restaurantId: string): RestaurantWithDe
   const { data: brands = [] } = useBrands();
   const { data: areas = [] } = useAreas();
 
-  if (!restaurant) return null;
-
-  const brand = brands.find((b) => b.id === restaurant.brandId);
-  const area = restaurant.areaId ? areas.find((a) => a.id === restaurant.areaId) : null;
-
-  return {
-    ...restaurant,
-    brandName: brand?.name || 'Unknown Brand',
-    areaName: area?.name || 'Unknown Area',
-  };
+  return useMemo(() => {
+    if (!restaurant) return null;
+    const { brandMap, areaMap } = buildLookupMaps(brands, areas);
+    const brand = brandMap.get(restaurant.brandId);
+    const area = restaurant.areaId ? areaMap.get(restaurant.areaId) : null;
+    return {
+      ...restaurant,
+      brandName: brand?.name || 'Unknown Brand',
+      areaName: area?.name || 'Unknown Area',
+    };
+  }, [restaurant, brands, areas]);
 }
 
 /**
  * Returns restaurants with details (brand and area names) for a list of restaurants.
+ * Uses Map-based O(1) lookups instead of .find() for each restaurant.
  *
  * @returns Array of restaurants with brand and area names
  */
@@ -108,16 +117,18 @@ export function useRestaurantsWithDetails(): RestaurantWithDetails[] {
   const { data: brands = [] } = useBrands();
   const { data: areas = [] } = useAreas();
 
-  return restaurants.map((restaurant: Restaurant): RestaurantWithDetails => {
-    const brand = brands.find((b) => b.id === restaurant.brandId);
-    const area = restaurant.areaId ? areas.find((a) => a.id === restaurant.areaId) : null;
-
-    return {
-      ...restaurant,
-      brandName: brand?.name || 'Unknown Brand',
-      areaName: area?.name || 'Unknown Area',
-    };
-  });
+  return useMemo(() => {
+    const { brandMap, areaMap } = buildLookupMaps(brands, areas);
+    return restaurants.map((restaurant: Restaurant): RestaurantWithDetails => {
+      const brand = brandMap.get(restaurant.brandId);
+      const area = restaurant.areaId ? areaMap.get(restaurant.areaId) : null;
+      return {
+        ...restaurant,
+        brandName: brand?.name || 'Unknown Brand',
+        areaName: area?.name || 'Unknown Area',
+      };
+    });
+  }, [restaurants, brands, areas]);
 }
 
 /**
@@ -150,7 +161,7 @@ export function useRestaurantsForMap() {
   }, [brandIds, brands, globalCompanyIds]);
 
   return useQuery({
-    queryKey: [...queryKeys.restaurants.list({ brandIds, areaIds, companyIds: effectiveCompanyIds }), 'forMap'],
+    queryKey: [...queryKeys.restaurants.list({ areaIds, companyIds: effectiveCompanyIds }), 'forMap'],
     queryFn: () =>
       fetchRestaurantsForMap({
         companyIds: effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined,

@@ -293,16 +293,27 @@ function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoadin
     });
   };
 
-  // Get all descendant IDs for a given row
+  // Pre-build parent→children index for O(1) lookups
+  const childrenIndex = useMemo(() => {
+    const map = new Map<string | undefined, HierarchyRow[]>();
+    for (const row of data) {
+      const pid = row.parentId;
+      if (!map.has(pid)) map.set(pid, []);
+      map.get(pid)!.push(row);
+    }
+    return map;
+  }, [data]);
+
+  // Get all descendant IDs for a given row (uses pre-built index)
   const getDescendantIds = useCallback((parentId: string): string[] => {
     const descendants: string[] = [];
-    const children = data.filter((r) => r.parentId === parentId);
+    const children = childrenIndex.get(parentId) || [];
     for (const child of children) {
       descendants.push(child.id);
       descendants.push(...getDescendantIds(child.id));
     }
     return descendants;
-  }, [data]);
+  }, [childrenIndex]);
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => {
@@ -412,13 +423,21 @@ function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoadin
     // First, sort the data while respecting hierarchy
     const sortedData = sortRowsWithHierarchy(data);
 
+    // Build sorted index for O(1) child lookups
+    const sortedChildrenIndex = new Map<string | undefined, HierarchyRow[]>();
+    for (const row of sortedData) {
+      const pid = row.parentId;
+      if (!sortedChildrenIndex.has(pid)) sortedChildrenIndex.set(pid, []);
+      sortedChildrenIndex.get(pid)!.push(row);
+    }
+
     const result: (HierarchyRow & { _depth: number })[] = [];
-    const topLevel = sortedData.filter((r) => !r.parentId);
+    const topLevel = sortedChildrenIndex.get(undefined) || [];
 
     const addWithChildren = (row: HierarchyRow, depth: number) => {
       result.push({ ...row, _depth: depth });
       if (expandedRows.has(row.id)) {
-        const children = sortedData.filter((r) => r.parentId === row.id);
+        const children = sortedChildrenIndex.get(row.id) || [];
         children.forEach((child) => addWithChildren(child, depth + 1));
       }
     };
@@ -427,7 +446,7 @@ function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoadin
     return result;
   }, [data, expandedRows, sortRowsWithHierarchy]);
 
-  const hasChildren = (id: string) => data.some((r) => r.parentId === id);
+  const hasChildren = (id: string) => childrenIndex.has(id);
 
   const tabs: { id: ViewTab; label: string }[] = [
     { id: 'rendimiento', label: 'Rendimiento' },
@@ -742,8 +761,8 @@ function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoadin
 // ============================================
 
 export function ControllingPage() {
-  const { companyIds } = useGlobalFiltersStore();
-  const { dateRange } = useDashboardFiltersStore();
+  const companyIds = useGlobalFiltersStore((s) => s.companyIds);
+  const dateRange = useDashboardFiltersStore((s) => s.dateRange);
   const { data, isLoading, error } = useControllingData();
   const { weeklyRevenue, channelWeeklyRevenue, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 

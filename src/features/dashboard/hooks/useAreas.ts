@@ -1,6 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { queryKeys } from '@/constants/queryKeys';
-import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import { fetchCrpAreas, fetchCrpAreaById } from '@/services/crp-portal';
 
 /**
@@ -13,10 +11,8 @@ import { fetchCrpAreas, fetchCrpAreaById } from '@/services/crp-portal';
  * const { data: areas, isLoading } = useAreas();
  */
 export function useAreas() {
-  const { brandIds } = useDashboardFiltersStore();
-
   return useQuery({
-    queryKey: queryKeys.areas.list(brandIds),
+    queryKey: ['areas', 'list'],
     queryFn: fetchCrpAreas,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

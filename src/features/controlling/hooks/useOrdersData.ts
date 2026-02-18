@@ -201,7 +201,7 @@ export function useOrdersData(params: UseOrdersDataParams) {
     // Only fetch when we have at least one company selected
     enabled: numericCompanyIds.length > 0,
     // Keep data fresh but avoid excessive refetching
-    staleTime: 1 * 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 }
