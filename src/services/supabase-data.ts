@@ -1803,89 +1803,75 @@ export async function fetchAuditsWithDetails(
 
   if (audits.length === 0) return [];
 
-  // Fetch related data
+  // Collect unique IDs
   const auditTypeIds = [...new Set(audits.map((a) => a.pfkIdAuditType))];
   const companyIds = [...new Set(audits.filter((a) => a.pfkIdCompany).map((a) => a.pfkIdCompany!))];
   const brandIds = [...new Set(audits.filter((a) => a.pfkIdStore).map((a) => a.pfkIdStore!))];
+  const portalIds = [...new Set(audits.filter((a) => a.pfkIdPortal).map((a) => a.pfkIdPortal!))];
   const creatorIds = [...new Set(audits.filter((a) => a.pfkCreatedBy).map((a) => a.pfkCreatedBy!))];
 
-  // Fetch audit types
-  const { data: auditTypes } = await supabase
-    .from('audit_types')
-    .select('*')
-    .in('id', auditTypeIds);
+  // Fetch all related data in parallel
+  const [
+    { data: auditTypes },
+    { data: companies },
+    { data: brands },
+    { data: portals },
+    { data: profiles },
+  ] = await Promise.all([
+    supabase.from('audit_types').select('*').in('id', auditTypeIds),
+    companyIds.length > 0
+      ? supabase.from('crp_portal__dt_company').select('pk_id_company, des_company_name, flg_deleted').in('pk_id_company', companyIds.map(Number)).order('pk_ts_month', { ascending: false })
+      : Promise.resolve({ data: [] as Array<{ pk_id_company: number; des_company_name: string; flg_deleted: number }> }),
+    brandIds.length > 0
+      ? supabase.from('crp_portal__dt_store').select('pk_id_store, des_store, pfk_id_company, flg_deleted').in('pk_id_store', brandIds.map(Number)).order('pk_ts_month', { ascending: false })
+      : Promise.resolve({ data: [] as Array<{ pk_id_store: number; des_store: string; pfk_id_company: number; flg_deleted: number }> }),
+    portalIds.length > 0
+      ? supabase.from('crp_portal__dt_portal').select('pk_id_portal, des_portal').in('pk_id_portal', portalIds).order('pk_ts_month', { ascending: false })
+      : Promise.resolve({ data: [] as Array<{ pk_id_portal: string; des_portal: string }> }),
+    creatorIds.length > 0
+      ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', creatorIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; avatar_url: string | null }> }),
+  ]);
+
+  // Build audit type map
   const auditTypeMap = new Map(
     (auditTypes as DbAuditType[] || []).map((t) => [t.id, mapDbAuditTypeToAuditType(t)])
   );
 
-  // Fetch companies from CRP Portal
-  // NOTE: For audit lookups, we include deleted companies since audits may reference them
-  let companyMap = new Map<string, Company>();
-  if (companyIds.length > 0) {
-    const { data: companies } = await supabase
-      .from('crp_portal__dt_company')
-      .select('pk_id_company, des_company_name, flg_deleted')
-      .in('pk_id_company', companyIds.map(Number))
-      .order('pk_ts_month', { ascending: false });
-    // Deduplicate by PK (keep most recent snapshot), but DON'T filter deleted for lookups
-    const seenCompanyIds = new Set<string>();
-    const uniqueCompanies: Array<{ pk_id_company: number; des_company_name: string }> = [];
-    for (const c of (companies || []) as Array<{ pk_id_company: number; des_company_name: string; flg_deleted: number }>) {
-      const id = String(c.pk_id_company);
-      if (!seenCompanyIds.has(id)) {
-        seenCompanyIds.add(id);
-        uniqueCompanies.push(c);
-      }
+  // Build company map (deduplicate by PK, keep most recent)
+  const companyMap = new Map<string, Company>();
+  for (const c of (companies || []) as Array<{ pk_id_company: number; des_company_name: string; flg_deleted: number }>) {
+    const id = String(c.pk_id_company);
+    if (!companyMap.has(id)) {
+      companyMap.set(id, { id, name: c.des_company_name } as Company);
     }
-    companyMap = new Map(
-      uniqueCompanies.map((c) => [
-        String(c.pk_id_company),
-        { id: String(c.pk_id_company), name: c.des_company_name } as Company,
-      ])
-    );
   }
 
-  // Fetch brands from CRP Portal
-  // NOTE: For audit lookups, we include deleted brands since audits may reference them
-  let brandMap = new Map<string, Brand>();
-  if (brandIds.length > 0) {
-    const { data: brands } = await supabase
-      .from('crp_portal__dt_store')
-      .select('pk_id_store, des_store, pfk_id_company, flg_deleted')
-      .in('pk_id_store', brandIds.map(Number))
-      .order('pk_ts_month', { ascending: false });
-    // Deduplicate by PK (keep most recent snapshot), but DON'T filter deleted for lookups
-    const seenBrandIds = new Set<string>();
-    const uniqueBrands: Array<{ pk_id_store: number; des_store: string; pfk_id_company: number }> = [];
-    for (const b of (brands || []) as Array<{ pk_id_store: number; des_store: string; pfk_id_company: number; flg_deleted: number }>) {
-      const id = String(b.pk_id_store);
-      if (!seenBrandIds.has(id)) {
-        seenBrandIds.add(id);
-        uniqueBrands.push(b);
-      }
+  // Build brand map (deduplicate by PK, keep most recent)
+  const brandMap = new Map<string, Brand>();
+  for (const b of (brands || []) as Array<{ pk_id_store: number; des_store: string; pfk_id_company: number; flg_deleted: number }>) {
+    const id = String(b.pk_id_store);
+    if (!brandMap.has(id)) {
+      brandMap.set(id, { id, name: b.des_store, companyId: String(b.pfk_id_company) } as Brand);
     }
-    brandMap = new Map(
-      uniqueBrands.map((b) => [
-        String(b.pk_id_store),
-        { id: String(b.pk_id_store), name: b.des_store, companyId: String(b.pfk_id_company) } as Brand,
-      ])
-    );
   }
 
-  // Fetch creators
-  let creatorMap = new Map<string, { fullName: string; avatarUrl: string | null }>();
-  if (creatorIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .in('id', creatorIds);
-    creatorMap = new Map(
-      (profiles || []).map((p: { id: string; full_name: string | null; avatar_url: string | null }) => [
-        p.id,
-        { fullName: p.full_name || 'Usuario', avatarUrl: p.avatar_url },
-      ])
-    );
+  // Build portal map (deduplicate by PK, keep most recent)
+  const portalMap = new Map<string, { id: string; name: string }>();
+  for (const p of (portals || []) as Array<{ pk_id_portal: string; des_portal: string }>) {
+    const id = String(p.pk_id_portal);
+    if (!portalMap.has(id)) {
+      portalMap.set(id, { id, name: p.des_portal });
+    }
   }
+
+  // Build creator map
+  const creatorMap = new Map(
+    (profiles || []).map((p: { id: string; full_name: string | null; avatar_url: string | null }) => [
+      p.id,
+      { fullName: p.full_name || 'Usuario', avatarUrl: p.avatar_url },
+    ])
+  );
 
   // Enrich audits
   return audits.map((audit) => ({
@@ -1893,6 +1879,7 @@ export async function fetchAuditsWithDetails(
     auditType: auditTypeMap.get(audit.pfkIdAuditType),
     company: audit.pfkIdCompany ? companyMap.get(audit.pfkIdCompany) : undefined,
     brand: audit.pfkIdStore ? brandMap.get(audit.pfkIdStore) : undefined,
+    portal: audit.pfkIdPortal ? portalMap.get(audit.pfkIdPortal) : undefined,
     createdByProfile: audit.pfkCreatedBy ? creatorMap.get(audit.pfkCreatedBy) : undefined,
   }));
 }
