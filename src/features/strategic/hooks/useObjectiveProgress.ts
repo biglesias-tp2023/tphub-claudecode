@@ -418,7 +418,8 @@ export function useObjectiveProgress({
 
   return {
     ...progressData,
-    isLoading: isLoadingKpi || (includeSnapshots && isLoadingSnapshots),
+    isLoading: isLoadingKpi,
+    isLoadingVelocity: includeSnapshots && isLoadingSnapshots,
   };
 }
 

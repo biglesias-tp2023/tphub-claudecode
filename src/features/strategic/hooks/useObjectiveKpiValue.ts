@@ -168,6 +168,7 @@ export function useObjectiveKpiValue({
       return aggregation;
     },
     enabled: !!kpiType && !!companyId,
+    retry: 1, // Fail fast — don't hang for 15s on broken queries
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });

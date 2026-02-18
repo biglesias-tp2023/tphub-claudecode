@@ -325,7 +325,7 @@ export const ObjectiveCard = memo(function ObjectiveCard({
                   <div className="w-14 h-14 rounded-full bg-gray-100 animate-pulse" />
                 ) : (
                   <ProgressCircle
-                    value={progress.progressPercentage}
+                    value={progress.progressPercentage ?? 0}
                     size={56}
                     strokeWidth={5}
                     color={circleColor}
@@ -343,7 +343,7 @@ export const ObjectiveCard = memo(function ObjectiveCard({
                   {objective.title}
                 </h3>
 
-                {/* Trend indicator (if has velocity data) */}
+                {/* Trend indicator (if has velocity data — may arrive after snapshots load) */}
                 {!progress.isLoading && progress.velocity !== null && (
                   <div className="mb-2">
                     <TrendIndicator
