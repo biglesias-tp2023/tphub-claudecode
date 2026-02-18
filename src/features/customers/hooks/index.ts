@@ -7,8 +7,11 @@ export type { UseCustomerCohortsParams, UseCustomerCohortsResult } from './useCu
 export { useChurnRisk } from './useChurnRisk';
 export type { UseChurnRiskParams, UseChurnRiskResult } from './useChurnRisk';
 
-export { useSpendDistribution } from './useSpendDistribution';
-export type { UseSpendDistributionResult } from './useSpendDistribution';
-
 export { useMultiPlatform } from './useMultiPlatform';
 export type { UseMultiPlatformResult } from './useMultiPlatform';
+
+export { useRevenueConcentration } from './useRevenueConcentration';
+export type { UseRevenueConcentrationResult } from './useRevenueConcentration';
+
+export { usePostPromoHealth } from './usePostPromoHealth';
+export type { UsePostPromoHealthResult } from './usePostPromoHealth';

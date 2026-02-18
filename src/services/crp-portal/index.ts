@@ -159,8 +159,9 @@ export {
   fetchCustomerMetricsByChannel,
   fetchCustomerCohorts,
   fetchChurnRiskCustomers,
-  fetchSpendDistribution,
   fetchMultiPlatformAnalysis,
+  fetchRevenueConcentration,
+  fetchPostPromoHealth,
 } from './customers';
 
 export type {
@@ -170,9 +171,9 @@ export type {
   ChannelCustomerMetrics,
   CohortData,
   CustomerChurnRisk,
-  SpendSegment,
-  SpendDistribution,
   MultiPlatformAnalysis,
+  RevenueConcentration,
+  PostPromoHealth,
 } from './customers';
 
 // ============================================

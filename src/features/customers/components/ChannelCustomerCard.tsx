@@ -10,13 +10,12 @@ interface ChannelCustomerCardProps {
   totalCustomers: number;
   newCustomers: number;
   newCustomersPercentage: number;
-  avgCLV: number;
   avgTicket: number;
   avgOrdersPerCustomer: number;
-  /** Customers with more than 1 order */
   returningCustomers: number;
-  /** Percentage of customers with more than 1 order */
   repetitionRate: number;
+  netRevenuePerCustomer: number;
+  promoOrdersPercentage: number;
 }
 
 const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string }> = {
@@ -31,11 +30,12 @@ export function ChannelCustomerCard({
   totalCustomers,
   newCustomers,
   newCustomersPercentage,
-  avgCLV,
   avgTicket,
   avgOrdersPerCustomer,
   returningCustomers,
   repetitionRate,
+  netRevenuePerCustomer,
+  promoOrdersPercentage,
 }: ChannelCustomerCardProps) {
   const styles = CHANNEL_STYLES[channelId];
 
@@ -78,8 +78,16 @@ export function ChannelCustomerCard({
 
       <div className="grid grid-cols-2 gap-3 py-3 border-t border-gray-200/60">
         <div>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">CLV</p>
-          <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(avgCLV)}</p>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Net Rev/Cli</p>
+            <span
+              className="cursor-help text-gray-300"
+              title="Ingreso neto por cliente: (Ventas - Reembolsos) / Clientes"
+            >
+              <Info className="w-3 h-3" />
+            </span>
+          </div>
+          <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(netRevenuePerCustomer)}</p>
         </div>
         <div>
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ticket</p>
@@ -87,10 +95,22 @@ export function ChannelCustomerCard({
         </div>
       </div>
 
-      <div className="pt-3 border-t border-gray-200/60">
+      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200/60">
         <div>
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ped./Cliente</p>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{avgOrdersPerCustomer.toFixed(1)}</p>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">% con Promo</p>
+            <span
+              className="cursor-help text-gray-300"
+              title="Porcentaje de pedidos que usaron promociones"
+            >
+              <Info className="w-3 h-3" />
+            </span>
+          </div>
+          <p className="text-sm font-semibold text-gray-900 tabular-nums">{promoOrdersPercentage.toFixed(1)}%</p>
         </div>
       </div>
     </div>

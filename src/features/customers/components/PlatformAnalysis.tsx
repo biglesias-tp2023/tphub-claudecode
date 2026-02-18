@@ -1,4 +1,3 @@
-import { ArrowRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatNumber } from '@/utils/formatters';
 import type { MultiPlatformAnalysis } from '@/services/crp-portal';
@@ -44,7 +43,7 @@ export function PlatformAnalysis({ data }: PlatformAnalysisProps) {
       <div className="px-5 py-4 border-b border-gray-100">
         <h3 className="text-sm font-semibold text-gray-900">Análisis Multi-Plataforma</h3>
         <p className="text-xs text-gray-500 mt-0.5">
-          Clientes por plataforma y transiciones entre ellas
+          Distribución de clientes por plataforma y solapamiento
         </p>
       </div>
 
@@ -81,40 +80,48 @@ export function PlatformAnalysis({ data }: PlatformAnalysisProps) {
           </div>
         </div>
 
-        {/* Transitions */}
-        {data.transitions.length > 0 && (
+        {/* Overlap Breakdown */}
+        {data.overlapBreakdown.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">
-              Transiciones entre Plataformas
+              Detalle de Solapamiento
             </h4>
             <div className="space-y-2">
-              {data.transitions.slice(0, 6).map((transition, index) => {
-                const fromColors = CHANNEL_COLORS[transition.from];
-                const toColors = CHANNEL_COLORS[transition.to];
+              {data.overlapBreakdown.map((overlap, index) => {
+                const percentage = data.multiPlatform > 0
+                  ? (overlap.count / data.multiPlatform) * 100
+                  : 0;
 
                 return (
                   <div
-                    key={`${transition.from}-${transition.to}-${index}`}
-                    className="flex items-center gap-3 p-2 rounded-lg bg-gray-50"
+                    key={index}
+                    className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50"
                   >
-                    <span className={cn(
-                      'px-2 py-0.5 rounded text-xs font-medium',
-                      fromColors.bg,
-                      fromColors.text
-                    )}>
-                      {CHANNEL_NAMES[transition.from]}
-                    </span>
-                    <ArrowRight className="w-4 h-4 text-gray-400" />
-                    <span className={cn(
-                      'px-2 py-0.5 rounded text-xs font-medium',
-                      toColors.bg,
-                      toColors.text
-                    )}>
-                      {CHANNEL_NAMES[transition.to]}
-                    </span>
-                    <span className="ml-auto text-sm font-semibold text-gray-900 tabular-nums">
-                      {formatNumber(transition.count)}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {overlap.channels.map((ch, chIdx) => {
+                        const colors = CHANNEL_COLORS[ch];
+                        return (
+                          <span key={ch}>
+                            {chIdx > 0 && <span className="text-gray-400 text-xs mx-0.5">+</span>}
+                            <span className={cn(
+                              'px-2 py-0.5 rounded text-xs font-medium',
+                              colors.bg,
+                              colors.text
+                            )}>
+                              {CHANNEL_NAMES[ch]}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                        {formatNumber(overlap.count)}
+                      </span>
+                      <span className="text-xs text-gray-400 tabular-nums">
+                        ({percentage.toFixed(1)}%)
+                      </span>
+                    </div>
                   </div>
                 );
               })}

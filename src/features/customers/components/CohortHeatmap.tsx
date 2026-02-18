@@ -147,13 +147,19 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
                   </td>
                   {periodLabels.map((_, i) => {
                     const value = retentionData?.[i] ?? 0;
+                    const absoluteCount = cohort.retentionCounts?.[i] ?? 0;
+                    const tooltipContent = value > 0
+                      ? `${value.toFixed(1)}% (${absoluteCount} clientes)`
+                      : 'Sin datos';
+
                     return (
                       <td key={i} className="py-1 px-1">
                         <div
                           className={cn(
-                            'flex items-center justify-center h-8 rounded text-xs font-medium tabular-nums',
+                            'flex items-center justify-center h-8 rounded text-xs font-medium tabular-nums cursor-default',
                             getColorIntensity(value)
                           )}
+                          title={tooltipContent}
                         >
                           {value > 0 ? `${value.toFixed(0)}%` : '-'}
                         </div>

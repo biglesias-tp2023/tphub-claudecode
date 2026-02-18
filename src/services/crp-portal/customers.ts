@@ -2,7 +2,7 @@
  * CRP Portal Customers Service
  *
  * Provides customer analytics data from the crp_portal__ft_order_head table.
- * Calculates metrics like retention, CLV, churn risk, cohorts, and multi-platform analysis.
+ * Calculates metrics like retention, churn risk, cohorts, and multi-platform analysis.
  *
  * ## SOLID Principles Applied
  *
@@ -14,10 +14,10 @@
  *
  * ```
  * Supabase (crp_portal__ft_order_head)
- *     ↓
- * fetchCustomerOrders() → Raw customer order data
- *     ↓
- * Various aggregation functions → Metrics, Cohorts, Risk Scores
+ *     |
+ * fetchCustomerOrders() -> Raw customer order data
+ *     |
+ * Various aggregation functions -> Metrics, Cohorts, Risk Scores
  * ```
  *
  * @module services/crp-portal/customers
@@ -63,12 +63,12 @@ export interface CustomerMetrics {
   newCustomers: number;
   /** Returning customers */
   returningCustomers: number;
-  /** Retention rate percentage */
+  /** Retention rate percentage (customers with >1 order / total) */
   retentionRate: number;
-  /** Average days between orders */
+  /** Average days between orders (kept for churn risk, not shown in scorecards) */
   avgFrequencyDays: number;
-  /** Estimated Customer Lifetime Value */
-  estimatedCLV: number;
+  /** Average spend per customer (totalRevenue / totalCustomers) */
+  avgSpendPerCustomer: number;
   /** Average ticket across all customers */
   avgTicket: number;
   /** Total orders */
@@ -84,8 +84,8 @@ export interface CustomerMetricsWithChanges extends CustomerMetrics {
   totalCustomersChange: number;
   newCustomersChange: number;
   retentionRateChange: number;
-  avgFrequencyDaysChange: number;
-  estimatedCLVChange: number;
+  avgSpendPerCustomerChange: number;
+  avgOrdersPerCustomerChange: number;
   avgTicketChange: number;
 }
 
@@ -96,13 +96,16 @@ export interface ChannelCustomerMetrics {
   totalCustomers: number;
   newCustomers: number;
   newCustomersPercentage: number;
-  avgCLV: number;
   avgTicket: number;
   avgOrdersPerCustomer: number;
   /** Customers with more than 1 order */
   returningCustomers: number;
   /** Percentage of customers with more than 1 order */
   repetitionRate: number;
+  /** Net revenue per customer: (totalRevenue - refunds) / totalCustomers */
+  netRevenuePerCustomer: number;
+  /** Percentage of orders that used promotions */
+  promoOrdersPercentage: number;
 }
 
 /** Cohort data for retention analysis */
@@ -115,6 +118,8 @@ export interface CohortData {
   retention: number[];
   /** Cumulative retention (% who have returned at least once up to this period) */
   cumulativeRetention: number[];
+  /** Absolute customer counts per period (for tooltips) */
+  retentionCounts: number[];
 }
 
 /** Customer with churn risk score */
@@ -131,45 +136,6 @@ export interface CustomerChurnRisk {
   riskScore: number;
 }
 
-/** Spend segment */
-export interface SpendSegment {
-  segment: 'vip' | 'high' | 'medium' | 'low' | 'single_order';
-  label: string;
-  count: number;
-  percentage: number;
-  avgSpend: number;
-  totalRevenue: number;
-  /** Customers with more than 1 order in this segment */
-  repeatCustomers: number;
-  /** Percentage of customers with more than 1 order */
-  repetitionRate: number;
-  /** Average orders per customer in this segment */
-  avgOrdersPerCustomer: number;
-  /** Average days between orders (null for single_order segment) */
-  avgFrequencyDays: number | null;
-}
-
-/** Spend distribution with histogram data */
-export interface SpendDistribution {
-  /** Histogram buckets */
-  buckets: {
-    min: number;
-    max: number;
-    count: number;
-  }[];
-  /** Segment breakdown */
-  segments: SpendSegment[];
-  /** Statistics */
-  stats: {
-    min: number;
-    max: number;
-    median: number;
-    avg: number;
-    p75: number;
-    p90: number;
-  };
-}
-
 /** Multi-platform analysis */
 export interface MultiPlatformAnalysis {
   /** Customers using only Glovo */
@@ -182,12 +148,34 @@ export interface MultiPlatformAnalysis {
   multiPlatform: number;
   /** Percentage of multi-platform customers */
   multiPlatformPercentage: number;
-  /** Platform transitions (customer moved from one to another) */
-  transitions: {
-    from: ChannelId;
-    to: ChannelId;
-    count: number;
-  }[];
+  /** Overlap breakdown: which channel combinations multi-platform customers use */
+  overlapBreakdown: { channels: ChannelId[]; count: number }[];
+}
+
+/** Revenue concentration (Pareto) */
+export interface RevenueConcentration {
+  /** % of revenue from top 10% of customers */
+  top10Pct: number;
+  /** % of revenue from top 20% of customers */
+  top20Pct: number;
+  /** % of revenue from top 50% of customers */
+  top50Pct: number;
+  /** Gini coefficient (0 = perfectly equal, 1 = perfectly unequal) */
+  giniCoefficient: number;
+}
+
+/** Post-promo health segments */
+export interface PostPromoHealth {
+  /** Customers acquired with promo who returned without promo */
+  sticky: number;
+  /** Customers acquired with promo who only buy with promo */
+  promocioneros: number;
+  /** Customers who entered without promo */
+  organico: number;
+  /** Inactive 45+ days reactivated by promo */
+  dormidos: number;
+  /** Total classified customers */
+  total: number;
 }
 
 // ============================================
@@ -344,7 +332,7 @@ function calculateMetrics(orders: CustomerOrder[]): CustomerMetrics {
       returningCustomers: 0,
       retentionRate: 0,
       avgFrequencyDays: 0,
-      estimatedCLV: 0,
+      avgSpendPerCustomer: 0,
       avgTicket: 0,
       totalOrders: 0,
       totalRevenue: 0,
@@ -393,12 +381,10 @@ function calculateMetrics(orders: CustomerOrder[]): CustomerMetrics {
   const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   const avgOrdersPerCustomer = totalCustomers > 0 ? totalOrders / totalCustomers : 0;
   const avgFrequencyDays = customersWithMultipleOrders > 0 ? totalFrequencyDays / customersWithMultipleOrders : 0;
+  const avgSpendPerCustomer = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
 
   // Retention rate: customers who made more than 1 order / total customers
   const retentionRate = totalCustomers > 0 ? (customersWithMultipleOrders / totalCustomers) * 100 : 0;
-
-  // CLV estimation: avgTicket * avgOrdersPerCustomer * 12 (annualized)
-  const estimatedCLV = avgTicket * avgOrdersPerCustomer * 12;
 
   return {
     totalCustomers,
@@ -406,7 +392,7 @@ function calculateMetrics(orders: CustomerOrder[]): CustomerMetrics {
     returningCustomers,
     retentionRate,
     avgFrequencyDays,
-    estimatedCLV,
+    avgSpendPerCustomer,
     avgTicket,
     totalOrders,
     totalRevenue,
@@ -438,8 +424,8 @@ export async function fetchCustomerMetrics(
     totalCustomersChange: calcChange(current.totalCustomers, previous.totalCustomers),
     newCustomersChange: calcChange(current.newCustomers, previous.newCustomers),
     retentionRateChange: calcChange(current.retentionRate, previous.retentionRate),
-    avgFrequencyDaysChange: calcChange(current.avgFrequencyDays, previous.avgFrequencyDays),
-    estimatedCLVChange: calcChange(current.estimatedCLV, previous.estimatedCLV),
+    avgSpendPerCustomerChange: calcChange(current.avgSpendPerCustomer, previous.avgSpendPerCustomer),
+    avgOrdersPerCustomerChange: calcChange(current.avgOrdersPerCustomer, previous.avgOrdersPerCustomer),
     avgTicketChange: calcChange(current.avgTicket, previous.avgTicket),
   };
 }
@@ -487,17 +473,30 @@ export async function fetchCustomerMetricsByChannel(
     }
     const repetitionRate = metrics.totalCustomers > 0 ? (returningCustomers / metrics.totalCustomers) * 100 : 0;
 
+    // Net revenue per customer
+    const totalRefunds = chOrders.reduce((sum, o) => sum + o.refunds, 0);
+    const netRevenuePerCustomer = metrics.totalCustomers > 0
+      ? (metrics.totalRevenue - totalRefunds) / metrics.totalCustomers
+      : 0;
+
+    // Promo orders percentage
+    const ordersWithPromo = chOrders.filter((o) => o.promotions > 0).length;
+    const promoOrdersPercentage = chOrders.length > 0
+      ? (ordersWithPromo / chOrders.length) * 100
+      : 0;
+
     results.push({
       channelId,
       channelName: channelNames[channelId],
       totalCustomers: metrics.totalCustomers,
       newCustomers: metrics.newCustomers,
       newCustomersPercentage: metrics.totalCustomers > 0 ? (metrics.newCustomers / metrics.totalCustomers) * 100 : 0,
-      avgCLV: metrics.estimatedCLV,
       avgTicket: metrics.avgTicket,
       avgOrdersPerCustomer: metrics.avgOrdersPerCustomer,
       returningCustomers,
       repetitionRate,
+      netRevenuePerCustomer,
+      promoOrdersPercentage,
     });
   }
 
@@ -574,12 +573,15 @@ export async function fetchCustomerCohorts(
 
   // Convert to CohortData array
   const cohorts: CohortData[] = [];
-  const maxPeriods = 6; // Show up to 6 periods of retention
+  // Use 8 periods for weekly granularity, 6 for monthly
+  const maxPeriods = granularity === 'week' ? 8 : 6;
 
   for (const [cohortId, data] of cohortDataMap) {
     const retention: number[] = [];
+    const retentionCounts: number[] = [];
     for (let i = 0; i <= maxPeriods; i++) {
       const count = data.periodCounts.get(i) || 0;
+      retentionCounts.push(count);
       retention.push(data.size > 0 ? (count / data.size) * 100 : 0);
     }
 
@@ -614,6 +616,7 @@ export async function fetchCustomerCohorts(
       cohortSize: data.size,
       retention,
       cumulativeRetention,
+      retentionCounts,
     });
   }
 
@@ -697,154 +700,7 @@ export async function fetchChurnRiskCustomers(
 }
 
 /**
- * Fetches customer spend distribution.
- */
-export async function fetchSpendDistribution(
-  params: FetchCustomerDataParams
-): Promise<SpendDistribution> {
-  const orders = await fetchCustomerOrders(params);
-
-  if (orders.length === 0) {
-    return {
-      buckets: [],
-      segments: [],
-      stats: { min: 0, max: 0, median: 0, avg: 0, p75: 0, p90: 0 },
-    };
-  }
-
-  // Calculate total spend per customer
-  const customerSpend = new Map<string, number>();
-  for (const order of orders) {
-    const current = customerSpend.get(order.customerId) || 0;
-    customerSpend.set(order.customerId, current + order.totalPrice);
-  }
-
-  const spends = Array.from(customerSpend.values()).sort((a, b) => a - b);
-  const totalCustomers = spends.length;
-
-  // Calculate statistics
-  const min = spends[0];
-  const max = spends[spends.length - 1];
-  const sum = spends.reduce((a, b) => a + b, 0);
-  const avg = sum / totalCustomers;
-  const median = spends[Math.floor(totalCustomers / 2)];
-  const p75 = spends[Math.floor(totalCustomers * 0.75)];
-  const p90 = spends[Math.floor(totalCustomers * 0.9)];
-
-  // Calculate percentile thresholds for segments
-  const p30 = spends[Math.floor(totalCustomers * 0.3)];
-  const p70 = spends[Math.floor(totalCustomers * 0.7)];
-
-  // Count orders per customer for single-order detection
-  const customerOrderCounts = new Map<string, number>();
-  for (const order of orders) {
-    const current = customerOrderCounts.get(order.customerId) || 0;
-    customerOrderCounts.set(order.customerId, current + 1);
-  }
-
-  // Build segments with extended metrics
-  type SegmentKey = 'vip' | 'high' | 'medium' | 'low' | 'single_order';
-  const segmentCounts: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
-  const segmentSpends: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
-  const segmentTotalOrders: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
-  const segmentRepeatCustomers: Record<SegmentKey, number> = { vip: 0, high: 0, medium: 0, low: 0, single_order: 0 };
-
-  // Track customer order dates for frequency calculation
-  const customerOrderDates = new Map<string, Date[]>();
-  for (const order of orders) {
-    if (!customerOrderDates.has(order.customerId)) {
-      customerOrderDates.set(order.customerId, []);
-    }
-    customerOrderDates.get(order.customerId)!.push(order.orderDate);
-  }
-
-  // Calculate frequency per segment
-  const segmentFrequencyDays: Record<SegmentKey, number[]> = { vip: [], high: [], medium: [], low: [], single_order: [] };
-
-  for (const [customerId, spend] of customerSpend) {
-    const orderCount = customerOrderCounts.get(customerId) || 0;
-    let segment: SegmentKey;
-
-    if (orderCount === 1) {
-      segment = 'single_order';
-    } else if (spend >= p90) {
-      segment = 'vip';
-    } else if (spend >= p70) {
-      segment = 'high';
-    } else if (spend >= p30) {
-      segment = 'medium';
-    } else {
-      segment = 'low';
-    }
-
-    segmentCounts[segment]++;
-    segmentSpends[segment] += spend;
-    segmentTotalOrders[segment] += orderCount;
-
-    if (orderCount > 1) {
-      segmentRepeatCustomers[segment]++;
-
-      // Calculate average frequency for this customer
-      const dates = customerOrderDates.get(customerId) || [];
-      if (dates.length > 1) {
-        const sortedDates = dates.sort((a, b) => a.getTime() - b.getTime());
-        const firstDate = sortedDates[0];
-        const lastDate = sortedDates[sortedDates.length - 1];
-        const daysBetween = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
-        const avgDays = daysBetween / (sortedDates.length - 1);
-        segmentFrequencyDays[segment].push(avgDays);
-      }
-    }
-  }
-
-  const buildSegment = (key: SegmentKey, label: string): SpendSegment => {
-    const count = segmentCounts[key];
-    const freqs = segmentFrequencyDays[key];
-    const avgFreq = freqs.length > 0 ? freqs.reduce((a, b) => a + b, 0) / freqs.length : null;
-
-    return {
-      segment: key,
-      label,
-      count,
-      percentage: (count / totalCustomers) * 100,
-      avgSpend: count > 0 ? segmentSpends[key] / count : 0,
-      totalRevenue: segmentSpends[key],
-      repeatCustomers: segmentRepeatCustomers[key],
-      repetitionRate: count > 0 ? (segmentRepeatCustomers[key] / count) * 100 : 0,
-      avgOrdersPerCustomer: count > 0 ? segmentTotalOrders[key] / count : 0,
-      avgFrequencyDays: avgFreq !== null ? Math.round(avgFreq) : null,
-    };
-  };
-
-  const segments: SpendSegment[] = [
-    buildSegment('vip', 'VIP (Top 10%)'),
-    buildSegment('high', 'Alto (70-90%)'),
-    buildSegment('medium', 'Medio (30-70%)'),
-    buildSegment('low', 'Bajo (10-30%)'),
-    buildSegment('single_order', 'Único pedido'),
-  ];
-
-  // Build histogram buckets
-  const bucketCount = 10;
-  const bucketSize = (max - min) / bucketCount || 1;
-  const buckets: SpendDistribution['buckets'] = [];
-
-  for (let i = 0; i < bucketCount; i++) {
-    const bucketMin = min + i * bucketSize;
-    const bucketMax = min + (i + 1) * bucketSize;
-    const count = spends.filter((s) => s >= bucketMin && (i === bucketCount - 1 ? s <= bucketMax : s < bucketMax)).length;
-    buckets.push({ min: bucketMin, max: bucketMax, count });
-  }
-
-  return {
-    buckets,
-    segments,
-    stats: { min, max, median, avg, p75, p90 },
-  };
-}
-
-/**
- * Fetches multi-platform customer analysis.
+ * Fetches multi-platform customer analysis with overlap breakdown.
  */
 export async function fetchMultiPlatformAnalysis(
   params: FetchCustomerDataParams
@@ -858,13 +714,12 @@ export async function fetchMultiPlatformAnalysis(
       justeatOnly: 0,
       multiPlatform: 0,
       multiPlatformPercentage: 0,
-      transitions: [],
+      overlapBreakdown: [],
     };
   }
 
   // Track platforms per customer
   const customerPlatforms = new Map<string, Set<ChannelId>>();
-  const customerOrdersByPlatform = new Map<string, Map<ChannelId, CustomerOrder[]>>();
 
   for (const order of orders) {
     const channelId = portalIdToChannelId(order.portalId);
@@ -874,16 +729,6 @@ export async function fetchMultiPlatformAnalysis(
       customerPlatforms.set(order.customerId, new Set());
     }
     customerPlatforms.get(order.customerId)!.add(channelId);
-
-    // Track orders by platform for transitions
-    if (!customerOrdersByPlatform.has(order.customerId)) {
-      customerOrdersByPlatform.set(order.customerId, new Map());
-    }
-    const platformOrders = customerOrdersByPlatform.get(order.customerId)!;
-    if (!platformOrders.has(channelId)) {
-      platformOrders.set(channelId, []);
-    }
-    platformOrders.get(channelId)!.push(order);
   }
 
   let glovoOnly = 0;
@@ -891,9 +736,20 @@ export async function fetchMultiPlatformAnalysis(
   let justeatOnly = 0;
   let multiPlatform = 0;
 
+  // Track overlap combinations
+  const overlapCounts = new Map<string, { channels: ChannelId[]; count: number }>();
+
   for (const platforms of customerPlatforms.values()) {
     if (platforms.size > 1) {
       multiPlatform++;
+
+      // Track the specific combination
+      const sorted = Array.from(platforms).sort() as ChannelId[];
+      const key = sorted.join('+');
+      if (!overlapCounts.has(key)) {
+        overlapCounts.set(key, { channels: sorted, count: 0 });
+      }
+      overlapCounts.get(key)!.count++;
     } else {
       const platform = Array.from(platforms)[0];
       if (platform === 'glovo') glovoOnly++;
@@ -905,38 +761,8 @@ export async function fetchMultiPlatformAnalysis(
   const totalCustomers = customerPlatforms.size;
   const multiPlatformPercentage = totalCustomers > 0 ? (multiPlatform / totalCustomers) * 100 : 0;
 
-  // Calculate transitions (customers who switched primary platform)
-  const transitionCounts = new Map<string, number>();
-
-  for (const platformOrders of customerOrdersByPlatform.values()) {
-    if (platformOrders.size <= 1) continue;
-
-    // Get all orders sorted by date
-    const allOrders: { channelId: ChannelId; date: Date }[] = [];
-    for (const [channelId, orders] of platformOrders) {
-      for (const order of orders) {
-        allOrders.push({ channelId, date: order.orderDate });
-      }
-    }
-    allOrders.sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    // Find transitions
-    for (let i = 1; i < allOrders.length; i++) {
-      if (allOrders[i].channelId !== allOrders[i - 1].channelId) {
-        const key = `${allOrders[i - 1].channelId}:${allOrders[i].channelId}`;
-        transitionCounts.set(key, (transitionCounts.get(key) || 0) + 1);
-      }
-    }
-  }
-
-  const transitions: MultiPlatformAnalysis['transitions'] = [];
-  for (const [key, count] of transitionCounts) {
-    const [from, to] = key.split(':') as [ChannelId, ChannelId];
-    transitions.push({ from, to, count });
-  }
-
-  // Sort by count descending
-  transitions.sort((a, b) => b.count - a.count);
+  // Convert overlap map to sorted array
+  const overlapBreakdown = Array.from(overlapCounts.values()).sort((a, b) => b.count - a.count);
 
   return {
     glovoOnly,
@@ -944,6 +770,138 @@ export async function fetchMultiPlatformAnalysis(
     justeatOnly,
     multiPlatform,
     multiPlatformPercentage,
-    transitions: transitions.slice(0, 10), // Top 10 transitions
+    overlapBreakdown,
+  };
+}
+
+/**
+ * Fetches revenue concentration (Pareto) analysis.
+ */
+export async function fetchRevenueConcentration(
+  params: FetchCustomerDataParams
+): Promise<RevenueConcentration> {
+  const orders = await fetchCustomerOrders(params);
+
+  if (orders.length === 0) {
+    return { top10Pct: 0, top20Pct: 0, top50Pct: 0, giniCoefficient: 0 };
+  }
+
+  // Calculate total spend per customer
+  const customerSpend = new Map<string, number>();
+  for (const order of orders) {
+    const current = customerSpend.get(order.customerId) || 0;
+    customerSpend.set(order.customerId, current + order.totalPrice);
+  }
+
+  // Sort descending by spend
+  const spends = Array.from(customerSpend.values()).sort((a, b) => b - a);
+  const totalRevenue = spends.reduce((sum, s) => sum + s, 0);
+  const n = spends.length;
+
+  if (totalRevenue === 0) {
+    return { top10Pct: 0, top20Pct: 0, top50Pct: 0, giniCoefficient: 0 };
+  }
+
+  // Calculate revenue from top X%
+  const revenueFromTopN = (pct: number): number => {
+    const count = Math.max(1, Math.ceil(n * pct));
+    const topSum = spends.slice(0, count).reduce((sum, s) => sum + s, 0);
+    return (topSum / totalRevenue) * 100;
+  };
+
+  // Gini coefficient calculation
+  const sortedAsc = [...spends].sort((a, b) => a - b);
+  const mean = totalRevenue / n;
+  let sumAbsDiff = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      sumAbsDiff += Math.abs(sortedAsc[i] - sortedAsc[j]);
+    }
+  }
+  const giniCoefficient = n > 1 ? sumAbsDiff / (2 * n * n * mean) : 0;
+
+  return {
+    top10Pct: revenueFromTopN(0.1),
+    top20Pct: revenueFromTopN(0.2),
+    top50Pct: revenueFromTopN(0.5),
+    giniCoefficient: Math.min(giniCoefficient, 1),
+  };
+}
+
+/**
+ * Fetches post-promo health segments.
+ *
+ * Classification logic:
+ * 1. Dormidos: Had 45+ day gap between orders AND returning order had promo
+ * 2. Sticky: First order had promo AND at least one later order without promo
+ * 3. Promocioneros: First order had promo AND no later order without promo
+ * 4. Organico: First order had no promo (all remaining)
+ */
+export async function fetchPostPromoHealth(
+  params: FetchCustomerDataParams
+): Promise<PostPromoHealth> {
+  const orders = await fetchCustomerOrders(params);
+
+  if (orders.length === 0) {
+    return { sticky: 0, promocioneros: 0, organico: 0, dormidos: 0, total: 0 };
+  }
+
+  // Group orders by customer
+  const customerOrders = new Map<string, CustomerOrder[]>();
+  for (const order of orders) {
+    if (!customerOrders.has(order.customerId)) {
+      customerOrders.set(order.customerId, []);
+    }
+    customerOrders.get(order.customerId)!.push(order);
+  }
+
+  let sticky = 0;
+  let promocioneros = 0;
+  let organico = 0;
+  let dormidos = 0;
+
+  const DORMANT_THRESHOLD_DAYS = 45;
+
+  for (const [, custOrders] of customerOrders) {
+    const sorted = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
+
+    // Check for dormidos first: 45+ day gap with promo reactivation
+    let isDormido = false;
+    if (sorted.length >= 2) {
+      for (let i = 1; i < sorted.length; i++) {
+        const gapDays = (sorted[i].orderDate.getTime() - sorted[i - 1].orderDate.getTime()) / (1000 * 60 * 60 * 24);
+        if (gapDays >= DORMANT_THRESHOLD_DAYS && sorted[i].promotions > 0) {
+          isDormido = true;
+          break;
+        }
+      }
+    }
+
+    if (isDormido) {
+      dormidos++;
+      continue;
+    }
+
+    const firstOrderHadPromo = sorted[0].promotions > 0;
+
+    if (firstOrderHadPromo) {
+      // Check if any subsequent order was without promo
+      const hasOrganicReturn = sorted.length > 1 && sorted.slice(1).some((o) => o.promotions === 0);
+      if (hasOrganicReturn) {
+        sticky++;
+      } else {
+        promocioneros++;
+      }
+    } else {
+      organico++;
+    }
+  }
+
+  return {
+    sticky,
+    promocioneros,
+    organico,
+    dormidos,
+    total: customerOrders.size,
   };
 }

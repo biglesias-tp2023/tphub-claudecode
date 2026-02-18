@@ -3,8 +3,8 @@ import {
   Users,
   UserPlus,
   RefreshCcw,
-  Clock,
-  DollarSign,
+  ShoppingCart,
+  Wallet,
   Receipt,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
@@ -13,17 +13,19 @@ import {
   CustomerScorecard,
   ChannelCustomerCard,
   CohortHeatmap,
-  SpendHistogram,
   ChurnRiskTable,
   PlatformAnalysis,
+  RevenueConcentration,
+  PostPromoHealth,
 } from '@/features/customers/components';
 import {
   useCustomerMetrics,
   useChannelCustomerMetrics,
   useCustomerCohorts,
   useChurnRisk,
-  useSpendDistribution,
   useMultiPlatform,
+  useRevenueConcentration,
+  usePostPromoHealth,
 } from '@/features/customers/hooks';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
@@ -41,8 +43,9 @@ export function CustomersPage() {
   const channelMetricsQuery = useChannelCustomerMetrics();
   const cohortsQuery = useCustomerCohorts({ granularity: cohortGranularity });
   const churnRiskQuery = useChurnRisk({ limit: 20 });
-  const spendDistributionQuery = useSpendDistribution();
   const multiPlatformQuery = useMultiPlatform();
+  const concentrationQuery = useRevenueConcentration();
+  const postPromoQuery = usePostPromoHealth();
 
   // Period labels
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
@@ -58,16 +61,18 @@ export function CustomersPage() {
     channelMetricsQuery.isLoading ||
     cohortsQuery.isLoading ||
     churnRiskQuery.isLoading ||
-    spendDistributionQuery.isLoading ||
-    multiPlatformQuery.isLoading;
+    multiPlatformQuery.isLoading ||
+    concentrationQuery.isLoading ||
+    postPromoQuery.isLoading;
 
   const hasError =
     metricsQuery.error ||
     channelMetricsQuery.error ||
     cohortsQuery.error ||
     churnRiskQuery.error ||
-    spendDistributionQuery.error ||
-    multiPlatformQuery.error;
+    multiPlatformQuery.error ||
+    concentrationQuery.error ||
+    postPromoQuery.error;
 
   if (isLoading) {
     return (
@@ -89,8 +94,9 @@ export function CustomersPage() {
   const channelMetrics = channelMetricsQuery.data || [];
   const cohorts = cohortsQuery.data || [];
   const churnRisk = churnRiskQuery.data || [];
-  const spendDistribution = spendDistributionQuery.data;
   const multiPlatform = multiPlatformQuery.data;
+  const concentration = concentrationQuery.data;
+  const postPromo = postPromoQuery.data;
 
   // Filter out channels with no data
   const activeChannelMetrics = channelMetrics.filter((ch) => ch.totalCustomers > 0);
@@ -137,23 +143,22 @@ export function CustomersPage() {
               value={`${metrics.retentionRate.toFixed(1)}%`}
               change={metrics.retentionRateChange}
               icon={RefreshCcw}
-              tooltip="% de clientes que han hecho más de 1 pedido"
+              tooltip="% de clientes con más de 1 pedido / total clientes"
             />
             <CustomerScorecard
-              title="Frecuencia"
-              value={`${metrics.avgFrequencyDays.toFixed(0)} días`}
-              change={metrics.avgFrequencyDaysChange}
-              icon={Clock}
-              subtitle="entre pedidos"
-              tooltip="Días promedio entre pedidos (solo clientes con 2+ pedidos)"
+              title="Ped./Cliente"
+              value={metrics.avgOrdersPerCustomer.toFixed(1)}
+              change={metrics.avgOrdersPerCustomerChange}
+              icon={ShoppingCart}
+              tooltip="Pedidos promedio por cliente en el período"
             />
             <CustomerScorecard
-              title="CLV Est."
-              value={formatCurrency(metrics.estimatedCLV)}
-              change={metrics.estimatedCLVChange}
-              icon={DollarSign}
-              subtitle="anualizado"
-              tooltip="Valor estimado anual: Ticket × Pedidos/cliente × 12"
+              title="Gasto Medio"
+              value={formatCurrency(metrics.avgSpendPerCustomer)}
+              change={metrics.avgSpendPerCustomerChange}
+              icon={Wallet}
+              subtitle="por cliente"
+              tooltip="Gasto total acumulado / número de clientes"
             />
             <CustomerScorecard
               title="Ticket"
@@ -179,14 +184,32 @@ export function CustomersPage() {
                 totalCustomers={channel.totalCustomers}
                 newCustomers={channel.newCustomers}
                 newCustomersPercentage={channel.newCustomersPercentage}
-                avgCLV={channel.avgCLV}
                 avgTicket={channel.avgTicket}
                 avgOrdersPerCustomer={channel.avgOrdersPerCustomer}
                 returningCustomers={channel.returningCustomers}
                 repetitionRate={channel.repetitionRate}
+                netRevenuePerCustomer={channel.netRevenuePerCustomer}
+                promoOrdersPercentage={channel.promoOrdersPercentage}
               />
             ))}
           </div>
+          <p className="text-xs text-gray-400 mt-2 ml-1">
+            Los clientes que usan múltiples plataformas aparecen en cada canal
+          </p>
+        </section>
+      )}
+
+      {/* Post-Promo Health */}
+      {postPromo && postPromo.total > 0 && (
+        <section>
+          <PostPromoHealth data={postPromo} />
+        </section>
+      )}
+
+      {/* Revenue Concentration */}
+      {concentration && (concentration.top10Pct > 0 || concentration.top20Pct > 0) && (
+        <section>
+          <RevenueConcentration data={concentration} />
         </section>
       )}
 
@@ -221,14 +244,6 @@ export function CustomersPage() {
         </div>
         <CohortHeatmap data={cohorts} granularity={cohortGranularity} />
       </section>
-
-      {/* Spend Distribution */}
-      {spendDistribution && spendDistribution.segments.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Distribución de Gasto</h2>
-          <SpendHistogram data={spendDistribution} />
-        </section>
-      )}
 
       {/* Churn Risk */}
       {churnRisk.length > 0 && (
