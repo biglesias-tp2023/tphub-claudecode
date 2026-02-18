@@ -18,8 +18,9 @@ import {
 import { Spinner } from '@/components/ui/Spinner';
 import { ExportButtons, DataFreshnessIndicator, type ExportFormat, type PreviewTableData } from '@/components/common';
 import { DashboardFilters } from '@/features/dashboard';
-import { useControllingData } from '@/features/controlling';
+import { useControllingData, useWeeklyRevenue } from '@/features/controlling';
 import type { HierarchyRow, ChannelMetrics } from '@/features/controlling';
+import { Sparkline } from '@/components/charts/Sparkline';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
 import {
@@ -197,6 +198,8 @@ type SortDirection = 'asc' | 'desc' | null;
 interface HierarchyTableProps {
   data: HierarchyRow[];
   periodLabels: { current: string; comparison: string };
+  weeklyRevenue: Map<string, number[]>;
+  weeklyRevenueLoading: boolean;
 }
 
 const LEVEL_ICONS: Record<HierarchyRow['level'], React.ElementType> = {
@@ -255,7 +258,7 @@ function SortableHeader({ column, label, currentSort, currentDirection, onSort, 
   );
 }
 
-function HierarchyTable({ data, periodLabels }: HierarchyTableProps) {
+function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoading }: HierarchyTableProps) {
   const [activeTabs, setActiveTabs] = useState<Set<ViewTab>>(new Set(['rendimiento']));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -473,6 +476,9 @@ function HierarchyTable({ data, periodLabels }: HierarchyTableProps) {
                 currentDirection={sortDirection}
                 onSort={handleSort}
               />
+              <th className="py-2.5 px-2 font-medium text-gray-500 text-xs text-center w-[98px]">
+                Evolución
+              </th>
               <SortableHeader
                 column="pedidos"
                 label="Pedidos"
@@ -661,6 +667,13 @@ function HierarchyTable({ data, periodLabels }: HierarchyTableProps) {
                       {row.ventasChange >= 0 ? '+' : ''}{row.ventasChange.toFixed(1)}%
                     </span>
                   </td>
+                  <td className="py-2.5 px-1 text-center">
+                    {weeklyRevenueLoading ? (
+                      <div className="inline-block w-[90px] h-[28px] bg-gray-100 rounded animate-pulse" />
+                    ) : (
+                      <Sparkline data={weeklyRevenue.get(row.id) || []} />
+                    )}
+                  </td>
                   <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.pedidos)}</td>
                   {activeTabs.has('rendimiento') && (
                     <>
@@ -711,6 +724,7 @@ export function ControllingPage() {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange } = useDashboardFiltersStore();
   const { data, isLoading, error } = useControllingData();
+  const { weeklyRevenue, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 
   // Period labels for comparison - use actual dateRange values
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
@@ -925,7 +939,12 @@ export function ControllingPage() {
 
       {/* Detalle por Compañía */}
       <section>
-        <HierarchyTable data={hierarchy} periodLabels={periodLabels} />
+        <HierarchyTable
+          data={hierarchy}
+          periodLabels={periodLabels}
+          weeklyRevenue={weeklyRevenue}
+          weeklyRevenueLoading={weeklyRevenueLoading}
+        />
       </section>
     </div>
   );
