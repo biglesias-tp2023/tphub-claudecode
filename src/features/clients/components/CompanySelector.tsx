@@ -40,7 +40,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   const allowedCompanies = useMemo(() => {
     if (isUnrestrictedRole(profile?.role)) return companies;
     const assigned = profile?.assignedCompanyIds;
-    if (!assigned || assigned.length === 0) return companies;
+    if (!assigned || assigned.length === 0) return []; // No asignadas = no ve ninguna
     const allowedSet = new Set(assigned);
     return companies.filter((c) => allowedSet.has(c.id));
   }, [companies, profile?.role, profile?.assignedCompanyIds]);

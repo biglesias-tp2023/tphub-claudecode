@@ -18,6 +18,8 @@ import {
   fetchCrpBrands,
   fetchCrpRestaurants,
 } from '@/services/crp-portal';
+import { useAuthStore } from '@/stores/authStore';
+import { isUnrestrictedRole } from '@/stores/filtersStore';
 
 export interface EntityScopeSelectorProps {
   companyId: string | null;
@@ -44,11 +46,21 @@ export function EntityScopeSelector({
   summaryLabel = 'Alcance de la selección',
 }: EntityScopeSelectorProps) {
   // Fetch companies
-  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+  const { data: allCompanies = [], isLoading: companiesLoading } = useQuery({
     queryKey: ['crp', 'companies'],
     queryFn: fetchCrpCompanies,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Filter by assigned companies for restricted users
+  const profile = useAuthStore((s) => s.profile);
+  const companies = useMemo(() => {
+    if (isUnrestrictedRole(profile?.role)) return allCompanies;
+    const assigned = profile?.assignedCompanyIds;
+    if (!assigned || assigned.length === 0) return [];
+    const allowedSet = new Set(assigned);
+    return allCompanies.filter((c) => allowedSet.has(c.id));
+  }, [allCompanies, profile?.role, profile?.assignedCompanyIds]);
 
   // Fetch brands when company is selected
   const { data: brands = [], isLoading: brandsLoading } = useQuery({
