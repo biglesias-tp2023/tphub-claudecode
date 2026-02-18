@@ -4,7 +4,7 @@ import { Sidebar } from '../Sidebar';
 import { useUIStore } from '@/stores/uiStore';
 
 export function MainLayout() {
-  const { isSidebarCollapsed } = useUIStore();
+  const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed);
 
   return (
     <div className="min-h-screen bg-gray-100">

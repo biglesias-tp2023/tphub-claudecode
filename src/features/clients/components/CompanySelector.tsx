@@ -32,8 +32,11 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   const { data: companies = [], isLoading } = useCompanies();
-  const { companyIds, toggleCompanyId, setCompanyIds, clearCompanies } = useGlobalFiltersStore();
-  const { resetDashboardFilters } = useDashboardFiltersStore();
+  const companyIds = useGlobalFiltersStore((s) => s.companyIds);
+  const toggleCompanyId = useGlobalFiltersStore((s) => s.toggleCompanyId);
+  const setCompanyIds = useGlobalFiltersStore((s) => s.setCompanyIds);
+  const clearCompanies = useGlobalFiltersStore((s) => s.clearCompanies);
+  const resetDashboardFilters = useDashboardFiltersStore((s) => s.resetDashboardFilters);
   const profile = useAuthStore((s) => s.profile);
 
   // Filter companies by user's assigned companies (restricted users only)
