@@ -387,8 +387,11 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
     }
   }, [isBrandAutoLocked, filteredBrands, selectedBrand]);
 
-  // KAM evaluador = logged-in user who creates the audit
+  const isOnboarding = selectedTypeSlug === 'onboarding';
+
+  // KAM evaluador = logged-in user who creates the audit (mystery_shopper only)
   useEffect(() => {
+    if (isOnboarding) return;
     if (profile?.fullName) {
       setKamName(profile.fullName);
     } else if (profile?.email) {
@@ -396,7 +399,19 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
     } else {
       setKamName('');
     }
-  }, [profile?.fullName, profile?.email]);
+  }, [profile?.fullName, profile?.email, isOnboarding]);
+
+  // Onboarding: auto-select consultant matching company's KAM
+  useEffect(() => {
+    if (!isOnboarding || !selectedCompany?.keyAccountManager || profiles.length === 0) return;
+    const kamNameLower = selectedCompany.keyAccountManager.toLowerCase();
+    const match = profiles.find(
+      (p) => p.fullName?.toLowerCase() === kamNameLower || p.email?.toLowerCase().startsWith(kamNameLower.split(' ')[0])
+    );
+    if (match) {
+      setSelectedConsultant(match);
+    }
+  }, [isOnboarding, selectedCompany?.keyAccountManager, profiles]);
 
   const handleTypeSelect = (slug: AuditTypeSlug) => {
     setSelectedTypeSlug(slug);
@@ -413,8 +428,12 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
   };
 
   const handleCreate = async () => {
-    if (!selectedTypeSlug || !selectedCompany || !selectedBrand || !selectedPlatform || !selectedConsultant) {
+    if (!selectedTypeSlug || !selectedCompany || !selectedBrand || !selectedConsultant) {
       onError('Por favor completa todos los campos requeridos');
+      return;
+    }
+    if (!isOnboarding && !selectedPlatform) {
+      onError('Por favor selecciona una plataforma');
       return;
     }
 
@@ -427,25 +446,25 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
 
     setIsCreating(true);
     try {
-      // Generate audit number: MS-YYYYMMDD-BrandName
       const auditNumber = generateAuditNumber(selectedTypeSlug, selectedBrand.name);
 
       const newAudit = await createAudit.mutateAsync({
         pfkIdAuditType: auditType.id,
         pfkIdCompany: selectedCompany.id,
         pfkIdStore: selectedBrand.id,
-        pfkIdPortal: selectedPlatform.id,
+        pfkIdPortal: isOnboarding ? undefined : selectedPlatform!.id,
         desConsultant: selectedConsultant.fullName || selectedConsultant.email,
-        desKamEvaluator: kamName ?? undefined,
+        desKamEvaluator: isOnboarding ? undefined : (kamName ?? undefined),
         desAuditNumber: auditNumber,
-        desFieldData: {
-          general_brand: selectedBrand.name,
-          general_platform: selectedPlatform.name,
-        },
+        desFieldData: isOnboarding
+          ? {}
+          : {
+              general_brand: selectedBrand.name,
+              general_platform: selectedPlatform!.name,
+            },
       });
 
       onClose();
-      // Navigate to the audit detail page using new field name
       navigate(`/audits/${newAudit.pkIdAudit}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al crear la auditoría';
@@ -455,7 +474,9 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
     }
   };
 
-  const isFormValid = selectedCompany && selectedBrand && selectedPlatform && selectedConsultant;
+  const isFormValid = isOnboarding
+    ? !!(selectedCompany && selectedBrand && selectedConsultant)
+    : !!(selectedCompany && selectedBrand && selectedPlatform && selectedConsultant);
 
   if (!open) return null;
 
@@ -547,12 +568,13 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
                 <SimpleDropdown
                   placeholder="Seleccionar compañía"
                   value={selectedCompany}
-                  options={availableCompanies.map((c) => ({ id: c.id, name: c.name }))}
+                  options={availableCompanies.map((c) => ({ id: c.id, name: c.name, keyAccountManager: c.keyAccountManager }))}
                   isLoading={companiesLoading}
                   onChange={(company) => {
                     setSelectedCompany(company);
-                    // Reset brand when company changes
+                    // Reset brand and consultant when company changes
                     setSelectedBrand(null);
+                    if (isOnboarding) setSelectedConsultant(null);
                   }}
                   getOptionLabel={(c) => c.name}
                   getOptionValue={(c) => c.id}
@@ -583,7 +605,8 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
               )}
             </div>
 
-            {/* Platform Selector */}
+            {/* Platform Selector (not for onboarding) */}
+            {!isOnboarding && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Plataforma <span className="text-red-500">*</span>
@@ -598,12 +621,18 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
                 getOptionValue={(p) => p.id}
               />
             </div>
+            )}
 
             {/* Consultant Selector (single-select) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Consultor que gestiona la cuenta <span className="text-red-500">*</span>
               </label>
+              {isOnboarding && selectedConsultant ? (
+                <div className="px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700">
+                  {selectedConsultant.fullName || selectedConsultant.email}
+                </div>
+              ) : (
               <SimpleDropdown
                 placeholder="Seleccionar consultor"
                 value={selectedConsultant}
@@ -613,9 +642,11 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
                 getOptionLabel={(p) => p.fullName || p.email}
                 getOptionValue={(p) => p.id}
               />
+              )}
             </div>
 
-            {/* KAM Evaluator (auto-filled from company) */}
+            {/* KAM Evaluator (auto-filled, not for onboarding) */}
+            {!isOnboarding && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 KAM evaluador
@@ -624,6 +655,7 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
                 {kamName || <span className="text-gray-400">Se cargará de la compañía</span>}
               </div>
             </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
               <Button variant="outline" onClick={onClose}>
