@@ -8,6 +8,7 @@ import {
   Target,
   Calendar,
   ClipboardCheck,
+  Grid3X3,
   Map,
   PanelLeftClose,
   PanelLeftOpen,
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'Soon!', color: 'gray' } },
   { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
   { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR },
+  { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
   { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
   { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
 ];
