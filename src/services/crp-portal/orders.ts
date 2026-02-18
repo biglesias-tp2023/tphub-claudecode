@@ -199,7 +199,7 @@ export async function fetchCrpOrdersRaw(
   while (hasMore) {
     let query = supabase
       .from('crp_portal__ft_order_head')
-      .select('*')
+      .select('pk_uuid_order, pfk_id_company, pfk_id_store, pfk_id_store_address, pfk_id_portal, td_creation_time, amt_total_price, amt_promotions, amt_refunds, cod_id_customer')
       .gte('td_creation_time', `${startDate}T00:00:00`)
       .lte('td_creation_time', `${endDate}T23:59:59`);
 

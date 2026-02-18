@@ -37,7 +37,7 @@ const TABLE_NAME = 'crp_portal__ct_business_area';
 export async function fetchAreas(): Promise<Area[]> {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('pk_id_business_area, des_business_area, flg_deleted')
     .order('des_business_area');
 
   if (error) {
@@ -69,7 +69,7 @@ export async function fetchAreas(): Promise<Area[]> {
 export async function fetchAreaById(areaId: string): Promise<Area | null> {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('pk_id_business_area, des_business_area, flg_deleted')
     .eq('pk_id_business_area', parseInt(areaId, 10))
     .single();
 

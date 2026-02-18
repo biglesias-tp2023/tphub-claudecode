@@ -66,7 +66,7 @@ export async function fetchRestaurants(
   // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication (see utils.ts)
   let query = supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted, pk_ts_month')
     .order('pk_ts_month', { ascending: false })
     .order('des_address');
 
@@ -131,7 +131,7 @@ export async function fetchRestaurantById(
   // NOTE: Do NOT filter flg_deleted here - check AFTER getting most recent
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted, pk_ts_month')
     .eq('pk_id_address', parseInt(restaurantId, 10))
     .order('pk_ts_month', { ascending: false })
     .limit(1);

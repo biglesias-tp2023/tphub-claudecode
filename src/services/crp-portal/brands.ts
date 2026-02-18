@@ -46,7 +46,7 @@ export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
   // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication (see utils.ts)
   let query = supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('pk_id_store, des_store, pfk_id_company, flg_deleted, pk_ts_month')
     .order('pk_ts_month', { ascending: false })
     .order('des_store');
 
@@ -103,7 +103,7 @@ export async function fetchBrandById(brandId: string): Promise<Brand | null> {
   // NOTE: Do NOT filter flg_deleted here - check AFTER getting most recent
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('pk_id_store, des_store, pfk_id_company, flg_deleted, pk_ts_month')
     .eq('pk_id_store', parseInt(brandId, 10))
     .order('pk_ts_month', { ascending: false })
     .limit(1);
