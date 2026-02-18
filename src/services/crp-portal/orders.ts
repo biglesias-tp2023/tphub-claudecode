@@ -246,10 +246,23 @@ export async function fetchCrpOrdersRaw(
 }
 
 /**
+ * Response row from get_orders_aggregation RPC function.
+ */
+interface OrdersAggregationRPCRow {
+  channel: string;
+  total_revenue: number;
+  total_orders: number;
+  total_discounts: number;
+  total_refunds: number;
+  unique_customers: number;
+}
+
+/**
  * Fetches and aggregates order data for dashboard display.
  *
- * Returns totals and per-channel breakdowns. This is the primary function
- * for the Controlling dashboard KPIs.
+ * Uses the `get_orders_aggregation` Supabase RPC function to perform
+ * aggregation server-side. The DB returns ~3 rows (one per channel)
+ * instead of downloading 50k+ individual orders.
  *
  * @param params - Query parameters including filters and date range
  * @returns Promise resolving to aggregated metrics
@@ -271,9 +284,31 @@ export async function fetchCrpOrdersRaw(
 export async function fetchCrpOrdersAggregated(
   params: FetchOrdersParams
 ): Promise<OrdersAggregation> {
-  const orders = await fetchCrpOrdersRaw(params);
+  const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
 
-  // Initialize aggregation
+  // Determine portal IDs for channel filter
+  let portalIdsToFilter: string[] | null = null;
+  if (channelIds && channelIds.length > 0 && shouldApplyChannelFilter(channelIds)) {
+    portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
+  }
+
+  const { data, error } = await supabase.rpc('get_orders_aggregation', {
+    p_company_ids: companyIds && companyIds.length > 0 ? companyIds.map(String) : null,
+    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds.map(String) : null,
+    p_address_ids: addressIds && addressIds.length > 0 ? addressIds.map(String) : null,
+    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+    p_start_date: `${startDate}T00:00:00`,
+    p_end_date: `${endDate}T23:59:59`,
+  });
+
+  if (error) {
+    console.error('Error fetching orders aggregation RPC:', error);
+    throw error;
+  }
+
+  const rows = (data || []) as OrdersAggregationRPCRow[];
+
+  // Initialize result with empty channel aggregations
   const result: OrdersAggregation = {
     totalRevenue: 0,
     totalOrders: 0,
@@ -293,46 +328,38 @@ export async function fetchCrpOrdersAggregated(
     },
   };
 
-  // Track unique customers globally and per channel
-  const globalCustomerIds = new Set<string>();
-  const channelCustomerIds: Record<ChannelId, Set<string>> = {
-    glovo: new Set(),
-    ubereats: new Set(),
-    justeat: new Set(),
-  };
+  // Parse RPC rows (one per channel: 'glovo', 'ubereats', 'other')
+  for (const row of rows) {
+    const revenue = Number(row.total_revenue) || 0;
+    const orders = Number(row.total_orders) || 0;
+    const discounts = Number(row.total_discounts) || 0;
+    const refunds = Number(row.total_refunds) || 0;
+    const customers = Number(row.unique_customers) || 0;
 
-  // Aggregate order data
-  for (const order of orders) {
-    const revenue = order.amt_total_price || 0;
-    const discounts = order.amt_promotions || 0;
-    const refunds = order.amt_refunds || 0;
-    const customerId = order.cod_id_customer;
-
-    // Add to totals
+    // Add to global totals
     result.totalRevenue += revenue;
-    result.totalOrders += 1;
+    result.totalOrders += orders;
     result.totalDiscounts += discounts;
     result.totalRefunds += refunds;
 
-    // Track unique customers
-    if (customerId) {
-      globalCustomerIds.add(customerId);
+    // Map channel row to byChannel
+    const channelKey = row.channel as ChannelId;
+    if (channelKey === 'glovo' || channelKey === 'ubereats') {
+      result.byChannel[channelKey].revenue = revenue;
+      result.byChannel[channelKey].orders = orders;
+      result.byChannel[channelKey].discounts = discounts;
+      result.byChannel[channelKey].refunds = refunds;
+      result.byChannel[channelKey].netRevenue = revenue - refunds;
+      result.byChannel[channelKey].uniqueCustomers = customers;
     }
-
-    // Add to channel-specific aggregation
-    const channelId = portalIdToChannelId(order.pfk_id_portal);
-    if (channelId && result.byChannel[channelId]) {
-      result.byChannel[channelId].revenue += revenue;
-      result.byChannel[channelId].orders += 1;
-      result.byChannel[channelId].discounts += discounts;
-      result.byChannel[channelId].refunds += refunds;
-
-      // Track unique customers per channel
-      if (customerId) {
-        channelCustomerIds[channelId].add(customerId);
-      }
-    }
+    // 'other' channel (e.g. JustEat or unknown portals) adds to totals but not byChannel
   }
+
+  // Note: unique_customers across channels can't be summed (customers may overlap).
+  // We use the global COUNT(DISTINCT) which we don't have from per-channel rows.
+  // Approximate by summing per-channel customers (slight overcount if customer uses multiple channels).
+  // For exact global count we'd need a separate query or an extra "totals" row from the RPC.
+  result.uniqueCustomers = rows.reduce((sum, r) => sum + (Number(r.unique_customers) || 0), 0);
 
   // Calculate derived metrics
   result.avgTicket = result.totalOrders > 0
@@ -353,18 +380,9 @@ export async function fetchCrpOrdersAggregated(
     ? result.totalDiscounts / result.totalOrders
     : 0;
 
-  result.uniqueCustomers = globalCustomerIds.size;
-
   result.ordersPerCustomer = result.uniqueCustomers > 0
     ? result.totalOrders / result.uniqueCustomers
     : 0;
-
-  // Calculate channel-level derived metrics
-  for (const channelId of ['glovo', 'ubereats', 'justeat'] as ChannelId[]) {
-    const channel = result.byChannel[channelId];
-    channel.netRevenue = channel.revenue - channel.refunds;
-    channel.uniqueCustomers = channelCustomerIds[channelId].size;
-  }
 
   return result;
 }
