@@ -11,3 +11,9 @@ export {
   useDeleteInvitation,
 } from './useInvitations';
 export type { UserInvitation, InvitationInput, InvitationStatus } from './useInvitations';
+export {
+  useAllCompsetProducts,
+  useUnmappedProducts,
+  useAllCompetitorsForMapping,
+  useUpdateProductCategory,
+} from './useCategoryMappings';

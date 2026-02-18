@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { UserPlus, Users, Mail, Clock, Crown, Shield } from 'lucide-react';
+import { UserPlus, Users, Mail, Clock, Crown, Shield, FolderTree } from 'lucide-react';
 import { Spinner, Button } from '@/components/ui';
 import { useIsAdmin, useCanInviteUsers } from '@/stores/authStore';
 import {
@@ -11,10 +11,11 @@ import {
   InviteUserModal,
   PendingInvitations,
   usePendingInvitations,
+  CategoryMappingTab,
 } from '@/features/admin';
 import type { Profile } from '@/types';
 
-type TabId = 'users' | 'invitations';
+type TabId = 'users' | 'invitations' | 'mapping';
 
 export function AdminPage() {
   const isAdmin = useIsAdmin();
@@ -64,6 +65,11 @@ export function AdminPage() {
       icon: Mail,
       count: pendingInvitations.length,
       badge: pendingInvitations.length > 0,
+    },
+    {
+      id: 'mapping' as TabId,
+      label: 'Categorías Menú',
+      icon: FolderTree,
     },
   ];
 
@@ -217,6 +223,20 @@ export function AdminPage() {
                 </h2>
               </div>
               <PendingInvitations showAll />
+            </>
+          )}
+
+          {activeTab === 'mapping' && (
+            <>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Categorías de Menú
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Asigna categorías normalizadas a los productos de competidores para comparar precios en el Compset.
+                </p>
+              </div>
+              <CategoryMappingTab />
             </>
           )}
 

@@ -1,0 +1,12 @@
+export { NORMALIZED_CATEGORIES, CATEGORY_MAP, PLATFORM_COLORS, PLATFORM_LABELS } from './categories';
+export type { CategoryConfig } from './categories';
+export {
+  MOCK_HERO,
+  MOCK_HERO_SNAPSHOT,
+  MOCK_HERO_PRODUCTS,
+  MOCK_HERO_PROMOTIONS,
+  MOCK_COMPETITORS,
+  MOCK_SNAPSHOTS,
+  MOCK_PRODUCTS,
+  MOCK_PROMOTIONS,
+} from './mockData';

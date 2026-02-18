@@ -21,6 +21,8 @@ const CalendarPage = lazyWithRetry(() => import('@/pages/calendar').then(m => ({
 const StrategicPage = lazyWithRetry(() => import('@/pages/strategic').then(m => ({ default: m.StrategicPage })));
 // Heatmap: temporal pattern analysis
 const HeatmapPage = lazyWithRetry(() => import('@/pages/heatmap').then(m => ({ default: m.HeatmapPage })));
+// Compset: competitive set analysis
+const CompsetPage = lazyWithRetry(() => import('@/pages/compset').then(m => ({ default: m.CompsetPage })));
 // Audits: large pages with extensive forms
 const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditsPage })));
 const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
@@ -72,7 +74,7 @@ export const router = createBrowserRouter([
       { path: 'reputation', element: <LazyPage><ReputationPage /></LazyPage> },
       { path: 'strategic', element: <LazyPage><StrategicPage /></LazyPage> },
       { path: 'calendar', element: <LazyPage><CalendarPage /></LazyPage> },
-      { path: 'compset', element: <PlaceholderPage title="Compset" /> },
+      { path: 'compset', element: <LazyPage><CompsetPage /></LazyPage> },
       { path: 'heatmap', element: <LazyPage><HeatmapPage /></LazyPage> },
       { path: 'audits', element: <LazyPage><AuditsPage /></LazyPage> },
       { path: 'audits/:id', element: <LazyPage><AuditDetailPage /></LazyPage> },
