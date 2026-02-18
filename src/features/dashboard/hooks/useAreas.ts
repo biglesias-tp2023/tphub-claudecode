@@ -29,7 +29,7 @@ export function useAreas() {
  */
 export function useArea(areaId: string) {
   return useQuery({
-    queryKey: queryKeys.areas.detail(areaId),
+    queryKey: ['areas', 'detail', areaId],
     queryFn: () => fetchCrpAreaById(areaId),
     enabled: !!areaId,
   });
