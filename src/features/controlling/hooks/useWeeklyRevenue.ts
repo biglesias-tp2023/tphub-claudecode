@@ -40,11 +40,10 @@ interface WeekRange {
  * most recent completed week.
  *
  * Example (if today is Wed Feb 18, 2026):
- * - Week 6 (most recent complete): Feb 9-15
- * - Week 5: Feb 2-8
- * - Week 4: Jan 26 - Feb 1
+ * - Week 8 (most recent complete): Feb 9-15
+ * - Week 7: Feb 2-8
  * - ...
- * - Week 1 (oldest): Jan 5-11
+ * - Week 1 (oldest): Dec 22-28
  */
 function getLast6Weeks(): WeekRange[] {
   const today = new Date();
@@ -60,7 +59,7 @@ function getLast6Weeks(): WeekRange[] {
 
   const weeks: WeekRange[] = [];
 
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 8; i++) {
     // Go back i weeks from current Monday
     const weekStart = new Date(currentMonday);
     weekStart.setDate(currentMonday.getDate() - i * 7);
