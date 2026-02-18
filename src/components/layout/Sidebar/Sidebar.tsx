@@ -30,16 +30,16 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   to: string;
-  tag?: { text: string; color: 'green' | 'gray' };
+  tag?: { text: string; color: 'green' | 'gray' | 'orange' };
 }
 
 const navItems: NavItem[] = [
   { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
   { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
   { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
-  { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
-  { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR },
-  { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Soon!', color: 'gray' } },
+  { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'Beta', color: 'orange' } },
+  { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
+  { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
   { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'Soon!', color: 'gray' } },
   { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
@@ -200,6 +200,8 @@ export function Sidebar() {
                           'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
                           item.tag.color === 'green'
                             ? 'bg-emerald-50 text-emerald-600'
+                            : item.tag.color === 'orange'
+                            ? 'bg-amber-50 text-accent-400'
                             : 'bg-gray-100 text-gray-400'
                         )}>
                           {item.tag.text}
