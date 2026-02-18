@@ -13,7 +13,7 @@ const SEGMENTS = [
     color: 'bg-emerald-400',
     dotColor: 'bg-emerald-400',
     textColor: 'text-emerald-700',
-    tooltip: 'Entraron con promo y han vuelto sin promo. Captación exitosa: el cliente se queda sin necesidad de descuento.',
+    tooltip: 'Cliente fidelizado: llegó por una promo pero volvió a comprar sin descuento. Es la mejor señal de que las promos funcionan.',
   },
   {
     key: 'promocioneros' as const,
@@ -21,7 +21,7 @@ const SEGMENTS = [
     color: 'bg-amber-400',
     dotColor: 'bg-amber-400',
     textColor: 'text-amber-700',
-    tooltip: 'Entraron con promo y siguen comprando solo con promo. Alta dependencia promocional.',
+    tooltip: 'Cliente dependiente de promos: solo compra cuando hay descuento. Un % alto indica que las promos no generan fidelización real.',
   },
   {
     key: 'organico' as const,
@@ -29,7 +29,7 @@ const SEGMENTS = [
     color: 'bg-blue-400',
     dotColor: 'bg-blue-400',
     textColor: 'text-blue-700',
-    tooltip: 'Entraron sin promo. Base de clientes saludable que no necesitó incentivo.',
+    tooltip: 'Cliente natural: llegó y compra sin necesidad de promociones. Es la base más rentable y sostenible.',
   },
   {
     key: 'dormidos' as const,
@@ -37,7 +37,7 @@ const SEGMENTS = [
     color: 'bg-gray-400',
     dotColor: 'bg-gray-400',
     textColor: 'text-gray-600',
-    tooltip: 'Clientes con +45 días sin pedido reactivados por promo. Mide eficacia de reactivación.',
+    tooltip: 'Cliente reactivado: llevaba +45 días sin pedir y volvió gracias a una promo. Mide si las promos sirven para recuperar clientes inactivos.',
   },
 ] as const;
 
@@ -51,7 +51,15 @@ export function PostPromoHealth({ data }: PostPromoHealthProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-100">
       <div className="px-5 py-4 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-900">Salud de la Cohorte Post-Promo</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-900">Salud de la Cohorte Post-Promo</h3>
+          <span
+            className="cursor-help text-gray-300"
+            title="Clasifica a los clientes según su relación con las promociones: ¿se fidelizan tras la promo o solo compran con descuento? Ayuda a evaluar si tu estrategia promocional genera clientes rentables a largo plazo."
+          >
+            <Info className="w-3.5 h-3.5" />
+          </span>
+        </div>
         <p className="text-xs text-gray-500 mt-0.5">
           Distribución de usuarios captados por comportamiento promocional
         </p>

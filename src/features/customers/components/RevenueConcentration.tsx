@@ -6,9 +6,9 @@ interface RevenueConcentrationProps {
 }
 
 const SEGMENTS = [
-  { key: 'top10Pct' as const, label: 'Top 10%', color: 'bg-primary-600' },
-  { key: 'top20Pct' as const, label: 'Top 20%', color: 'bg-primary-400' },
-  { key: 'top50Pct' as const, label: 'Top 50%', color: 'bg-primary-200' },
+  { key: 'top10Pct' as const, label: 'Top 10%', color: 'bg-primary-600', tooltip: 'El 10% de clientes que más gastan genera este porcentaje de tus ingresos totales.' },
+  { key: 'top20Pct' as const, label: 'Top 20%', color: 'bg-primary-400', tooltip: 'El 20% de clientes que más gastan genera este porcentaje de tus ingresos totales.' },
+  { key: 'top50Pct' as const, label: 'Top 50%', color: 'bg-primary-200', tooltip: 'La mitad de tus clientes (los que más gastan) genera este porcentaje de tus ingresos totales.' },
 ] as const;
 
 export function RevenueConcentration({ data }: RevenueConcentrationProps) {
@@ -23,7 +23,7 @@ export function RevenueConcentration({ data }: RevenueConcentrationProps) {
           <h3 className="text-sm font-semibold text-gray-900">Concentración de Ingresos</h3>
           <span
             className="cursor-help text-gray-300"
-            title="Análisis Pareto: qué porcentaje de los ingresos genera cada segmento de clientes"
+            title="Principio de Pareto: normalmente un grupo reducido de clientes genera la mayor parte de los ingresos. Cuanto mayor sea el %, más concentrada está la facturación en pocos clientes."
           >
             <Info className="w-3.5 h-3.5" />
           </span>
@@ -55,11 +55,17 @@ export function RevenueConcentration({ data }: RevenueConcentrationProps) {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          {SEGMENTS.map(({ key, label, color }) => (
+          {SEGMENTS.map(({ key, label, color, tooltip }) => (
             <div key={key} className="text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
                 <span className="text-xs text-gray-500">{label}</span>
+                <span
+                  className="cursor-help text-gray-300"
+                  title={tooltip}
+                >
+                  <Info className="w-3 h-3" />
+                </span>
               </div>
               <p className="text-lg font-bold text-gray-900 tabular-nums">
                 {data[key].toFixed(1)}%
@@ -75,7 +81,7 @@ export function RevenueConcentration({ data }: RevenueConcentrationProps) {
             <span className="text-xs text-gray-500">Coeficiente Gini</span>
             <span
               className="cursor-help text-gray-300"
-              title="0 = distribución perfectamente igual, 1 = toda la facturación en un solo cliente. Mayor de 0.5 indica alta concentración."
+              title="El coeficiente Gini mide la desigualdad en el gasto de tus clientes. 0 = todos gastan igual, 1 = un solo cliente acumula toda la facturación. >0.5 indica alta concentración."
             >
               <Info className="w-3 h-3" />
             </span>

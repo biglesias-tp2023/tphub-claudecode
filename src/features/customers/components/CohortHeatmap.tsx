@@ -123,9 +123,22 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
               <th className="text-left py-2.5 px-4 font-medium text-gray-500 text-xs w-40">Cohorte</th>
-              <th className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs w-16">Tam.</th>
+              <th
+                className="text-right py-2.5 px-2 font-medium text-gray-500 text-xs w-16 cursor-help"
+                title="Número de clientes nuevos en esta cohorte"
+              >
+                Tam.
+              </th>
               {periodLabels.map((label, i) => (
-                <th key={i} className="text-center py-2.5 px-1 font-medium text-gray-500 text-xs w-14">
+                <th
+                  key={i}
+                  className="text-center py-2.5 px-1 font-medium text-gray-500 text-xs w-14 cursor-help"
+                  title={
+                    i === 0
+                      ? `Período de adquisición (primer pedido del cliente)`
+                      : `${i} ${granularity === 'week' ? (i === 1 ? 'semana' : 'semanas') : (i === 1 ? 'mes' : 'meses')} después de la primera compra`
+                  }
+                >
                   {label}
                 </th>
               ))}

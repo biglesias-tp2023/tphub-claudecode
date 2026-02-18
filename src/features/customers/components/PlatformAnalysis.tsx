@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatNumber } from '@/utils/formatters';
 import type { MultiPlatformAnalysis } from '@/services/crp-portal';
@@ -41,7 +42,15 @@ export function PlatformAnalysis({ data }: PlatformAnalysisProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-100">
       <div className="px-5 py-4 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-900">Análisis Multi-Plataforma</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-900">Análisis Multi-Plataforma</h3>
+          <span
+            className="cursor-help text-gray-300"
+            title="Analiza en qué plataformas piden tus clientes y cuántos usan más de una. Útil para entender la dependencia de cada canal."
+          >
+            <Info className="w-3.5 h-3.5" />
+          </span>
+        </div>
         <p className="text-xs text-gray-500 mt-0.5">
           Distribución de clientes por plataforma y solapamiento
         </p>
@@ -58,6 +67,7 @@ export function PlatformAnalysis({ data }: PlatformAnalysisProps) {
               <div
                 key={platform.id}
                 className={cn('rounded-lg border p-4', colors.bg, colors.border)}
+                title={`Clientes que solo han pedido por ${CHANNEL_NAMES[platform.id]} en el período seleccionado`}
               >
                 <p className="text-xs text-gray-500 mb-1">{platform.label}</p>
                 <p className={cn('text-xl font-bold tabular-nums', colors.text)}>
@@ -69,7 +79,10 @@ export function PlatformAnalysis({ data }: PlatformAnalysisProps) {
           })}
 
           {/* Multi-platform card */}
-          <div className="rounded-lg border border-primary-200 bg-primary-50 p-4">
+          <div
+            className="rounded-lg border border-primary-200 bg-primary-50 p-4"
+            title="Clientes que han pedido en 2 o más plataformas en el período seleccionado"
+          >
             <p className="text-xs text-gray-500 mb-1">Multi-plataforma</p>
             <p className="text-xl font-bold text-primary-700 tabular-nums">
               {formatNumber(data.multiPlatform)}

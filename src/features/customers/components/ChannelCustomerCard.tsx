@@ -57,7 +57,15 @@ export function ChannelCustomerCard({
 
       <div className="grid grid-cols-2 gap-3 py-3 border-t border-gray-200/60">
         <div>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Nuevos</p>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Nuevos</p>
+            <span
+              className="cursor-help text-gray-300"
+              title="Clientes que hacen su primer pedido en este canal durante el período seleccionado"
+            >
+              <Info className="w-3 h-3" />
+            </span>
+          </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatNumber(newCustomers)}</p>
           <p className="text-[10px] text-gray-400 tabular-nums">{newCustomersPercentage.toFixed(1)}%</p>
         </div>
@@ -90,14 +98,30 @@ export function ChannelCustomerCard({
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(netRevenuePerCustomer)}</p>
         </div>
         <div>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ticket</p>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Ticket</p>
+            <span
+              className="cursor-help text-gray-300"
+              title="Importe medio por pedido en este canal"
+            >
+              <Info className="w-3 h-3" />
+            </span>
+          </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(avgTicket)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200/60">
         <div>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ped./Cliente</p>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Ped./Cliente</p>
+            <span
+              className="cursor-help text-gray-300"
+              title="Media de pedidos por cliente en este canal durante el período seleccionado"
+            >
+              <Info className="w-3 h-3" />
+            </span>
+          </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{avgOrdersPerCustomer.toFixed(1)}</p>
         </div>
         <div>
