@@ -464,16 +464,18 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        {/* Close button - floating top-right */}
+      <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col">
+        {/* Close button - floating top-right, above overflow container */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute -top-3 -right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-md hover:bg-gray-100 hover:scale-110 transition-all"
+          className="absolute -top-3 -right-3 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-md hover:bg-gray-100 hover:scale-110 transition-all"
         >
           <X className="w-4 h-4 text-gray-600" />
         </button>
 
+        {/* Scrollable content */}
+        <div className="p-6 overflow-y-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           {step === 'form' && (
@@ -482,7 +484,7 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
             </Button>
           )}
           <h2 className="text-lg font-semibold text-gray-900">
-            {step === 'type' ? 'Nueva Auditoría' : 'Mystery Shopper'}
+            {step === 'type' ? 'Nueva Auditoría' : (selectedTypeSlug === 'onboarding' ? 'Onboarding' : 'Mystery Shopper')}
           </h2>
         </div>
 
@@ -640,6 +642,7 @@ function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
             </div>
           </div>
         )}
+        </div>{/* end scrollable content */}
       </div>
     </div>
   );
