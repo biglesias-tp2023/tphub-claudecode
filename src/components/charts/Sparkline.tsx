@@ -37,12 +37,11 @@ export const Sparkline = memo(function Sparkline({
       .domain([0, data.length - 1])
       .range([padding, width - padding]);
 
-    const min = Math.min(...data);
     const max = Math.max(...data);
 
-    // If all values are the same, center the line
+    // Y-axis always starts at 0 so variations look proportional to real revenue
     const yScale = scaleLinear()
-      .domain(min === max ? [min - 1, max + 1] : [min, max])
+      .domain([0, max === 0 ? 1 : max])
       .range([height - padding, padding]);
 
     const points = data.map((d, i) => [xScale(i), yScale(d)] as [number, number]);
