@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
-import * as d3 from 'd3';
+import { select, scalePoint, scaleLinear, max, axisBottom, axisLeft, curveMonotoneX, curveLinear, area, line, pointer } from 'd3';
 import type { ChartMargin, AreaSeriesConfig, ReferenceLineConfig } from './types';
 
 interface AreaChartProps {
@@ -54,7 +54,7 @@ export function AreaChart({
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || data.length === 0) return;
 
-    const svg = d3.select(svgRef.current);
+    const svg = select(svgRef.current);
     svg.selectAll('*').remove();
 
     const innerWidth = dimensions.width - margin.left - margin.right;
@@ -77,7 +77,7 @@ export function AreaChart({
     });
 
     // Scales
-    const x = d3.scalePoint()
+    const x = scalePoint()
       .domain(data.map((d) => String(d[xKey])))
       .range([0, innerWidth])
       .padding(0.1);
@@ -125,11 +125,11 @@ export function AreaChart({
       return stackedValues.get(prevSeries.dataKey)?.get(i) || 0;
     };
 
-    const yMax = d3.max(data.flatMap((_, i) =>
+    const yMax = max(data.flatMap((_, i) =>
       series.map((s) => getValue(s, i))
     )) || 0;
 
-    const y = d3.scaleLinear()
+    const y = scaleLinear()
       .domain([0, yMax])
       .nice()
       .range([innerHeight, 0]);
@@ -160,7 +160,7 @@ export function AreaChart({
     // X Axis
     const xAxis = g.append('g')
       .attr('transform', `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(x).tickSize(0));
+      .call(axisBottom(x).tickSize(0));
 
     xAxis.select('.domain').attr('stroke', gridColor);
     xAxis.selectAll('text')
@@ -170,7 +170,7 @@ export function AreaChart({
     // Y Axis
     const yAxisG = g.append('g')
       .call(
-        d3.axisLeft(y)
+        axisLeft(y)
           .ticks(5)
           .tickSize(0)
           .tickFormat((d) => yTickFormatter ? yTickFormatter(d as number) : String(d))
@@ -181,17 +181,17 @@ export function AreaChart({
       .attr('font-size', tickFontSize)
       .attr('fill', tickColor);
 
-    const curve = curveType === 'monotone' ? d3.curveMonotoneX : d3.curveLinear;
+    const curve = curveType === 'monotone' ? curveMonotoneX : curveLinear;
 
     // Draw areas and lines (in order so later series draw on top)
     series.forEach((s) => {
-      const area = d3.area<Record<string, unknown>>()
+      const areaGen = area<Record<string, unknown>>()
         .x((d) => x(String(d[xKey])) || 0)
         .y0((_, i) => y(getBaseline(s, i)))
         .y1((_, i) => y(getValue(s, i)))
         .curve(curve);
 
-      const line = d3.line<Record<string, unknown>>()
+      const lineGen = line<Record<string, unknown>>()
         .x((d) => x(String(d[xKey])) || 0)
         .y((_, i) => y(getValue(s, i)))
         .curve(curve);
@@ -199,14 +199,14 @@ export function AreaChart({
       // Area fill
       g.append('path')
         .datum(data)
-        .attr('d', area)
+        .attr('d', areaGen)
         .attr('fill', `url(#gradient-${s.dataKey})`)
         .attr('stroke', 'none');
 
       // Line
       g.append('path')
         .datum(data)
-        .attr('d', line)
+        .attr('d', lineGen)
         .attr('fill', 'none')
         .attr('stroke', s.color)
         .attr('stroke-width', s.strokeWidth || 2);
@@ -256,7 +256,7 @@ export function AreaChart({
         .style('cursor', 'crosshair');
 
       overlay.on('mousemove', (event) => {
-        const [mx] = d3.pointer(event);
+        const [mx] = pointer(event);
         const domain = x.domain();
         const xPositions = domain.map((d) => x(d) || 0);
 

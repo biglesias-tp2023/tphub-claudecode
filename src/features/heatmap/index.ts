@@ -1,4 +1,3 @@
-export { useHeatmapData } from './hooks/useHeatmapData';
-export { HeatmapGrid } from './components/HeatmapGrid';
-export { MetricSelector } from './components/MetricSelector';
+export { useHeatmapData } from './hooks';
+export { HeatmapGrid, MetricSelector } from './components';
 export type { HeatmapMetric, HeatmapCell, HeatmapMatrix } from './types';

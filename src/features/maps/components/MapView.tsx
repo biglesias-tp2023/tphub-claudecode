@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import type { Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -54,6 +54,31 @@ function BoundsController({ bounds, restaurantCount }: BoundsControllerProps) {
 }
 
 // ============================================
+// VIEWPORT FILTER HOOK
+// ============================================
+
+/**
+ * Filters items with coordinates to only those visible in the current map viewport.
+ * Uses a version counter bumped by map events to trigger recalculation via useMemo.
+ */
+function useViewportFilter<T extends { coordinates: { lat: number; lng: number } }>(items: T[]): T[] {
+  const map = useMap();
+  const [boundsVersion, setBoundsVersion] = useState(0);
+
+  useMapEvents({
+    moveend: () => setBoundsVersion(v => v + 1),
+    zoomend: () => setBoundsVersion(v => v + 1),
+  });
+
+  return useMemo(() => {
+    // boundsVersion triggers recalculation when map moves/zooms
+    void boundsVersion;
+    const bounds = map.getBounds().pad(0.1);
+    return items.filter(item => bounds.contains([item.coordinates.lat, item.coordinates.lng]));
+  }, [map, items, boundsVersion]);
+}
+
+// ============================================
 // MAP VIEW COMPONENT
 // ============================================
 
@@ -100,45 +125,93 @@ export function MapView({
         {/* Bounds controller for auto-fit */}
         <BoundsController bounds={bounds} restaurantCount={restaurants.length} />
 
-        {/* Heatmap layer (primary visualization) */}
-        {showHeatmap && deliveryPoints.length > 0 && (
-          <HeatmapLayer
-            deliveryPoints={deliveryPoints}
-            selectedMetric={selectedMetric}
-          />
-        )}
-
-        {/* Delivery radius circles (using real restaurant radius) */}
-        {showDeliveryRadius &&
-          restaurants.map((restaurant) => (
-            <DeliveryRadiusCircle
-              key={`radius-${restaurant.id}`}
-              restaurant={restaurant}
-            />
-          ))}
-
-        {/* Restaurant markers (optional toggle) */}
-        {showRestaurants &&
-          restaurants.map((restaurant) => (
-            <RestaurantMarker
-              key={restaurant.id}
-              restaurant={restaurant}
-              metric={selectedMetric}
-              isSelected={selectedRestaurantId === restaurant.id}
-              onSelect={() => onRestaurantSelect(restaurant.id)}
-            />
-          ))}
-
-        {/* Delivery point markers (debug/detail view) */}
-        {showDeliveryPoints &&
-          deliveryPoints.map((point) => (
-            <DeliveryPointMarker key={point.id} point={point} />
-          ))}
+        {/* Filtered layers — only renders markers visible in viewport */}
+        <FilteredLayers
+          restaurants={restaurants}
+          deliveryPoints={deliveryPoints}
+          selectedMetric={selectedMetric}
+          showHeatmap={showHeatmap}
+          showRestaurants={showRestaurants}
+          showDeliveryRadius={showDeliveryRadius}
+          showDeliveryPoints={showDeliveryPoints}
+          selectedRestaurantId={selectedRestaurantId}
+          onRestaurantSelect={onRestaurantSelect}
+        />
 
         {/* Click handler for deselection */}
         <MapClickHandler onClick={handleMapClick} />
       </MapContainer>
     </div>
+  );
+}
+
+// ============================================
+// FILTERED LAYERS (viewport-aware rendering)
+// ============================================
+
+interface FilteredLayersProps {
+  restaurants: MapRestaurant[];
+  deliveryPoints: DeliveryPoint[];
+  selectedMetric: MapMetric;
+  showHeatmap: boolean;
+  showRestaurants: boolean;
+  showDeliveryRadius: boolean;
+  showDeliveryPoints: boolean;
+  selectedRestaurantId: string | null;
+  onRestaurantSelect: (id: string | null) => void;
+}
+
+function FilteredLayers({
+  restaurants,
+  deliveryPoints,
+  selectedMetric,
+  showHeatmap,
+  showRestaurants,
+  showDeliveryRadius,
+  showDeliveryPoints,
+  selectedRestaurantId,
+  onRestaurantSelect,
+}: FilteredLayersProps) {
+  const visibleRestaurants = useViewportFilter(restaurants);
+  const visibleDeliveryPoints = useViewportFilter(deliveryPoints);
+
+  return (
+    <>
+      {/* Heatmap layer (uses all points — leaflet.heat handles its own culling) */}
+      {showHeatmap && deliveryPoints.length > 0 && (
+        <HeatmapLayer
+          deliveryPoints={deliveryPoints}
+          selectedMetric={selectedMetric}
+        />
+      )}
+
+      {/* Delivery radius circles */}
+      {showDeliveryRadius &&
+        visibleRestaurants.map((restaurant) => (
+          <DeliveryRadiusCircle
+            key={`radius-${restaurant.id}`}
+            restaurant={restaurant}
+          />
+        ))}
+
+      {/* Restaurant markers */}
+      {showRestaurants &&
+        visibleRestaurants.map((restaurant) => (
+          <RestaurantMarker
+            key={restaurant.id}
+            restaurant={restaurant}
+            metric={selectedMetric}
+            isSelected={selectedRestaurantId === restaurant.id}
+            onSelect={() => onRestaurantSelect(restaurant.id)}
+          />
+        ))}
+
+      {/* Delivery point markers */}
+      {showDeliveryPoints &&
+        visibleDeliveryPoints.map((point) => (
+          <DeliveryPointMarker key={point.id} point={point} />
+        ))}
+    </>
   );
 }
 

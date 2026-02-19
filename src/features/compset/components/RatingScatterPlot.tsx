@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import * as d3 from 'd3';
+import { select, extent, min, max, scaleLinear, axisBottom, axisLeft } from 'd3';
 import { PLATFORM_COLORS } from '../config';
 import type { CompetitorWithData } from '../types';
 
@@ -63,7 +63,7 @@ export function RatingScatterPlot({ hero, competitors }: RatingScatterPlotProps)
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || dots.length === 0) return;
 
-    const svg = d3.select(svgRef.current);
+    const svg = select(svgRef.current);
     svg.selectAll('*').remove();
 
     const margin = { top: 20, right: 30, bottom: 40, left: 45 };
@@ -72,12 +72,12 @@ export function RatingScatterPlot({ hero, competitors }: RatingScatterPlotProps)
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const xExtent = d3.extent(dots, (d) => d.reviews) as [number, number];
-    const yMin = Math.min(3, d3.min(dots, (d) => d.rating) ?? 3);
-    const yMax = Math.max(5, d3.max(dots, (d) => d.rating) ?? 5);
+    const xExtent = extent(dots, (d) => d.reviews) as [number, number];
+    const yMin = Math.min(3, min(dots, (d) => d.rating) ?? 3);
+    const yMax = Math.max(5, max(dots, (d) => d.rating) ?? 5);
 
-    const x = d3.scaleLinear().domain([0, xExtent[1] * 1.1]).range([0, w]);
-    const y = d3.scaleLinear().domain([yMin - 0.1, yMax + 0.1]).range([h, 0]);
+    const x = scaleLinear().domain([0, xExtent[1] * 1.1]).range([0, w]);
+    const y = scaleLinear().domain([yMin - 0.1, yMax + 0.1]).range([h, 0]);
 
     // Grid
     g.selectAll('.grid-y')
@@ -92,11 +92,11 @@ export function RatingScatterPlot({ hero, competitors }: RatingScatterPlotProps)
       .attr('stroke-dasharray', '3 3');
 
     // Axes
-    const xAxis = g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x).ticks(5));
+    const xAxis = g.append('g').attr('transform', `translate(0,${h})`).call(axisBottom(x).ticks(5));
     xAxis.select('.domain').remove();
     xAxis.selectAll('text').attr('font-size', 10).attr('fill', '#6b7280');
 
-    const yAxis = g.append('g').call(d3.axisLeft(y).ticks(5));
+    const yAxis = g.append('g').call(axisLeft(y).ticks(5));
     yAxis.select('.domain').remove();
     yAxis.selectAll('text').attr('font-size', 10).attr('fill', '#6b7280');
 

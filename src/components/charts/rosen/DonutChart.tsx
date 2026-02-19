@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
-import * as d3 from 'd3';
+import { select, pie, arc } from 'd3';
+import type { PieArcDatum } from 'd3';
 import type { DonutChartDataItem } from './types';
 
 interface DonutChartProps {
@@ -44,7 +45,7 @@ export function DonutChart({
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || data.length === 0) return;
 
-    const svg = d3.select(svgRef.current);
+    const svg = select(svgRef.current);
     svg.selectAll('*').remove();
 
     // Reserve space for legend at bottom
@@ -57,20 +58,20 @@ export function DonutChart({
 
     const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
 
-    const pie = d3.pie<DonutChartDataItem>()
+    const pieGen = pie<DonutChartDataItem>()
       .value((d) => (d as unknown as Record<string, number>)[valueKey] || 0)
       .padAngle(paddingAngle)
       .sort(null);
 
-    const arc = d3.arc<d3.PieArcDatum<DonutChartDataItem>>()
+    const arcGen = arc<PieArcDatum<DonutChartDataItem>>()
       .innerRadius(radius * innerRadiusRatio)
       .outerRadius(radius * outerRadiusRatio);
 
     const arcs = g.selectAll('.arc')
-      .data(pie(data))
+      .data(pieGen(data))
       .enter()
       .append('path')
-      .attr('d', arc)
+      .attr('d', arcGen)
       .attr('fill', (d) => d.data.color)
       .style('cursor', renderTooltip ? 'pointer' : 'default');
 

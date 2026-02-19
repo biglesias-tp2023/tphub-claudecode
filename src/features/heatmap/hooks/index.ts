@@ -1,0 +1,1 @@
+export { useHeatmapData } from './useHeatmapData';

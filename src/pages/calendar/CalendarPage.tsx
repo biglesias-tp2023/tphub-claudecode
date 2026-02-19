@@ -22,7 +22,7 @@
  * @module pages/calendar/CalendarPage
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useReducer, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Calendar, CloudOff } from 'lucide-react';
 import { Card, ToastContainer } from '@/components/ui';
@@ -47,99 +47,216 @@ import type { PromotionalCampaignInput, PromotionalCampaign, CampaignPlatform, E
 // Storage key for campaign editor state (must match CampaignEditor)
 const CAMPAIGN_EDITOR_STORAGE_KEY = 'tphub_campaign_editor_state';
 
+// ============================================
+// REDUCER
+// ============================================
+
+interface CalendarState {
+  // Editor modal
+  isEditorOpen: boolean;
+  selectedDate: string | undefined;
+  editingCampaign: PromotionalCampaign | null;
+  // Detail modal
+  detailModalDate: Date | null;
+  detailModalCampaigns: PromotionalCampaign[];
+  detailModalEvents: CalendarEvent[];
+  // Calendar navigation
+  currentMonth: { year: number; month: number };
+  sidebarDate: Date;
+  // Filters
+  selectedPlatforms: CampaignPlatform[];
+  selectedStatuses: string[];
+  selectedEventCategories: EventCategory[];
+  selectedRegion: string;
+}
+
+type CalendarAction =
+  | { type: 'OPEN_EDITOR'; date?: string }
+  | { type: 'CLOSE_EDITOR' }
+  | { type: 'EDITOR_SAVED' }
+  | { type: 'EDIT_CAMPAIGN'; campaign: PromotionalCampaign }
+  | { type: 'DUPLICATE_CAMPAIGN'; startDate: string }
+  | { type: 'OPEN_DETAIL'; date: Date; campaigns: PromotionalCampaign[]; events: CalendarEvent[] }
+  | { type: 'CLOSE_DETAIL' }
+  | { type: 'REMOVE_CAMPAIGN_FROM_DETAIL'; campaignId: string }
+  | { type: 'ADD_CAMPAIGN_FROM_DETAIL' }
+  | { type: 'EDIT_FROM_DETAIL'; campaign: PromotionalCampaign }
+  | { type: 'SET_MONTH'; year: number; month: number }
+  | { type: 'SET_SIDEBAR_DATE'; date: Date }
+  | { type: 'SET_PLATFORMS'; platforms: CampaignPlatform[] }
+  | { type: 'SET_STATUSES'; statuses: string[] }
+  | { type: 'SET_EVENT_CATEGORIES'; categories: EventCategory[] }
+  | { type: 'SET_REGION'; region: string }
+  | { type: 'SYNC_FROM_URL'; month?: { year: number; month: number }; platforms?: CampaignPlatform[]; categories?: EventCategory[]; statuses?: string[]; region?: string };
+
+function calendarReducer(state: CalendarState, action: CalendarAction): CalendarState {
+  switch (action.type) {
+    case 'OPEN_EDITOR':
+      return { ...state, isEditorOpen: true, selectedDate: action.date, editingCampaign: null };
+
+    case 'CLOSE_EDITOR':
+      return { ...state, isEditorOpen: false, selectedDate: undefined, editingCampaign: null };
+
+    case 'EDITOR_SAVED':
+      return { ...state, isEditorOpen: false, selectedDate: undefined, editingCampaign: null };
+
+    case 'EDIT_CAMPAIGN':
+      return { ...state, isEditorOpen: true, editingCampaign: action.campaign, selectedDate: action.campaign.startDate };
+
+    case 'DUPLICATE_CAMPAIGN':
+      return { ...state, isEditorOpen: true, editingCampaign: null, selectedDate: action.startDate };
+
+    case 'OPEN_DETAIL':
+      return { ...state, detailModalDate: action.date, detailModalCampaigns: action.campaigns, detailModalEvents: action.events };
+
+    case 'CLOSE_DETAIL':
+      return { ...state, detailModalDate: null, detailModalCampaigns: [], detailModalEvents: [] };
+
+    case 'REMOVE_CAMPAIGN_FROM_DETAIL':
+      return { ...state, detailModalCampaigns: state.detailModalCampaigns.filter(c => c.id !== action.campaignId) };
+
+    case 'ADD_CAMPAIGN_FROM_DETAIL':
+      return {
+        ...state,
+        selectedDate: state.detailModalDate?.toISOString().split('T')[0],
+        detailModalDate: null, detailModalCampaigns: [], detailModalEvents: [],
+        isEditorOpen: true, editingCampaign: null,
+      };
+
+    case 'EDIT_FROM_DETAIL':
+      return {
+        ...state,
+        editingCampaign: action.campaign,
+        selectedDate: action.campaign.startDate,
+        detailModalDate: null, detailModalCampaigns: [], detailModalEvents: [],
+        isEditorOpen: true,
+      };
+
+    case 'SET_MONTH':
+      return { ...state, currentMonth: { year: action.year, month: action.month }, sidebarDate: new Date(action.year, action.month - 1, 1) };
+
+    case 'SET_SIDEBAR_DATE':
+      return { ...state, sidebarDate: action.date, currentMonth: { year: action.date.getFullYear(), month: action.date.getMonth() + 1 } };
+
+    case 'SET_PLATFORMS':
+      return { ...state, selectedPlatforms: action.platforms };
+
+    case 'SET_STATUSES':
+      return { ...state, selectedStatuses: action.statuses };
+
+    case 'SET_EVENT_CATEGORIES':
+      return { ...state, selectedEventCategories: action.categories };
+
+    case 'SET_REGION':
+      return { ...state, selectedRegion: action.region };
+
+    case 'SYNC_FROM_URL': {
+      const next = { ...state };
+      if (action.month) next.currentMonth = action.month;
+      if (action.platforms) next.selectedPlatforms = action.platforms;
+      if (action.categories) next.selectedEventCategories = action.categories;
+      if (action.statuses) next.selectedStatuses = action.statuses;
+      if (action.region) next.selectedRegion = action.region;
+      return next;
+    }
+
+    default:
+      return state;
+  }
+}
+
+function createInitialState(): CalendarState {
+  const now = new Date();
+  let isEditorOpen = false;
+
+  try {
+    const saved = sessionStorage.getItem(CAMPAIGN_EDITOR_STORAGE_KEY);
+    if (saved) {
+      const state = JSON.parse(saved);
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      if (state.timestamp > oneHourAgo) {
+        isEditorOpen = true;
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return {
+    isEditorOpen,
+    selectedDate: undefined,
+    editingCampaign: null,
+    detailModalDate: null,
+    detailModalCampaigns: [],
+    detailModalEvents: [],
+    currentMonth: { year: now.getFullYear(), month: now.getMonth() + 1 },
+    sidebarDate: now,
+    selectedPlatforms: [],
+    selectedStatuses: [],
+    selectedEventCategories: ['holiday', 'sports', 'entertainment', 'commercial'],
+    selectedRegion: 'ES',
+  };
+}
+
+// ============================================
+// COMPONENT
+// ============================================
+
 export function CalendarPage() {
   const [searchParams] = useSearchParams();
   const { restaurantIds } = useDashboardFiltersStore();
   const { toasts, closeToast, success } = useToast();
 
-  // Check if there's saved editor state to auto-reopen the modal
-  const [isEditorOpen, setIsEditorOpen] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(CAMPAIGN_EDITOR_STORAGE_KEY);
-      if (saved) {
-        const state = JSON.parse(saved);
-        // Only restore if saved within the last hour
-        const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        if (state.timestamp > oneHourAgo) {
-          return true; // Auto-open modal if there's recent saved state
-        }
-      }
-    } catch {
-      // Ignore errors
-    }
-    return false;
-  });
-  const [selectedDate, setSelectedDate] = useState<string | undefined>();
-  const [detailModalDate, setDetailModalDate] = useState<Date | null>(null);
-  const [detailModalCampaigns, setDetailModalCampaigns] = useState<PromotionalCampaign[]>([]);
-  const [detailModalEvents, setDetailModalEvents] = useState<CalendarEvent[]>([]);
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
-  });
+  const [state, dispatch] = useReducer(calendarReducer, null, createInitialState);
 
   // Client mode from URL params (for shared links)
   const isClientMode = searchParams.get('mode') === 'client';
 
-  // Sidebar state
-  const [sidebarDate, setSidebarDate] = useState(new Date());
-  const [selectedPlatforms, setSelectedPlatforms] = useState<CampaignPlatform[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-
-  // Event filters - all categories selected by default
-  const [selectedEventCategories, setSelectedEventCategories] = useState<EventCategory[]>([
-    'holiday', 'sports', 'entertainment', 'commercial'
-  ]);
-  const [selectedRegion, setSelectedRegion] = useState('ES');
-
   // Handle URL params for shared links
   useEffect(() => {
+    let month: { year: number; month: number } | undefined;
+    let platforms: CampaignPlatform[] | undefined;
+    let categories: EventCategory[] | undefined;
+    let statuses: string[] | undefined;
+    let region: string | undefined;
+
     const weekStartParam = searchParams.get('weekStart');
     if (weekStartParam) {
       const date = new Date(weekStartParam);
       if (!isNaN(date.getTime())) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCurrentMonth({ year: date.getFullYear(), month: date.getMonth() + 1 });
+        month = { year: date.getFullYear(), month: date.getMonth() + 1 };
       }
     }
 
-    // Parse platform filters from URL
     const platformsParam = searchParams.get('platforms');
     if (platformsParam) {
-      const platforms = platformsParam.split(',').filter(p =>
+      const parsed = platformsParam.split(',').filter(p =>
         ['glovo', 'ubereats', 'justeat', 'google_ads'].includes(p)
       ) as CampaignPlatform[];
-      if (platforms.length > 0) {
-        setSelectedPlatforms(platforms);
-      }
+      if (parsed.length > 0) platforms = parsed;
     }
 
-    // Parse category filters from URL
     const categoriesParam = searchParams.get('categories');
     if (categoriesParam) {
-      const categories = categoriesParam.split(',').filter(c =>
+      const parsed = categoriesParam.split(',').filter(c =>
         ['holiday', 'sports', 'entertainment', 'commercial'].includes(c)
       ) as EventCategory[];
-      if (categories.length > 0) {
-        setSelectedEventCategories(categories);
-      }
+      if (parsed.length > 0) categories = parsed;
     }
 
-    // Parse status filters from URL
     const statusesParam = searchParams.get('statuses');
     if (statusesParam) {
-      const statuses = statusesParam.split(',').filter(s =>
+      const parsed = statusesParam.split(',').filter(s =>
         ['scheduled', 'active', 'completed', 'cancelled'].includes(s)
       );
-      if (statuses.length > 0) {
-        setSelectedStatuses(statuses);
-      }
+      if (parsed.length > 0) statuses = parsed;
     }
 
-    // Parse region from URL
     const regionParam = searchParams.get('region');
-    if (regionParam) {
-      setSelectedRegion(regionParam);
+    if (regionParam) region = regionParam;
+
+    if (month || platforms || categories || statuses || region) {
+      dispatch({ type: 'SYNC_FROM_URL', month, platforms, categories, statuses, region });
     }
   }, [searchParams]);
 
@@ -154,22 +271,22 @@ export function CalendarPage() {
   // Fetch campaigns for current month
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaignsByMonth(
     restaurantIds.length > 0 ? restaurantIds : restaurants.map(r => r.id),
-    currentMonth.year,
-    currentMonth.month
+    state.currentMonth.year,
+    state.currentMonth.month
   );
 
   // Fetch calendar events (passing region for localized events)
   const { data: calendarEvents = [] } = useCalendarEventsByMonth(
-    currentMonth.year,
-    currentMonth.month,
-    selectedRegion.startsWith('ES-') ? 'ES' : selectedRegion // Use country code for API
+    state.currentMonth.year,
+    state.currentMonth.month,
+    state.selectedRegion.startsWith('ES-') ? 'ES' : state.selectedRegion
   );
 
   // Fetch weather for selected restaurant (includes historical data for the month)
   const { data: weatherForecasts = [] } = useWeatherByMonth(
     selectedRestaurant,
-    currentMonth.year,
-    currentMonth.month
+    state.currentMonth.year,
+    state.currentMonth.month
   );
 
   // Check if weather data is available (requires restaurant with coordinates)
@@ -183,160 +300,133 @@ export function CalendarPage() {
   const deleteCampaign = useDeleteCampaign();
   const updateCampaign = useUpdateCampaign();
 
-  // State for editing campaign
-  const [editingCampaign, setEditingCampaign] = useState<PromotionalCampaign | null>(null);
-
   // Filter campaigns based on sidebar filters
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter(campaign => {
-      // Platform filter
-      if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(campaign.platform)) {
+      if (state.selectedPlatforms.length > 0 && !state.selectedPlatforms.includes(campaign.platform)) {
         return false;
       }
-      // Status filter
-      if (selectedStatuses.length > 0 && !selectedStatuses.includes(campaign.status)) {
+      if (state.selectedStatuses.length > 0 && !state.selectedStatuses.includes(campaign.status)) {
         return false;
       }
       return true;
     });
-  }, [campaigns, selectedPlatforms, selectedStatuses]);
+  }, [campaigns, state.selectedPlatforms, state.selectedStatuses]);
 
   // Filter events based on category and region
   const filteredEvents = useMemo(() => {
     return calendarEvents.filter(event => {
-      // Category filter
-      if (selectedEventCategories.length > 0 && !selectedEventCategories.includes(event.category)) {
+      if (state.selectedEventCategories.length > 0 && !state.selectedEventCategories.includes(event.category)) {
         return false;
       }
-      // Region filter - show national events + regional events
-      if (selectedRegion.startsWith('ES-')) {
-        // If specific region selected, show national (ES) and that region's events
+      if (state.selectedRegion.startsWith('ES-')) {
         const isNational = !event.regionCode || event.regionCode === null;
-        const isMatchingRegion = event.regionCode === selectedRegion;
+        const isMatchingRegion = event.regionCode === state.selectedRegion;
         return isNational || isMatchingRegion;
       }
-      // If national selected, show all events without region code (national ones)
       return !event.regionCode || event.regionCode === null;
     });
-  }, [calendarEvents, selectedEventCategories, selectedRegion]);
+  }, [calendarEvents, state.selectedEventCategories, state.selectedRegion]);
 
   const handleNewCampaign = useCallback(() => {
-    setSelectedDate(undefined);
-    setIsEditorOpen(true);
+    dispatch({ type: 'OPEN_EDITOR' });
   }, []);
 
   const handleCampaignClick = useCallback((campaign: PromotionalCampaign) => {
-    // Find the date and all campaigns for that date
     const dateStr = campaign.startDate;
     const campaignsForDate = filteredCampaigns.filter(c =>
       c.startDate <= dateStr && c.endDate >= dateStr
     );
     const eventsForDate = filteredEvents.filter(e => e.eventDate === dateStr);
-    setDetailModalDate(new Date(dateStr));
-    setDetailModalCampaigns(campaignsForDate);
-    setDetailModalEvents(eventsForDate);
+    dispatch({ type: 'OPEN_DETAIL', date: new Date(dateStr), campaigns: campaignsForDate, events: eventsForDate });
   }, [filteredCampaigns, filteredEvents]);
 
   const handleDayClick = useCallback((date: Date, dayCampaigns: PromotionalCampaign[], dayEvents: CalendarEvent[]) => {
-    // Always show the modal with campaigns and events
-    setDetailModalDate(date);
-    setDetailModalCampaigns(dayCampaigns);
-    setDetailModalEvents(dayEvents);
+    dispatch({ type: 'OPEN_DETAIL', date, campaigns: dayCampaigns, events: dayEvents });
   }, []);
 
   const handleMonthChange = useCallback((year: number, month: number) => {
-    setCurrentMonth({ year, month });
-    // Sync sidebar mini calendar to show the same month
-    setSidebarDate(new Date(year, month - 1, 1));
+    dispatch({ type: 'SET_MONTH', year, month });
   }, []);
 
   const handleSidebarDateSelect = useCallback((date: Date) => {
-    setSidebarDate(date);
-    // Also update the main calendar view
-    setCurrentMonth({ year: date.getFullYear(), month: date.getMonth() + 1 });
+    dispatch({ type: 'SET_SIDEBAR_DATE', date });
   }, []);
 
   const handleSaveCampaign = useCallback(async (input: PromotionalCampaignInput) => {
     try {
-      if (editingCampaign) {
-        // Update existing campaign
+      if (state.editingCampaign) {
         await updateCampaign.mutateAsync({
-          id: editingCampaign.id,
+          id: state.editingCampaign.id,
           updates: input,
         });
         success('¡Campaña actualizada con éxito!');
       } else {
-        // Create new campaign
         await createCampaign.mutateAsync(input);
         success('¡Campaña creada con éxito!');
       }
-      setIsEditorOpen(false);
-      setSelectedDate(undefined);
-      setEditingCampaign(null);
+      dispatch({ type: 'EDITOR_SAVED' });
     } catch (error) {
       console.error('Error saving campaign:', error);
       throw error;
     }
-  }, [createCampaign, updateCampaign, editingCampaign, success]);
+  }, [createCampaign, updateCampaign, state.editingCampaign, success]);
 
   const handleCloseEditor = useCallback(() => {
-    setIsEditorOpen(false);
-    setSelectedDate(undefined);
-    setEditingCampaign(null);
+    dispatch({ type: 'CLOSE_EDITOR' });
   }, []);
 
   const handleCloseDetailModal = useCallback(() => {
-    setDetailModalDate(null);
-    setDetailModalCampaigns([]);
-    setDetailModalEvents([]);
+    dispatch({ type: 'CLOSE_DETAIL' });
   }, []);
 
   const handleAddCampaignFromDetail = useCallback(() => {
-    if (detailModalDate) {
-      setSelectedDate(detailModalDate.toISOString().split('T')[0]);
-      handleCloseDetailModal();
-      setIsEditorOpen(true);
+    if (state.detailModalDate) {
+      dispatch({ type: 'ADD_CAMPAIGN_FROM_DETAIL' });
     }
-  }, [detailModalDate, handleCloseDetailModal]);
+  }, [state.detailModalDate]);
 
   const handleEditCampaign = useCallback((campaign: PromotionalCampaign) => {
-    setEditingCampaign(campaign);
-    setSelectedDate(campaign.startDate);
-    handleCloseDetailModal();
-    setIsEditorOpen(true);
-  }, [handleCloseDetailModal]);
+    dispatch({ type: 'EDIT_FROM_DETAIL', campaign });
+  }, []);
 
   const handleDeleteCampaign = useCallback(async (campaign: PromotionalCampaign) => {
     try {
       await deleteCampaign.mutateAsync(campaign.id);
       success('Campaña eliminada');
-      // If deleting the last campaign for this day, close the modal
-      if (detailModalCampaigns.length <= 1) {
-        handleCloseDetailModal();
+      if (state.detailModalCampaigns.length <= 1) {
+        dispatch({ type: 'CLOSE_DETAIL' });
       } else {
-        // Update the modal to remove the deleted campaign
-        setDetailModalCampaigns(prev => prev.filter(c => c.id !== campaign.id));
+        dispatch({ type: 'REMOVE_CAMPAIGN_FROM_DETAIL', campaignId: campaign.id });
       }
     } catch (err) {
       console.error('Error deleting campaign:', err);
     }
-  }, [deleteCampaign, success, detailModalCampaigns.length, handleCloseDetailModal]);
+  }, [deleteCampaign, success, state.detailModalCampaigns.length]);
 
   const handleDuplicateCampaign = useCallback((campaign: PromotionalCampaign) => {
-    // Open editor with campaign data but as new (no id)
-    setEditingCampaign(null);
-    setSelectedDate(campaign.startDate);
-    // Store campaign data for duplication (will be picked up by CampaignEditor)
-    // For now, just open editor - full duplication would require passing campaign data
-    setIsEditorOpen(true);
+    dispatch({ type: 'DUPLICATE_CAMPAIGN', startDate: campaign.startDate });
   }, []);
 
   const handleCreateCampaignWithDates = useCallback((startDate: string, _endDate: string) => {
-    setSelectedDate(startDate);
-    // Note: To prefill end date, CampaignEditor would need to accept it as prop
-    // For now, we set the start date. End date available as _endDate if needed.
     void _endDate;
-    setIsEditorOpen(true);
+    dispatch({ type: 'OPEN_EDITOR', date: startDate });
+  }, []);
+
+  const handlePlatformsChange = useCallback((platforms: CampaignPlatform[]) => {
+    dispatch({ type: 'SET_PLATFORMS', platforms });
+  }, []);
+
+  const handleStatusesChange = useCallback((statuses: string[]) => {
+    dispatch({ type: 'SET_STATUSES', statuses });
+  }, []);
+
+  const handleEventCategoriesChange = useCallback((categories: EventCategory[]) => {
+    dispatch({ type: 'SET_EVENT_CATEGORIES', categories });
+  }, []);
+
+  const handleRegionChange = useCallback((region: string) => {
+    dispatch({ type: 'SET_REGION', region });
   }, []);
 
   return (
@@ -365,17 +455,17 @@ export function CalendarPage() {
           {/* Sidebar - hide create button in client mode */}
           {!isClientMode && (
             <CalendarSidebar
-              selectedDate={sidebarDate}
+              selectedDate={state.sidebarDate}
               onDateSelect={handleSidebarDateSelect}
               onCreateClick={handleNewCampaign}
-              selectedPlatforms={selectedPlatforms}
-              onPlatformsChange={setSelectedPlatforms}
-              selectedStatuses={selectedStatuses}
-              onStatusesChange={setSelectedStatuses}
-              selectedEventCategories={selectedEventCategories}
-              onEventCategoriesChange={setSelectedEventCategories}
-              selectedRegion={selectedRegion}
-              onRegionChange={setSelectedRegion}
+              selectedPlatforms={state.selectedPlatforms}
+              onPlatformsChange={handlePlatformsChange}
+              selectedStatuses={state.selectedStatuses}
+              onStatusesChange={handleStatusesChange}
+              selectedEventCategories={state.selectedEventCategories}
+              onEventCategoriesChange={handleEventCategoriesChange}
+              selectedRegion={state.selectedRegion}
+              onRegionChange={handleRegionChange}
               campaigns={campaigns}
             />
           )}
@@ -408,10 +498,10 @@ export function CalendarPage() {
               isClientMode={isClientMode}
               shareFilters={{
                 restaurantIds,
-                platformFilters: selectedPlatforms,
-                categoryFilters: selectedEventCategories,
-                statusFilters: selectedStatuses,
-                region: selectedRegion,
+                platformFilters: state.selectedPlatforms,
+                categoryFilters: state.selectedEventCategories,
+                statusFilters: state.selectedStatuses,
+                region: state.selectedRegion,
               }}
             />
           </div>
@@ -420,23 +510,23 @@ export function CalendarPage() {
 
       {/* Campaign editor modal */}
       <CampaignEditor
-        isOpen={isEditorOpen}
+        isOpen={state.isEditorOpen}
         onClose={handleCloseEditor}
         onSave={handleSaveCampaign}
         restaurant={selectedRestaurant || null}
         upcomingEvents={filteredEvents}
         weatherForecasts={weatherForecasts}
-        initialDate={selectedDate}
-        campaign={editingCampaign}
+        initialDate={state.selectedDate}
+        campaign={state.editingCampaign}
       />
 
       {/* Campaign detail modal */}
       <CampaignDetailModal
-        isOpen={detailModalDate !== null}
+        isOpen={state.detailModalDate !== null}
         onClose={handleCloseDetailModal}
-        date={detailModalDate}
-        campaigns={detailModalCampaigns}
-        events={detailModalEvents}
+        date={state.detailModalDate}
+        campaigns={state.detailModalCampaigns}
+        events={state.detailModalEvents}
         onAddCampaign={handleAddCampaignFromDetail}
         onEditCampaign={handleEditCampaign}
         onDeleteCampaign={handleDeleteCampaign}

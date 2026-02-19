@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
-import * as d3 from 'd3';
+import { select, scaleBand, scaleLinear, max, axisBottom, axisLeft } from 'd3';
 import type { ChartMargin, BarChartDataItem } from './types';
 
 interface BarChartProps {
@@ -50,7 +50,7 @@ export function BarChart({
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || data.length === 0) return;
 
-    const svg = d3.select(svgRef.current);
+    const svg = select(svgRef.current);
     svg.selectAll('*').remove();
 
     const innerWidth = dimensions.width - margin.left - margin.right;
@@ -58,13 +58,13 @@ export function BarChart({
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const x = d3.scaleBand()
+    const x = scaleBand()
       .domain(data.map((d) => d.label))
       .range([0, innerWidth])
       .padding(0.3);
 
-    const y = d3.scaleLinear()
-      .domain([0, d3.max(data, (d) => d.value) || 0])
+    const y = scaleLinear()
+      .domain([0, max(data, (d) => d.value) || 0])
       .nice()
       .range([innerHeight, 0]);
 
@@ -84,7 +84,7 @@ export function BarChart({
     // X Axis
     const xAxis = g.append('g')
       .attr('transform', `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(x).tickSize(0));
+      .call(axisBottom(x).tickSize(0));
 
     xAxis.select('.domain').remove();
     xAxis.selectAll('text')
@@ -97,7 +97,7 @@ export function BarChart({
 
     // Y Axis
     const yAxis = g.append('g')
-      .call(d3.axisLeft(y).ticks(5).tickSize(0));
+      .call(axisLeft(y).ticks(5).tickSize(0));
 
     yAxis.select('.domain').remove();
     yAxis.selectAll('text')

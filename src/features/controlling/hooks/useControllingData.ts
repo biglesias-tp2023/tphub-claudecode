@@ -1,65 +1,12 @@
 import { useMemo } from 'react';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
-import type { Brand, ChannelId, Restaurant } from '@/types';
+import type { ChannelId } from '@/types';
 import { useOrdersData } from './useOrdersData';
 import { useHierarchyData } from './useHierarchyData';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
+import { expandBrandIds, expandRestaurantIds } from './idExpansion';
 import type { HierarchyDataRow } from '@/services/crp-portal';
-
-// ============================================
-// HELPERS
-// ============================================
-
-/**
- * Expand selected brand IDs to include all related IDs from multi-portal grouping.
- */
-function expandBrandIds(selectedIds: string[], brands: Brand[]): string[] {
-  if (selectedIds.length === 0) return [];
-
-  const expandedIds = new Set<string>();
-
-  for (const selectedId of selectedIds) {
-    const brand = brands.find(
-      (b) => b.id === selectedId || b.allIds.includes(selectedId)
-    );
-
-    if (brand) {
-      for (const id of brand.allIds) {
-        expandedIds.add(id);
-      }
-    } else {
-      expandedIds.add(selectedId);
-    }
-  }
-
-  return Array.from(expandedIds);
-}
-
-/**
- * Expand selected restaurant IDs to include all related IDs from multi-portal grouping.
- */
-function expandRestaurantIds(selectedIds: string[], restaurants: Restaurant[]): string[] {
-  if (selectedIds.length === 0) return [];
-
-  const expandedIds = new Set<string>();
-
-  for (const selectedId of selectedIds) {
-    const restaurant = restaurants.find(
-      (r) => r.id === selectedId || r.allIds.includes(selectedId)
-    );
-
-    if (restaurant) {
-      for (const id of restaurant.allIds) {
-        expandedIds.add(id);
-      }
-    } else {
-      expandedIds.add(selectedId);
-    }
-  }
-
-  return Array.from(expandedIds);
-}
 
 // ============================================
 // TYPES
