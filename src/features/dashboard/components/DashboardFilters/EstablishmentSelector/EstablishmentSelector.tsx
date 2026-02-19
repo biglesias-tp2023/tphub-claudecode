@@ -195,27 +195,48 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
 
           {/* Footer actions */}
           {sortedRestaurants.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <div className="flex items-center justify-between px-3 py-2.5 border-t border-gray-100 bg-gray-50 rounded-b-lg">
               <button
                 type="button"
-                onClick={clearRestaurants}
-                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                onClick={() => {
+                  if (restaurantIds.length === 0) {
+                    // Already "all selected" state
+                    return;
+                  }
+                  clearRestaurants();
+                }}
+                className="px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
               >
-                Limpiar
+                Seleccionar todos
               </button>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  'px-4 py-1.5 text-sm font-medium rounded-lg',
-                  'bg-gradient-to-b from-primary-500 to-primary-600 text-white',
-                  'shadow-sm shadow-primary-600/25',
-                  'hover:from-primary-600 hover:to-primary-700',
-                  'transition-all duration-150'
-                )}
-              >
-                Aplicar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={clearRestaurants}
+                  disabled={restaurantIds.length === 0}
+                  className={cn(
+                    'px-2 py-1 text-xs font-medium rounded-lg transition-colors',
+                    restaurantIds.length > 0
+                      ? 'text-error-600 hover:bg-error-50'
+                      : 'text-gray-400 cursor-not-allowed'
+                  )}
+                >
+                  Borrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium',
+                    'bg-gradient-to-b from-primary-500 to-primary-600 text-white',
+                    'shadow-sm shadow-primary-600/25',
+                    'hover:from-primary-600 hover:to-primary-700',
+                    'transition-all duration-150'
+                  )}
+                >
+                  Aplicar
+                </button>
+              </div>
             </div>
           )}
         </div>

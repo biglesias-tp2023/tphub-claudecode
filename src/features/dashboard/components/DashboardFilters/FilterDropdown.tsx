@@ -225,7 +225,7 @@ export function FilterDropdown({
 
           {/* Footer with actions */}
           {options.length > 0 && (
-            <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100">
+            <div className="flex items-center justify-between px-3 py-2.5 border-t border-gray-100 bg-gray-50 rounded-b-lg">
               <button
                 type="button"
                 onClick={() => {
@@ -242,20 +242,43 @@ export function FilterDropdown({
                     });
                   }
                 }}
-                className="text-xs text-primary-600 hover:text-primary-700 px-2 py-1"
+                className="px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
               >
                 Seleccionar todos
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClear();
-                  setIsOpen(false);
-                }}
-                className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-              >
-                Limpiar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClear();
+                  }}
+                  disabled={selectedIds.length === 0}
+                  className={cn(
+                    'px-2 py-1 text-xs font-medium rounded-lg transition-colors',
+                    selectedIds.length > 0
+                      ? 'text-error-600 hover:bg-error-50'
+                      : 'text-gray-400 cursor-not-allowed'
+                  )}
+                >
+                  Borrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium',
+                    'bg-gradient-to-b from-primary-500 to-primary-600 text-white',
+                    'shadow-sm shadow-primary-600/25',
+                    'hover:from-primary-600 hover:to-primary-700',
+                    'transition-all duration-150'
+                  )}
+                >
+                  Aplicar
+                </button>
+              </div>
             </div>
           )}
         </div>
