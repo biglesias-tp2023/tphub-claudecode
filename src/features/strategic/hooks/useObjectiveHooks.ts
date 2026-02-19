@@ -8,8 +8,8 @@ import {
   updateStrategicObjective,
   updateStrategicObjectiveOrder,
   deleteStrategicObjective,
-  fetchRestaurants,
 } from '@/services/supabase-data';
+import { fetchCrpRestaurants } from '@/services/crp-portal';
 import type {
   StrategicObjectiveInput,
   ObjectiveHorizon,
@@ -31,7 +31,7 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
   // Also fetch restaurants for backward compatibility (used by other components)
   const restaurantsQuery = useQuery({
     queryKey: queryKeys.restaurants.list({ companyIds }),
-    queryFn: () => fetchRestaurants({ companyIds }),
+    queryFn: () => fetchCrpRestaurants({ companyIds: companyIds.length > 0 ? companyIds : undefined }),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -93,7 +93,7 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
     restaurantIds,
     companyIds, // Expose companyIds for the editor
     isLoading: restaurantsQuery.isLoading || objectivesQuery.isLoading,
-    error: restaurantsQuery.error || objectivesQuery.error,
+    error: objectivesQuery.error,
     refetch: objectivesQuery.refetch,
   };
 }
