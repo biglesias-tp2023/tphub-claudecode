@@ -252,13 +252,7 @@ export function FilterDropdown({
                   onClick={() => {
                     onClear();
                   }}
-                  disabled={selectedIds.length === 0}
-                  className={cn(
-                    'px-2 py-1 text-xs font-medium rounded-lg transition-colors',
-                    selectedIds.length > 0
-                      ? 'text-error-600 hover:bg-error-50'
-                      : 'text-gray-400 cursor-not-allowed'
-                  )}
+                  className="px-2 py-1 text-xs font-medium text-error-600 hover:bg-error-50 rounded-lg transition-colors"
                 >
                   Borrar
                 </button>
