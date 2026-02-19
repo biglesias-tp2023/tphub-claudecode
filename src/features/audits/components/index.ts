@@ -11,3 +11,15 @@ export * from './fields';
 
 // Preview modal
 export { AuditPreviewModal } from './AuditPreviewModal';
+
+// Extracted from AuditsPage
+export { SimpleDropdown } from './SimpleDropdown';
+export type { SimpleDropdownProps } from './SimpleDropdown';
+export { NewAuditModal } from './NewAuditModal';
+export type { NewAuditModalProps } from './NewAuditModal';
+export { AuditEmptyState } from './AuditEmptyState';
+export type { AuditEmptyStateProps } from './AuditEmptyState';
+export { AuditFilterBar } from './AuditFilterBar';
+export type { AuditFilters, AuditFilterBarProps } from './AuditFilterBar';
+export { AuditsList } from './AuditsList';
+export type { AuditsListProps } from './AuditsList';

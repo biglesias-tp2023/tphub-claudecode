@@ -1,9 +1,9 @@
 /**
- * SalesProjection - Componente de proyección de ventas
+ * SalesProjection - Componente de proyeccion de ventas
  *
  * SOLID Principles:
  * - S: Componente principal orquesta subcomponentes especializados
- * - O: Extensible vía props y composición
+ * - O: Extensible via props y composicion
  * - D: Depende de abstracciones (tipos) no implementaciones
  *
  * @module features/strategic/components/SalesProjection
@@ -24,221 +24,16 @@ import {
   type SalesProjectionExportData,
 } from '@/utils/export';
 import type {
-  SalesChannel, SalesProjectionConfig,
-  GridChannelMonthData, InvestmentConfig,
+  SalesChannel, GridChannelMonthData,
 } from '@/types';
 
-// ============================================
-// TYPES
-// ============================================
-
-/** Real sales data from CRP Portal (filtered by brand/restaurant) */
-interface RealSalesData {
-  totalRevenue: number;
-  totalPromos: number;
-  totalAds?: number;  // Not available in order data, optional
-  byChannel?: {
-    glovo: { revenue: number; promos: number };
-    ubereats: { revenue: number; promos: number };
-    justeat: { revenue: number; promos: number };
-  };
-}
-
-interface SalesProjectionProps {
-  config: SalesProjectionConfig;
-  targetRevenue: GridChannelMonthData;
-  actualRevenue: GridChannelMonthData;
-  actualAds: GridChannelMonthData;
-  actualPromos: GridChannelMonthData;
-  onTargetChange?: (data: GridChannelMonthData) => void;
-  onActualRevenueChange?: (data: GridChannelMonthData) => void;
-  onActualAdsChange?: (data: GridChannelMonthData) => void;
-  onActualPromosChange?: (data: GridChannelMonthData) => void;
-  onEditConfig?: () => void;
-  restaurantName?: string;
-  /** Real sales data from CRP Portal (filtered by selected brand/restaurant) */
-  realSalesData?: RealSalesData;
-  /** Loading state for real sales data */
-  isLoadingRealData?: boolean;
-  /** Real revenue by month×channel from CRP Portal for grid rows */
-  realRevenueByMonth?: GridChannelMonthData;
-}
-
-interface MonthInfo {
-  key: string;
-  label: string;
-  isCurrent: boolean;
-}
-
-type TabType = 'revenue' | 'ads' | 'promos';
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const CHANNELS: { id: SalesChannel; name: string; color: string; logo: string }[] = [
-  { id: 'glovo', name: 'Glovo', color: '#FFC244', logo: '/images/channels/glovo.png' },
-  { id: 'ubereats', name: 'UberEats', color: '#06C167', logo: '/images/channels/ubereats.png' },
-  { id: 'justeat', name: 'JustEat', color: '#FF8000', logo: '/images/channels/justeat.webp' },
-];
-
-const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-// ============================================
-// UTILS (Pure functions)
-// ============================================
-
-/** Genera ventana fija de 6 meses: 2 anteriores + actual (HOY) + 3 futuros */
-function getFixedMonthWindow(): MonthInfo[] {
-  const today = new Date();
-  const currentKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  const offsets = [-2, -1, 0, 1, 2, 3];
-
-  return offsets.map((offset) => {
-    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    return {
-      key,
-      label: `${MONTH_NAMES[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`,
-      isCurrent: key === currentKey,
-    };
-  });
-}
-
-/** Formatea número con separador de miles */
-const fmt = (n: number): string => (!n || isNaN(n)) ? '0' : n.toLocaleString('es-ES');
-
-/** Formatea número en K */
-const fmtK = (n: number): string => {
-  if (!n || isNaN(n)) return '0';
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
-};
-
-/** Calcula inversión basada en porcentaje */
-const calcInvestment = (revenue: number, percent: number): number => Math.round((revenue * percent) / 100);
-
-/** Obtiene % de inversión por canal */
-const getPercent = (config: InvestmentConfig | number, ch: SalesChannel): number =>
-  typeof config === 'number' ? config : config[ch] || 0;
-
-// ============================================
-// SUBCOMPONENTS
-// ============================================
-
-/** Scorecard individual con objetivo y real */
-function Scorecard({
-  label, value, actual, color, showActual, isLoading = false, isRealData = false
-}: {
-  label: string;
-  value: number;
-  actual: number;
-  color: string;
-  showActual: boolean;
-  isLoading?: boolean;
-  isRealData?: boolean;
-}) {
-  const diff = actual > 0 && value > 0
-    ? ((actual / value - 1) * 100).toFixed(0)
-    : null;
-
-  const isPositive = diff ? parseFloat(diff) >= 0 : false;
-  const isInvestment = label !== 'Ventas';
-  const diffText = isInvestment
-    ? (isPositive ? `+${diff}% sobre obj` : `${Math.abs(parseFloat(diff || '0'))}% bajo obj`)
-    : (isPositive ? `+${diff}% vs obj` : `${diff}% vs obj`);
-  const diffColor = isInvestment
-    ? (isPositive ? 'text-red-500' : 'text-emerald-600')
-    : (isPositive ? 'text-emerald-600' : 'text-amber-600');
-
-  return (
-    <div>
-      <div className="flex items-center gap-1.5">
-        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-        {isRealData && (
-          <span className="text-[9px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-            Real
-          </span>
-        )}
-      </div>
-      <div className="flex items-baseline gap-2">
-        <p className={cn('text-xl font-bold tabular-nums', color)}>{fmtK(value)}€</p>
-        {isLoading ? (
-          <span className="text-sm text-gray-400 animate-pulse">cargando...</span>
-        ) : showActual && actual > 0 && (
-          <p className={cn('text-sm font-medium tabular-nums', color.replace('600', '500'))}>/ {fmtK(actual)}€</p>
-        )}
-      </div>
-      {!isLoading && showActual && actual > 0 && diff && (
-        <p className={cn('text-[10px] mt-0.5', diffColor)}>{diffText}</p>
-      )}
-    </div>
-  );
-}
-
-
-function Row({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex items-center justify-between gap-6">
-      <span className="text-gray-500">{label}</span>
-      <span className={cn('font-medium tabular-nums', color)}>{fmt(value)}€</span>
-    </div>
-  );
-}
-
-/** Fila de tabla editable */
-function TableRow({
-  label, logoUrl, months, values, channel, onChange, total, variant, readOnly,
-}: {
-  label: string;
-  logoUrl: string;
-  months: MonthInfo[];
-  values: GridChannelMonthData;
-  channel: SalesChannel;
-  onChange?: (month: string, val: string) => void;
-  total: number;
-  variant: 'target' | 'actual';
-  readOnly?: boolean;
-}) {
-  const isActual = variant === 'actual';
-
-  return (
-    <tr className={cn(isActual && 'bg-emerald-50/30')}>
-      <td className="py-1.5 pr-2">
-        <div className="flex items-center gap-1.5">
-          <img src={logoUrl} alt={label} className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-          <span className="text-xs text-gray-600 whitespace-nowrap">{label}</span>
-          {isActual && <span className="text-[9px] text-emerald-600 font-medium">(real)</span>}
-        </div>
-      </td>
-      {months.map((m) => (
-        <td key={m.key} className={cn('py-0.5 px-0.5', m.isCurrent && 'bg-primary-50')}>
-          {readOnly ? (
-            <div className={cn('w-full text-center text-xs py-1.5 px-1 tabular-nums', isActual ? 'text-emerald-700 font-medium' : 'text-gray-700')}>
-              {fmt(values[m.key]?.[channel] || 0)}
-            </div>
-          ) : (
-            <input
-              type="number"
-              value={values[m.key]?.[channel] || ''}
-              onChange={(e) => onChange?.(m.key, e.target.value)}
-              placeholder="0"
-              className={cn(
-                'w-full text-center text-xs py-1.5 px-0.5 border rounded tabular-nums focus:outline-none focus:ring-1',
-                isActual ? 'border-emerald-200 focus:ring-emerald-300 bg-white' : 'border-gray-200 focus:ring-primary-300 bg-white',
-                m.isCurrent && 'ring-1 ring-primary-300'
-              )}
-            />
-          )}
-        </td>
-      ))}
-      <td className="py-1.5 pl-2 text-right">
-        <span className={cn('text-xs font-semibold tabular-nums', isActual ? 'text-emerald-600' : 'text-gray-800')}>
-          {fmt(total)}€
-        </span>
-      </td>
-    </tr>
-  );
-}
+import type { SalesProjectionProps, TabType } from './salesProjectionTypes';
+import {
+  CHANNELS, getFixedMonthWindow, fmt, fmtK,
+  calcInvestment, getPercent,
+} from './salesProjectionTypes';
+import { Scorecard, Row } from './SalesScorecard';
+import { SalesTableRow } from './SalesTableRow';
 
 // ============================================
 // MAIN COMPONENT
@@ -552,7 +347,7 @@ export function SalesProjection({
                       {activeChannels.map((ch) => {
                         const channel = CHANNELS.find((c) => c.id === ch);
                         return (
-                          <TableRow
+                          <SalesTableRow
                             key={`target-${ch}`}
                             label={channel?.name || ch}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
@@ -568,7 +363,7 @@ export function SalesProjection({
                       {showActual && activeChannels.map((ch) => {
                         const channel = CHANNELS.find((c) => c.id === ch);
                         return (
-                          <TableRow
+                          <SalesTableRow
                             key={`actual-${ch}`}
                             label={channel?.name || ch}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
@@ -613,7 +408,7 @@ export function SalesProjection({
                         });
                         const total = months.reduce((sum, m) => sum + calculations.calcTargetAds(m.key, ch), 0);
                         return (
-                          <TableRow
+                          <SalesTableRow
                             key={`ads-${ch}`}
                             label={`${channel?.name} (${getPercent(config.maxAdsPercent, ch)}%)`}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
@@ -629,7 +424,7 @@ export function SalesProjection({
                       {showActual && activeChannels.map((ch) => {
                         const channel = CHANNELS.find((c) => c.id === ch);
                         return (
-                          <TableRow
+                          <SalesTableRow
                             key={`ads-actual-${ch}`}
                             label={channel?.name || ch}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
@@ -676,7 +471,7 @@ export function SalesProjection({
                         });
                         const total = months.reduce((sum, m) => sum + calculations.calcTargetPromos(m.key, ch), 0);
                         return (
-                          <TableRow
+                          <SalesTableRow
                             key={`promos-${ch}`}
                             label={`${channel?.name} (${getPercent(config.maxPromosPercent, ch)}%)`}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
@@ -692,7 +487,7 @@ export function SalesProjection({
                       {showActual && activeChannels.map((ch) => {
                         const channel = CHANNELS.find((c) => c.id === ch);
                         return (
-                          <TableRow
+                          <SalesTableRow
                             key={`promos-actual-${ch}`}
                             label={channel?.name || ch}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}

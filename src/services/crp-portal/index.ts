@@ -120,9 +120,7 @@ export {
   fetchCrpOrdersAggregated,
   fetchCrpOrdersRaw,
   fetchCrpOrdersComparison,
-  fetchHierarchyData,
   fetchControllingMetricsRPC,
-  fetchHierarchyDataRPC,
 } from './orders';
 
 export type {
@@ -130,10 +128,19 @@ export type {
   OrdersAggregation,
   ChannelAggregation,
   OrdersChanges,
-  HierarchyMetrics,
-  HierarchyDataRow,
   ControllingMetricsRow,
 } from './orders';
+
+// Hierarchy (Company → Brand → Address → Channel)
+export {
+  fetchHierarchyData,
+  fetchHierarchyDataRPC,
+} from './hierarchy';
+
+export type {
+  HierarchyMetrics,
+  HierarchyDataRow,
+} from './hierarchy';
 
 // Contacts (HubSpot)
 export { fetchContactsByCompanyId } from './contacts';
