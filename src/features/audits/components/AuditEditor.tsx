@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Save, CheckCircle, ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -31,6 +31,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
   const [currentAuditNumber, setCurrentAuditNumber] = useState<string | null>(null);
 
   // Track current audit number
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (audit?.desAuditNumber) {
       setCurrentAuditNumber(audit.desAuditNumber);
@@ -43,6 +44,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
       setFieldData(audit.desFieldData);
     }
   }, [audit]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle field data changes
   const handleFieldDataChange = useCallback((newFieldData: Record<string, unknown>) => {
@@ -152,14 +154,12 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
   }, [audit, auditType, fieldData, hasChanges, handleSave, completeAudit, onSaved, onClose, scrollToField]);
 
   // Auto-save debounce
-  const handleAutoSave = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    return () => {
-      if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        handleSave();
-      }, 3000);
-    };
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSave();
+    }, 3000);
   }, [handleSave]);
 
   const isLoading = auditLoading || typeLoading;

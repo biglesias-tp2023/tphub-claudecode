@@ -111,13 +111,16 @@ export async function fetchShareLinkByToken(
 ): Promise<ObjectiveShareLink | null> {
   if (MOCK_MODE) {
     const links = getMockShareLinks();
-    return links.find((l) => l.token === token) || null;
+    const link = links.find((l) => l.token === token) || null;
+    if (link && !isShareLinkValid(link).valid) return null;
+    return link;
   }
 
   const { data, error } = await supabase
     .from('objective_share_links')
     .select('*')
     .eq('token', token)
+    .eq('is_active', true)
     .single();
 
   if (error) {
@@ -125,7 +128,13 @@ export async function fetchShareLinkByToken(
     throw error;
   }
 
-  return mapDbShareLink(data);
+  // Check expiration client-side (Supabase doesn't support nullable gt easily)
+  const link = mapDbShareLink(data);
+  if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+    return null;
+  }
+
+  return link;
 }
 
 /**

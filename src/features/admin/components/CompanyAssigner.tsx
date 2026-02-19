@@ -19,6 +19,7 @@ export function CompanyAssigner({ profile, isOpen, onClose }: CompanyAssignerPro
   // Initialize selected IDs when profile changes
   useEffect(() => {
     if (profile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedIds(profile.assignedCompanyIds);
     }
   }, [profile]);

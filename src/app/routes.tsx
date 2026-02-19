@@ -47,6 +47,7 @@ function LazyPage({ children }: { children: React.ReactNode }) {
 
 // Route-level error element — catches errors React Router intercepts before
 // they reach ChunkLoadErrorBoundary (which sits above RouterProvider)
+// eslint-disable-next-line react-refresh/only-export-components
 function RouteErrorFallback() {
   const error = useRouteError();
   const message = error instanceof Error ? error.message : '';

@@ -101,7 +101,7 @@ function formatDate(date: Date | string): string {
  * - previousEnd = day before current start = Feb 1
  * - previousStart = previousEnd - duration = Jan 26
  */
-function getPreviousPeriodRange(dateRange: DateRange, _preset: DatePreset): { start: Date; end: Date } {
+function getPreviousPeriodRange(dateRange: DateRange): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
 
@@ -160,7 +160,7 @@ export function useOrdersData(params: UseOrdersDataParams) {
   const endDate = formatDate(dateRange.end);
 
   // Calculate previous period for comparison
-  const previousRange = getPreviousPeriodRange(dateRange, datePreset);
+  const previousRange = getPreviousPeriodRange(dateRange);
   const previousStartDate = formatDate(previousRange.start);
   const previousEndDate = formatDate(previousRange.end);
 

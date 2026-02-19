@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -38,6 +38,11 @@ export function Toast({ id, message, type = 'success', duration = 4000, onClose 
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setIsLeaving(true);
+    setTimeout(() => onClose(id), 200);
+  }, [id, onClose]);
+
   useEffect(() => {
     // Animate in
     requestAnimationFrame(() => setIsVisible(true));
@@ -48,12 +53,7 @@ export function Toast({ id, message, type = 'success', duration = 4000, onClose 
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsLeaving(true);
-    setTimeout(() => onClose(id), 200);
-  };
+  }, [duration, handleClose]);
 
   const Icon = ICONS[type];
 

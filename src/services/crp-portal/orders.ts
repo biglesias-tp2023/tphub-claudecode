@@ -190,13 +190,16 @@ export async function fetchCrpOrdersRaw(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  // Use pagination to fetch all orders (bypasses Supabase's server-side max_rows limit)
+  // Use pagination to fetch orders (bypasses Supabase's server-side max_rows limit)
+  // Safety limit: max 100 pages (100K rows) to prevent browser crashes with huge datasets
   const PAGE_SIZE = 1000;
+  const MAX_PAGES = 100;
   const allOrders: DbCrpOrderHead[] = [];
   let offset = 0;
   let hasMore = true;
+  let pageCount = 0;
 
-  while (hasMore) {
+  while (hasMore && pageCount < MAX_PAGES) {
     let query = supabase
       .from('crp_portal__ft_order_head')
       .select('pk_uuid_order, pfk_id_company, pfk_id_store, pfk_id_store_address, pfk_id_portal, td_creation_time, amt_total_price, amt_promotions, amt_refunds, cod_id_customer')
@@ -236,10 +239,15 @@ export async function fetchCrpOrdersRaw(
     if (data && data.length > 0) {
       allOrders.push(...(data as DbCrpOrderHead[]));
       offset += PAGE_SIZE;
+      pageCount++;
       hasMore = data.length === PAGE_SIZE;
     } else {
       hasMore = false;
     }
+  }
+
+  if (pageCount >= MAX_PAGES) {
+    console.warn(`fetchCrpOrdersRaw: hit ${MAX_PAGES}-page safety limit (${allOrders.length} rows). Consider narrowing the date range.`);
   }
 
   return allOrders;
@@ -583,11 +591,10 @@ interface AllDimensions {
  * We deduplicate by keeping only the most recent snapshot (ORDER BY pk_ts_month DESC).
  *
  * @param companyIds - Numeric company IDs for company/store queries (INTEGER columns)
- * @param companyIdsAsStrings - String company IDs for address query (TEXT column in crp_portal__dt_address)
+ * @param companyIds - Numeric company IDs
  */
 async function fetchAllDimensions(
-  companyIds: number[],
-  _companyIdsAsStrings: string[]
+  companyIds: number[]
 ): Promise<AllDimensions> {
   // Fetch all dimension data in parallel (ordered by pk_ts_month DESC for deduplication)
   // Note: Supabase has a default limit of 1000 rows. We need explicit limits for large datasets.
@@ -1177,9 +1184,7 @@ export async function fetchHierarchyData(
 
   // Step 1: Fetch ALL dimensions for selected companies (not filtered by orders)
   // This ensures we show all entities even if they have 0 orders
-  // Note: companyIds here is number[], need to convert to strings for address query
-  const companyIdsAsStrings = companyIds.map(id => String(id));
-  const dimensions = await fetchAllDimensions(companyIds, companyIdsAsStrings);
+  const dimensions = await fetchAllDimensions(companyIds);
 
   // Step 2: Fetch orders for both periods
   const [currentOrders, previousOrders] = await Promise.all([
@@ -1532,7 +1537,7 @@ export async function fetchHierarchyDataRPC(
   const numericCompanyIds = companyIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
 
   // Step 1: Fetch ALL dimensions for selected companies (for names)
-  const dimensions = await fetchAllDimensions(numericCompanyIds, companyIds);
+  const dimensions = await fetchAllDimensions(numericCompanyIds);
 
   if (import.meta.env.DEV) {
     console.log('[fetchHierarchyDataRPC] Dimensions loaded:', {

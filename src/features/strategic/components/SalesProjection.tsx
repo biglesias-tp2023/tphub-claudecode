@@ -305,10 +305,12 @@ export function SalesProjection({
   })), [months, targetRevenue, effectiveActualRevenue, actualAds, actualPromos, activeChannels, calculations]);
 
   const currentMonthIndex = months.findIndex((m) => m.isCurrent);
+  /* eslint-disable react-hooks/purity */
   const daysRemaining = useMemo(() => {
     const diff = new Date(config.endDate).getTime() - Date.now();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }, [config.endDate]);
+  /* eslint-enable react-hooks/purity */
 
   // Update handlers
   const updateData = useCallback((

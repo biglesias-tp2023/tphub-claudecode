@@ -18,8 +18,8 @@ function calcAverage(
 }
 
 export function useCompsetData(companyId: string | undefined) {
-  const { data: competitors = [], isLoading: loadingCompetitors } = useCompetitors(companyId);
-  const { data: hero, isLoading: loadingHero } = useHero(companyId);
+  const { data: competitors = [], isLoading: loadingCompetitors, error: errCompetitors } = useCompetitors(companyId);
+  const { data: hero, isLoading: loadingHero, error: errHero } = useHero(companyId);
 
   const allIds = useMemo(() => {
     const ids = competitors.map((c) => c.id);
@@ -27,9 +27,9 @@ export function useCompsetData(companyId: string | undefined) {
     return ids;
   }, [competitors, hero]);
 
-  const { data: snapshots = [], isLoading: loadingSnapshots } = useCompsetSnapshots(allIds);
-  const { data: products = [], isLoading: loadingProducts } = useCompsetProducts(allIds);
-  const { data: promotions = [], isLoading: loadingPromotions } = useCompsetPromotions(allIds);
+  const { data: snapshots = [], isLoading: loadingSnapshots, error: errSnapshots } = useCompsetSnapshots(allIds);
+  const { data: products = [], isLoading: loadingProducts, error: errProducts } = useCompsetProducts(allIds);
+  const { data: promotions = [], isLoading: loadingPromotions, error: errPromotions } = useCompsetPromotions(allIds);
 
   const heroWithData: CompetitorWithData | null = useMemo(() => {
     if (!hero) return null;
@@ -70,6 +70,8 @@ export function useCompsetData(companyId: string | undefined) {
     };
   }, [snapshots, hero]);
 
+  const error = errCompetitors || errHero || errSnapshots || errProducts || errPromotions;
+
   return {
     hero: heroWithData,
     competitors: competitorsWithData,
@@ -78,5 +80,6 @@ export function useCompsetData(companyId: string | undefined) {
     allPromotions: promotions,
     isLoading:
       loadingCompetitors || loadingHero || loadingSnapshots || loadingProducts || loadingPromotions,
+    error,
   };
 }

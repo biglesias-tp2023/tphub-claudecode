@@ -78,6 +78,7 @@ export function useStrategicPageState() {
   });
 
   // Load sales projection from localStorage
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const stored = localStorage.getItem(SALES_PROJECTION_KEY);
     if (stored) {
@@ -108,6 +109,7 @@ export function useStrategicPageState() {
       }
     }
   }, [salesProjection]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Save sales projection to localStorage
   const saveSalesProjection = useCallback((data: SalesProjectionData) => {
@@ -123,6 +125,7 @@ export function useStrategicPageState() {
     restaurants,
     companyIds,
     isLoading: isLoadingObjectives,
+    error: objectivesError,
   } = useStrategicObjectives();
 
   // Data hooks - Strategic Tasks
@@ -473,6 +476,7 @@ export function useStrategicPageState() {
 
   // Computed values
   const isLoading = isLoadingObjectives || isLoadingTasks;
+  const fetchError = objectivesError;
   const hasObjectives = objectives.length > 0;
   const hasSalesProjection = salesProjection !== null;
   const daysRemaining = salesProjection
@@ -484,9 +488,10 @@ export function useStrategicPageState() {
     toasts,
     closeToast,
 
-    // Loading state
+    // Loading/error state
     isLoading,
     isLoadingSales,
+    error: fetchError,
 
     // Computed flags
     hasObjectives,

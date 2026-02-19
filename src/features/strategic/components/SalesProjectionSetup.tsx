@@ -499,6 +499,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       const lastMonthData = autoRevenue[lastMonthKey];
 
       if (lastMonthData) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBaseline({
           glovo: lastMonthData.glovo || 0,
           ubereats: lastMonthData.ubereats || 0,
@@ -512,6 +513,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   // Reset baselineLoaded when wizard closes/opens
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBaselineLoaded(false);
     }
   }, [isOpen]);

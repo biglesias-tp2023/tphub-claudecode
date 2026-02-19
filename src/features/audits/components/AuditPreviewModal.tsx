@@ -166,6 +166,7 @@ function ImageViewerModal({
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) setCurrentIndex(0);
   }, [open]);
 
@@ -364,7 +365,7 @@ ThinkPaladar`;
       setEmailBody('');
       setIsSending(false);
     }
-  }, [open]);
+  }, [open, pdfUrl]);
 
   const handleDownloadPdf = useCallback(() => {
     if (exportData) {

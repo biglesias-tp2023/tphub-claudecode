@@ -132,6 +132,7 @@ export function HealthBadge({
 /**
  * Get just the label for a health status
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getHealthStatusLabel(status: HealthStatus): string {
   return STATUS_CONFIG[status].label;
 }
@@ -139,6 +140,7 @@ export function getHealthStatusLabel(status: HealthStatus): string {
 /**
  * Get the config for a health status (for custom rendering)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getHealthStatusConfig(status: HealthStatus): StatusConfig {
   return STATUS_CONFIG[status];
 }

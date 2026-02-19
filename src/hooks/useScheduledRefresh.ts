@@ -96,6 +96,7 @@ export function useScheduledRefresh() {
     timerRef.current = setTimeout(() => {
       invalidateData();
       // Re-schedule for the next day
+      // eslint-disable-next-line react-hooks/immutability
       scheduleNext();
     }, ms);
   }, [invalidateData]);

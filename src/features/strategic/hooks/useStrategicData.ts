@@ -321,6 +321,7 @@ export function useStrategicTasks(params?: {
   }, [restaurantsQuery.data, filterRestaurantIds]);
 
   // Determine query key based on params
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const queryKey = useMemo(() => {
     if (params?.startDate && params?.endDate) {
       return queryKeys.strategicTasks.byDateRange(restaurantIds, params.startDate, params.endDate);

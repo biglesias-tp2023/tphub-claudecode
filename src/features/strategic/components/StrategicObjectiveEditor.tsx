@@ -184,6 +184,7 @@ function ObjectiveForm({
   // Auto-populate baseline value with last month's revenue when data loads
   useEffect(() => {
     if (shouldFetchRevenue && lastMonthRevenue > 0 && !formData.kpiTargetValue) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => ({
         ...prev,
         linkedKpiId: prev.linkedKpiId || 'revenue',

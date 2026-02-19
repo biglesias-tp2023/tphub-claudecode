@@ -11,8 +11,15 @@ export default defineConfig({
     },
   },
   build: {
-    // Silence chunk size warnings - main bundle is ~960KB due to lucide-react, xlsx, jspdf
-    // These are already lazy-loaded where possible, acceptable for internal portal
-    chunkSizeWarningLimit: 1000,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-maps': ['leaflet', 'react-leaflet'],
+          'vendor-charts': ['d3'],
+          'vendor-export': ['jspdf', 'jspdf-autotable', 'xlsx'],
+        },
+      },
+    },
   },
 })

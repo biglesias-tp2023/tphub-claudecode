@@ -11,6 +11,8 @@ import {
   Handshake,
   UtensilsCrossed,
   CircleDot,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, Spinner, ToastContainer } from '@/components/ui';
 import { ExportButtons } from '@/components/common';
@@ -52,6 +54,25 @@ const CATEGORY_FILTERS: { value: ObjectiveCategory | 'all'; label: string; icon:
 
 export function StrategicPage() {
   const state = useStrategicPageState();
+
+  if (state.error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center">
+        <AlertTriangle className="w-10 h-10 text-amber-500 mb-3" />
+        <p className="text-gray-700 font-medium mb-1">Error al cargar objetivos</p>
+        <p className="text-gray-500 text-sm mb-4">
+          {state.error instanceof Error ? state.error.message : 'Error desconocido'}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   if (state.isLoading) {
     return (

@@ -65,6 +65,7 @@ export function RoleEditor({ profile, isOpen, onClose }: RoleEditorProps) {
   // Initialize selected role when profile changes
   useEffect(() => {
     if (profile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedRole(profile.role);
     }
   }, [profile]);

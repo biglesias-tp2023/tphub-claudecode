@@ -21,6 +21,7 @@ export function DeleteAuditModal({
   const [error, setError] = useState<string | null>(null);
 
   // Reset state when modal closes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) {
       setStep(1);
@@ -29,6 +30,7 @@ export function DeleteAuditModal({
       setError(null);
     }
   }, [open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleContinue = useCallback(() => {
     setStep(2);

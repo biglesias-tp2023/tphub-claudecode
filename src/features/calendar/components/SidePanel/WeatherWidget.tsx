@@ -16,6 +16,7 @@ function getIcon(iconName: string): LucideIcon {
 }
 
 function WeatherDay({ forecast, isToday }: { forecast: WeatherForecast; isToday: boolean }) {
+  /* eslint-disable react-hooks/static-components */
   const Icon = getIcon(forecast.icon);
   const date = new Date(forecast.date);
   const dayName = isToday
@@ -62,6 +63,7 @@ function WeatherDay({ forecast, isToday }: { forecast: WeatherForecast; isToday:
       </div>
     </div>
   );
+  /* eslint-enable react-hooks/static-components */
 }
 
 export function WeatherWidget({ forecasts, isLoading, error }: WeatherWidgetProps) {

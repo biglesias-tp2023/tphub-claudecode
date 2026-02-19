@@ -105,7 +105,7 @@ export function deduplicateBy<T>(items: T[], keyFn: (item: T) => string | number
  * parseNumericIds(['1', '2', '3']) // [1, 2, 3]
  */
 export function parseNumericIds(ids: string[]): number[] {
-  return ids.map(id => parseInt(id, 10));
+  return ids.map(id => parseInt(id, 10)).filter(n => !isNaN(n));
 }
 
 /**
@@ -291,7 +291,7 @@ export function normalizeAddress(address: string): string {
   const streetNumber = numberMatch ? numberMatch[1] : '';
 
   // Remove postal code and everything after (5 digits followed by city)
-  let streetPart = address
+  const streetPart = address
     .replace(/,?\s*\d{5}\s*.*/i, '')  // Remove postal code and city
     .replace(/,?\s*(madrid|barcelona|valencia|sevilla|zaragoza|málaga|murcia|palma|bilbao|alicante|córdoba|valladolid|vigo|gijón|tetuán|chamberí|salamanca|retiro|moncloa|arganzuela|carabanchel|usera|latina|puente de vallecas|moratalaz|ciudad lineal|hortaleza|villaverde|villa de vallecas|vicálvaro|san blas|barajas)\b.*/i, '')  // Remove city/district names
     .split(',')[0]  // Take first part
@@ -306,7 +306,7 @@ export function normalizeAddress(address: string): string {
     // Remove accents
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     // Remove punctuation and extra spaces
-    .replace(/[,.\-\/]/g, ' ')
+    .replace(/[,.\-/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 

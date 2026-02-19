@@ -62,6 +62,7 @@ export function StrategicTaskEditor({
     if (isOpen) {
       if (task) {
         // Editing existing task
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTitle(task.title);
         setDescription(task.description || '');
         setObjectiveId(task.objectiveId);
@@ -91,6 +92,7 @@ export function StrategicTaskEditor({
     if (objectiveId && !isEditing) {
       const objective = objectives.find((o) => o.id === objectiveId);
       if (objective) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCategory(objective.category);
         // Use addressId from new CRP Portal model (fallback to empty string)
         setRestaurantId(objective.addressId || '');

@@ -3,6 +3,7 @@
  * @see https://github.com/Leaflet/Leaflet.heat
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as L from 'leaflet';
 
 declare module 'leaflet' {

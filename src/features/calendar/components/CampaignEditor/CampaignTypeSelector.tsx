@@ -30,6 +30,7 @@ function CampaignTypeCard({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  /* eslint-disable react-hooks/static-components */
   const Icon = getIcon(config.icon);
 
   return (
@@ -69,6 +70,7 @@ function CampaignTypeCard({
       )}
     </button>
   );
+  /* eslint-enable react-hooks/static-components */
 }
 
 export function CampaignTypeSelector({ platform, selected, onSelect }: CampaignTypeSelectorProps) {

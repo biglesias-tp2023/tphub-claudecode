@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { fetchHierarchyDataRPC } from '@/services/crp-portal';
 import type { HierarchyDataRow } from '@/services/crp-portal';
-import type { DateRange, DatePreset, Brand, Restaurant } from '@/types';
+import type { DateRange, Brand, Restaurant } from '@/types';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 
@@ -52,7 +52,7 @@ function formatDate(date: Date | string): string {
  * - previousEnd = day before current start = Feb 1
  * - previousStart = previousEnd - duration = Jan 26
  */
-function getPreviousPeriodRange(dateRange: DateRange, _preset: DatePreset): { start: Date; end: Date } {
+function getPreviousPeriodRange(dateRange: DateRange): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
 
@@ -169,7 +169,7 @@ export function useHierarchyData() {
   const endDate = formatDate(dateRange.end);
 
   // Calculate previous period
-  const previousRange = getPreviousPeriodRange(dateRange, datePreset);
+  const previousRange = getPreviousPeriodRange(dateRange);
   const previousStartDate = formatDate(previousRange.start);
   const previousEndDate = formatDate(previousRange.end);
 

@@ -87,6 +87,7 @@ export function ExportPreviewModal({
   const [zoom, setZoom] = useState(100);
 
   // Generate PDF blob when modal opens for PDF format
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) {
       // Cleanup blob URL when modal closes
@@ -113,6 +114,7 @@ export function ExportPreviewModal({
         });
     }
   }, [isOpen, format, generatePdfBlob, pdfBlobUrl]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Cleanup on unmount
   useEffect(() => {

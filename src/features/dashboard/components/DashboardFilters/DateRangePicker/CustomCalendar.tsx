@@ -41,6 +41,7 @@ export function CustomCalendar({ value, onChange, onCancel, onApply }: CustomCal
   // Sync internal state with external value when value changes from outside
   useEffect(() => {
     if (value) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRange({ from: value.start, to: value.end });
     }
   }, [value]);

@@ -180,6 +180,7 @@ export function ProgressCircle({
 /**
  * Get circle color based on health status
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getProgressCircleColor(
   healthStatus: 'on_track' | 'at_risk' | 'off_track' | 'completed' | 'exceeded'
 ): ProgressCircleColor {

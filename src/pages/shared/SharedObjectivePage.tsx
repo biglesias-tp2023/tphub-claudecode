@@ -275,7 +275,7 @@ function ObjectiveDisplay({ objective }: ObjectiveDisplayProps) {
 // MAIN PAGE
 // ============================================
 
-export default function SharedObjectivePage() {
+export function SharedObjectivePage() {
   const { token } = useParams<{ token: string }>();
   const recordAccess = useRecordAccess();
 
@@ -298,11 +298,12 @@ export default function SharedObjectivePage() {
   });
 
   // Record access on mount
+  const recordAccessMutate = recordAccess.mutate;
   useEffect(() => {
     if (token && shareLink?.isActive) {
-      recordAccess.mutate(token);
+      recordAccessMutate(token);
     }
-  }, [token, shareLink?.isActive]);
+  }, [token, shareLink?.isActive, recordAccessMutate]);
 
   // Validation
   const validation = useMemo(() => {

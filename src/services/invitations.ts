@@ -190,8 +190,11 @@ export async function hasPendingInvitation(email: string): Promise<boolean> {
 // Allowed email domain for invitations
 const ALLOWED_EMAIL_DOMAIN = '@thinkpaladar.com';
 
-// Allowed specific emails (for testing/development)
-const ALLOWED_EMAILS = ['briglesias21@gmail.com'];
+// Allowed specific emails (for testing/development) — configured via env var
+const ALLOWED_EMAILS: string[] = (import.meta.env.VITE_ALLOWED_INVITATION_EMAILS || '')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 /**
  * Create an invitation for a user

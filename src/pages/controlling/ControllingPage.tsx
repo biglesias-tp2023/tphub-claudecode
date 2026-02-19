@@ -307,10 +307,14 @@ function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoadin
   // Get all descendant IDs for a given row (uses pre-built index)
   const getDescendantIds = useCallback((parentId: string): string[] => {
     const descendants: string[] = [];
-    const children = childrenIndex.get(parentId) || [];
-    for (const child of children) {
-      descendants.push(child.id);
-      descendants.push(...getDescendantIds(child.id));
+    const stack = [parentId];
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      const children = childrenIndex.get(currentId) || [];
+      for (const child of children) {
+        descendants.push(child.id);
+        stack.push(child.id);
+      }
     }
     return descendants;
   }, [childrenIndex]);

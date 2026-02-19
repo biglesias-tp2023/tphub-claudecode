@@ -62,6 +62,7 @@ export function CalendarView({
     return monday.toISOString().split('T')[0];
   }, [year, month, day]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handlePrevPeriod = useCallback(() => {
     if (currentView === 'day') {
       const prevDay = new Date(year, month - 1, day - 1);
@@ -94,6 +95,7 @@ export function CalendarView({
     }
   }, [currentView, day, month, year, onMonthChange]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleNextPeriod = useCallback(() => {
     if (currentView === 'day') {
       const nextDay = new Date(year, month - 1, day + 1);
@@ -126,6 +128,7 @@ export function CalendarView({
     }
   }, [currentView, day, month, year, onMonthChange]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleToday = useCallback(() => {
     const now = new Date();
     setYear(now.getFullYear());

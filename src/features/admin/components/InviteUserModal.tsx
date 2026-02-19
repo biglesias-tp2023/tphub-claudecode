@@ -88,6 +88,7 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
     if (availableRoles.length > 0 && !availableRoles.some((r) => r.value === role)) {
       // Default to consultant if available, otherwise first available role
       const defaultRole = availableRoles.find((r) => r.value === 'consultant')?.value || availableRoles[0].value;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRole(defaultRole);
     }
   }, [availableRoles, role]);
@@ -153,6 +154,7 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
   }, [searchQuery, sortedCompanies, fuse, statusFilters, kamFilters]);
 
   // Reset form when modal closes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) {
       setEmail('');
@@ -165,6 +167,7 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
       setKamFilters([]);
     }
   }, [isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

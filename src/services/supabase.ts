@@ -1,18 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { env } from '@/config/env';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'Supabase credentials not found. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env'
-  );
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
+export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 
 /**
  * Valida que el email sea del dominio @thinkpaladar.com

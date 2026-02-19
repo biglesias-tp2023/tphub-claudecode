@@ -81,12 +81,24 @@ export function CalendarPage() {
   // Client mode from URL params (for shared links)
   const isClientMode = searchParams.get('mode') === 'client';
 
+  // Sidebar state
+  const [sidebarDate, setSidebarDate] = useState(new Date());
+  const [selectedPlatforms, setSelectedPlatforms] = useState<CampaignPlatform[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+
+  // Event filters - all categories selected by default
+  const [selectedEventCategories, setSelectedEventCategories] = useState<EventCategory[]>([
+    'holiday', 'sports', 'entertainment', 'commercial'
+  ]);
+  const [selectedRegion, setSelectedRegion] = useState('ES');
+
   // Handle URL params for shared links
   useEffect(() => {
     const weekStartParam = searchParams.get('weekStart');
     if (weekStartParam) {
       const date = new Date(weekStartParam);
       if (!isNaN(date.getTime())) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentMonth({ year: date.getFullYear(), month: date.getMonth() + 1 });
       }
     }
@@ -130,17 +142,6 @@ export function CalendarPage() {
       setSelectedRegion(regionParam);
     }
   }, [searchParams]);
-
-  // Sidebar state
-  const [sidebarDate, setSidebarDate] = useState(new Date());
-  const [selectedPlatforms, setSelectedPlatforms] = useState<CampaignPlatform[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-
-  // Event filters - all categories selected by default
-  const [selectedEventCategories, setSelectedEventCategories] = useState<EventCategory[]>([
-    'holiday', 'sports', 'entertainment', 'commercial'
-  ]);
-  const [selectedRegion, setSelectedRegion] = useState('ES');
 
   // Get restaurants based on filters (uses store internally)
   const { data: restaurants = [] } = useRestaurants();

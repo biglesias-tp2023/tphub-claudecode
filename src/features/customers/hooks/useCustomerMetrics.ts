@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCustomerMetrics, fetchCustomerMetricsByChannel } from '@/services/crp-portal';
 import type { CustomerMetricsWithChanges, ChannelCustomerMetrics } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import type { DateRange, DatePreset } from '@/types';
+import type { DateRange } from '@/types';
 
 // ============================================
 // HELPERS
@@ -29,7 +29,7 @@ function formatDate(date: Date | string): string {
   return `${year}-${month}-${day}`;
 }
 
-function getPreviousPeriodRange(dateRange: DateRange, _preset: DatePreset): { start: Date; end: Date } {
+function getPreviousPeriodRange(dateRange: DateRange): { start: Date; end: Date } {
   const start = ensureDate(dateRange.start);
   const end = ensureDate(dateRange.end);
   const durationMs = end.getTime() - start.getTime();
@@ -63,7 +63,7 @@ export function useCustomerMetrics(): UseCustomerMetricsResult {
 
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);
-  const previousRange = getPreviousPeriodRange(dateRange, datePreset);
+  const previousRange = getPreviousPeriodRange(dateRange);
   const previousStartDate = formatDate(previousRange.start);
   const previousEndDate = formatDate(previousRange.end);
 
