@@ -4,6 +4,7 @@ const METRIC_OPTIONS: { value: HeatmapMetric; label: string }[] = [
   { value: 'revenue', label: 'Ventas' },
   { value: 'orders', label: '# Pedidos' },
   { value: 'avgTicket', label: 'Ticket Medio' },
+  { value: 'newCustomers', label: 'Nuevos clientes' },
 ];
 
 interface MetricSelectorProps {

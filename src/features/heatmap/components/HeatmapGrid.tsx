@@ -18,6 +18,7 @@ const METRIC_LABELS: Record<HeatmapMetric, string> = {
   revenue: 'Ventas',
   orders: '# Pedidos',
   avgTicket: 'Ticket Medio',
+  newCustomers: 'Nuevos clientes',
 };
 
 // ============================================
@@ -25,10 +26,16 @@ const METRIC_LABELS: Record<HeatmapMetric, string> = {
 // ============================================
 
 function getCellValue(cell: HeatmapCell, metric: HeatmapMetric): number {
+  if (metric === 'newCustomers') return cell.newCustomers;
   return cell[metric];
 }
 
-function formatValue(value: number, metric: HeatmapMetric): string {
+function formatNewCustomers(count: number, pct: number): string {
+  if (count === 0) return '';
+  return `${formatNumber(count)} (${Math.round(pct)}%)`;
+}
+
+function formatValue(value: number, metric: HeatmapMetric, cell?: HeatmapCell): string {
   if (value === 0) return '';
   switch (metric) {
     case 'revenue':
@@ -36,6 +43,8 @@ function formatValue(value: number, metric: HeatmapMetric): string {
       return formatCurrency(value);
     case 'orders':
       return formatNumber(value);
+    case 'newCustomers':
+      return cell ? formatNewCustomers(cell.newCustomers, cell.newCustomerPct) : formatNumber(value);
   }
 }
 
@@ -45,6 +54,7 @@ function formatTooltipValue(value: number, metric: HeatmapMetric): string {
     case 'avgTicket':
       return formatCurrency(value);
     case 'orders':
+    case 'newCustomers':
       return formatNumber(value);
   }
 }
@@ -72,6 +82,7 @@ function Tooltip({ cell, x, y }: TooltipData) {
         <p>Ventas: {formatTooltipValue(cell.revenue, 'revenue')}</p>
         <p># Pedidos: {formatTooltipValue(cell.orders, 'orders')}</p>
         <p>Ticket Medio: {formatTooltipValue(cell.avgTicket, 'avgTicket')}</p>
+        <p>Nuevos clientes: {formatNewCustomers(cell.newCustomers, cell.newCustomerPct) || '0'}</p>
       </div>
     </div>
   );
@@ -203,7 +214,7 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
                         className="flex items-center justify-center h-8 min-w-[80px] text-[11px] tabular-nums transition-colors cursor-default"
                         style={{ backgroundColor: bgColor, color: textColor }}
                       >
-                        {formatValue(value, metric)}
+                        {formatValue(value, metric, cell)}
                       </div>
                     </td>
                   );
@@ -219,19 +230,31 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
               {Array.from({ length: 7 }, (_, dow) => {
                 let dayRevenue = 0;
                 let dayOrders = 0;
+                let dayNewCustomers = 0;
+                let dayUniqueCustomers = 0;
                 for (let h = START_HOUR; h < 24; h++) {
                   dayRevenue += data[h][dow].revenue;
                   dayOrders += data[h][dow].orders;
+                  dayNewCustomers += data[h][dow].newCustomers;
+                  dayUniqueCustomers += data[h][dow].uniqueCustomers;
                 }
-                const summaryValue =
-                  metric === 'avgTicket'
-                    ? dayOrders > 0 ? dayRevenue / dayOrders : 0
-                    : metric === 'revenue' ? dayRevenue : dayOrders;
+
+                let summaryText: string;
+                if (metric === 'newCustomers') {
+                  const pct = dayUniqueCustomers > 0 ? (dayNewCustomers / dayUniqueCustomers) * 100 : 0;
+                  summaryText = dayNewCustomers > 0 ? formatNewCustomers(dayNewCustomers, pct) : '';
+                } else {
+                  const summaryValue =
+                    metric === 'avgTicket'
+                      ? dayOrders > 0 ? dayRevenue / dayOrders : 0
+                      : metric === 'revenue' ? dayRevenue : dayOrders;
+                  summaryText = summaryValue > 0 ? formatTooltipValue(summaryValue, metric) : '';
+                }
 
                 return (
                   <td key={dow} className="p-0 border border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-center h-8 min-w-[80px] text-[11px] font-semibold tabular-nums text-gray-700">
-                      {summaryValue > 0 ? formatTooltipValue(summaryValue, metric) : ''}
+                      {summaryText}
                     </div>
                   </td>
                 );

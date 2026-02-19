@@ -65,6 +65,8 @@ function jsToIsoDayOfWeek(jsDay: number): number {
 /**
  * Build a 24×7 empty matrix.
  */
+const LOOKBACK_DAYS = 90;
+
 function createEmptyMatrix(): HeatmapMatrix {
   return Array.from({ length: 24 }, (_, hour) =>
     Array.from({ length: 7 }, (_, dow) => ({
@@ -73,6 +75,9 @@ function createEmptyMatrix(): HeatmapMatrix {
       revenue: 0,
       orders: 0,
       avgTicket: 0,
+      uniqueCustomers: 0,
+      newCustomers: 0,
+      newCustomerPct: 0,
     }))
   );
 }
@@ -121,16 +126,40 @@ export function useHeatmapData() {
       channelIds.length > 0 ? channelIds.sort().join(',') : '',
     ],
     queryFn: async () => {
-      const orders = await fetchCrpOrdersRaw({
+      // Compute lookback period: 90 days before startDate
+      const lookbackStart = new Date(startDate);
+      lookbackStart.setDate(lookbackStart.getDate() - LOOKBACK_DAYS);
+      const lookbackEnd = new Date(startDate);
+      lookbackEnd.setDate(lookbackEnd.getDate() - 1);
+
+      const baseParams = {
         companyIds: numericCompanyIds.length > 0 ? numericCompanyIds : undefined,
         brandIds: numericBrandIds && numericBrandIds.length > 0 ? numericBrandIds : undefined,
         addressIds: numericRestaurantIds && numericRestaurantIds.length > 0 ? numericRestaurantIds : undefined,
         channelIds: channelIds.length > 0 ? channelIds : undefined,
-        startDate,
-        endDate,
-      });
+      };
+
+      // Fetch current period + lookback in parallel
+      const [orders, lookbackOrders] = await Promise.all([
+        fetchCrpOrdersRaw({ ...baseParams, startDate, endDate }),
+        fetchCrpOrdersRaw({
+          ...baseParams,
+          startDate: formatDate(lookbackStart),
+          endDate: formatDate(lookbackEnd),
+        }),
+      ]);
+
+      // Build set of existing customers from lookback period
+      const existingCustomers = new Set<string>();
+      for (const order of lookbackOrders) {
+        if (order.cod_id_customer) existingCustomers.add(order.cod_id_customer);
+      }
 
       const matrix = createEmptyMatrix();
+
+      // Per-cell customer tracking: key = "hour-dow"
+      const cellCustomers = new Map<string, Set<string>>();
+      const cellNewCustomers = new Map<string, Set<string>>();
 
       for (const order of orders) {
         if (!order.td_creation_time) continue;
@@ -140,13 +169,33 @@ export function useHeatmapData() {
         const cell = matrix[hour][dow];
         cell.revenue += order.amt_total_price || 0;
         cell.orders += 1;
+
+        // Track customers per cell
+        const customerId = order.cod_id_customer;
+        if (customerId) {
+          const key = `${hour}-${dow}`;
+          if (!cellCustomers.has(key)) cellCustomers.set(key, new Set());
+          cellCustomers.get(key)!.add(customerId);
+
+          if (!existingCustomers.has(customerId)) {
+            if (!cellNewCustomers.has(key)) cellNewCustomers.set(key, new Set());
+            cellNewCustomers.get(key)!.add(customerId);
+          }
+        }
       }
 
-      // Calculate avgTicket per cell
+      // Calculate derived metrics per cell
       for (let h = 0; h < 24; h++) {
         for (let d = 0; d < 7; d++) {
           const cell = matrix[h][d];
           cell.avgTicket = cell.orders > 0 ? cell.revenue / cell.orders : 0;
+
+          const key = `${h}-${d}`;
+          const unique = cellCustomers.get(key)?.size ?? 0;
+          const newC = cellNewCustomers.get(key)?.size ?? 0;
+          cell.uniqueCustomers = unique;
+          cell.newCustomers = newC;
+          cell.newCustomerPct = unique > 0 ? (newC / unique) * 100 : 0;
         }
       }
 
