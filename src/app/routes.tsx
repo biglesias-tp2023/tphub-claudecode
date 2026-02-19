@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useRouteError } from 'react-router-dom';
 import { Suspense } from 'react';
 import { MainLayout, AuthLayout } from '@/components/layout';
 import { ProtectedRoute } from '@/components/common';
@@ -27,9 +27,10 @@ const CompsetPage = lazyWithRetry(() => import('@/pages/compset').then(m => ({ d
 const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditsPage })));
 const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
 // Public shared pages
-const SharedObjectivePage = lazyWithRetry(() => import('@/pages/shared/SharedObjectivePage'));
+const SharedObjectivePage = lazyWithRetry(() => import('@/pages/shared/SharedObjectivePage').then(m => ({ default: m.SharedObjectivePage })));
 
 // Loading spinner for lazy-loaded pages
+// eslint-disable-next-line react-refresh/only-export-components
 function PageLoader() {
   return (
     <div className="min-h-[50vh] flex items-center justify-center">
@@ -39,8 +40,61 @@ function PageLoader() {
 }
 
 // Wrapper for lazy-loaded pages with Suspense
+// eslint-disable-next-line react-refresh/only-export-components
 function LazyPage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
+
+// Route-level error element — catches errors React Router intercepts before
+// they reach ChunkLoadErrorBoundary (which sits above RouterProvider)
+function RouteErrorFallback() {
+  const error = useRouteError();
+  const message = error instanceof Error ? error.message : '';
+  const isChunk =
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module');
+
+  if (isChunk) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Nueva versión disponible
+          </h2>
+          <p className="text-gray-500 mb-6">
+            Se ha publicado una actualización de TPHub. Recarga la página para continuar.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Recargar página
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <div className="text-center max-w-md px-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Algo salió mal</h2>
+        <p className="text-gray-500 mb-6">Ha ocurrido un error inesperado.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+        >
+          Recargar página
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // Placeholder pages - will be replaced with real implementations
@@ -65,6 +119,7 @@ export const router = createBrowserRouter([
         <MainLayout />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorFallback />,
     children: [
       { index: true, element: <Navigate to="/controlling" replace /> },
       { path: 'controlling', element: <LazyPage><ControllingPage /></LazyPage> },

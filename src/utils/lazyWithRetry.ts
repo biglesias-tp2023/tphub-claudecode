@@ -1,35 +1,53 @@
 import { lazy } from 'react';
 
+const RELOAD_KEY = 'tphub_chunk_reload';
+
 /**
- * Wraps React.lazy() with retry logic and exponential backoff.
+ * Wraps React.lazy() with auto-reload on chunk load errors.
  *
  * When Vercel deploys a new version, old JS chunks are removed.
  * If a user has a cached HTML page referencing old chunk URLs,
  * dynamic imports will fail with "Failed to fetch dynamically imported module".
  *
- * This utility retries the import up to 3 times with increasing delays
- * before giving up (at which point ChunkLoadErrorBoundary catches the error).
+ * This utility detects chunk load errors and forces a full page reload
+ * so the browser fetches the new HTML with updated chunk references.
+ * A sessionStorage flag prevents infinite reload loops.
  */
 export function lazyWithRetry<T extends React.ComponentType<unknown>>(
   importFn: () => Promise<{ default: T }>
 ) {
-  return lazy(() => retryImport(importFn));
+  return lazy(() => importWithReload(importFn));
 }
 
-const RETRY_DELAYS = [500, 1000, 2000];
-
-async function retryImport<T>(
-  importFn: () => Promise<T>,
-  retries = RETRY_DELAYS.length
+async function importWithReload<T>(
+  importFn: () => Promise<T>
 ): Promise<T> {
   try {
-    return await importFn();
+    const result = await importFn();
+    // Successful load - clear the reload flag
+    sessionStorage.removeItem(RELOAD_KEY);
+    return result;
   } catch (error) {
-    if (retries <= 0) throw error;
-
-    const delay = RETRY_DELAYS[RETRY_DELAYS.length - retries];
-    await new Promise((resolve) => setTimeout(resolve, delay));
-
-    return retryImport(importFn, retries - 1);
+    if (isChunkLoadError(error) && !sessionStorage.getItem(RELOAD_KEY)) {
+      // First chunk error: flag it and reload the page
+      sessionStorage.setItem(RELOAD_KEY, '1');
+      window.location.reload();
+      // Return a never-resolving promise to prevent React from rendering an error
+      return new Promise(() => {});
+    }
+    // Already reloaded once or not a chunk error - let error boundary handle it
+    sessionStorage.removeItem(RELOAD_KEY);
+    throw error;
   }
+}
+
+function isChunkLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message || '';
+  return (
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module') ||
+    (error.name === 'TypeError' && message.includes('Failed to fetch'))
+  );
 }
