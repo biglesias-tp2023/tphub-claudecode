@@ -4,27 +4,12 @@ import { Spinner } from '../Spinner';
 import type { ButtonProps } from './Button.types';
 
 const variantStyles = {
-  primary: [
-    'bg-gradient-to-b from-primary-500 to-primary-600 text-white',
-    'shadow-sm shadow-primary-600/25',
-    'hover:from-primary-600 hover:to-primary-700',
-    'active:from-primary-700 active:to-primary-800',
-  ].join(' '),
+  primary: 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800',
   secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300',
   outline: 'border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 active:bg-gray-100',
   ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200',
-  danger: [
-    'bg-gradient-to-b from-error-500 to-error-600 text-white',
-    'shadow-sm shadow-error-600/25',
-    'hover:from-error-600 hover:to-error-700',
-    'active:from-error-700 active:to-error-800',
-  ].join(' '),
-  success: [
-    'bg-gradient-to-b from-success-500 to-success-600 text-white',
-    'shadow-sm shadow-success-600/25',
-    'hover:from-success-600 hover:to-success-700',
-    'active:from-success-700 active:to-success-800',
-  ].join(' '),
+  danger: 'bg-error-600 text-white hover:bg-error-700 active:bg-error-800',
+  success: 'bg-success-600 text-white hover:bg-success-700 active:bg-success-800',
 };
 
 const sizeStyles = {

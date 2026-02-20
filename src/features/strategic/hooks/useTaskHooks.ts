@@ -8,8 +8,8 @@ import {
   updateTask,
   toggleTaskCompletion,
   deleteTask,
-  fetchRestaurants,
 } from '@/services/supabase-data';
+import { fetchCrpRestaurants } from '@/services/crp-portal';
 import type { TaskInput } from '@/types';
 
 // ============================================
@@ -23,10 +23,10 @@ export function useTasks(isCompleted?: boolean) {
   const { companyIds } = useGlobalFiltersStore();
   const { restaurantIds: filterRestaurantIds } = useDashboardFiltersStore();
 
-  // First fetch restaurants to get IDs
+  // First fetch restaurants to get IDs (using CRP Portal)
   const restaurantsQuery = useQuery({
     queryKey: queryKeys.restaurants.list({ companyIds }),
-    queryFn: () => fetchRestaurants({ companyIds }),
+    queryFn: () => fetchCrpRestaurants({ companyIds: companyIds.length > 0 ? companyIds : undefined }),
     staleTime: 5 * 60 * 1000,
   });
 

@@ -52,6 +52,8 @@ export const AUDIT_TYPE_ICONS: Record<string, string> = {
   onboarding: 'Rocket',
   google_ads: 'BarChart3',
   mystery_shopper: 'UserSearch',
+  packaging: 'Package',
+  presencia_digital: 'Globe',
 };
 
 // Type card configurations for the new audit modal
@@ -92,6 +94,24 @@ export const AUDIT_TYPE_CARDS: AuditTypeCardConfig[] = [
     isActive: false,
     color: 'text-orange-600',
     bgColor: 'bg-orange-100',
+  },
+  {
+    slug: 'packaging',
+    name: 'Packaging',
+    description: 'Evaluación de packaging y presentación de producto',
+    icon: 'Package',
+    isActive: false,
+    color: 'text-teal-600',
+    bgColor: 'bg-teal-100',
+  },
+  {
+    slug: 'presencia_digital',
+    name: 'Presencia Digital',
+    description: 'Auditoría de presencia en plataformas digitales',
+    icon: 'Globe',
+    isActive: false,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
   },
 ];
 

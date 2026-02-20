@@ -76,7 +76,7 @@ export function ChannelCard({ data, weeklyData, weeklyLoading }: ChannelCardProp
         </div>
         <div className="text-center">
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ticket</p>
-          <p className="text-sm font-semibold text-gray-900 tabular-nums">{data.ticketMedio.toFixed(1)}\u20AC</p>
+          <p className="text-sm font-semibold text-gray-900 tabular-nums">{data.ticketMedio.toFixed(1)} €</p>
         </div>
         <div className="text-center">
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Open</p>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, ClipboardList, UserSearch, Rocket, BarChart3, ArrowLeft, X } from 'lucide-react';
+import { Loader2, ClipboardList, UserSearch, Rocket, BarChart3, Package, Globe, ArrowLeft, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/utils/cn';
 import { SimpleDropdown } from './SimpleDropdown';
@@ -26,6 +26,10 @@ function TypeCardIcon({ slug, className }: { slug: string; className?: string })
       return <Rocket className={className} />;
     case 'google_ads':
       return <BarChart3 className={className} />;
+    case 'packaging':
+      return <Package className={className} />;
+    case 'presencia_digital':
+      return <Globe className={className} />;
     default:
       return <ClipboardList className={className} />;
   }
@@ -259,7 +263,7 @@ export function NewAuditModal({ open, onClose, onError }: NewAuditModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col">
+      <div className={cn("relative bg-white rounded-xl shadow-xl w-full mx-4 max-h-[90vh] flex flex-col", step === 'type' ? 'max-w-2xl' : 'max-w-lg')}>
         {/* Close button - floating top-right, above overflow container */}
         <button
           type="button"
