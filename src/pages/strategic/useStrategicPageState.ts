@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import { useOrdersData } from '@/features/controlling/hooks';
+import { useOrdersData, useSessionState } from '@/features/controlling/hooks';
 import { fetchCrpCompanyById } from '@/services/crp-portal';
 import {
   useStrategicObjectives,
@@ -67,11 +67,13 @@ export function useStrategicPageState() {
   const [isWarningOpen, setIsWarningOpen] = useState(false);
   const [salesProjection, setSalesProjection] = useState<SalesProjectionData | null>(null);
 
-  // Category filter state
-  const [selectedCategory, setSelectedCategory] = useState<ObjectiveCategory | 'all'>('all');
+  // Persisted filter states
+  const [selectedCategory, setSelectedCategory] = useSessionState<ObjectiveCategory | 'all'>('tphub-st-category', 'all');
+  const [selectedStatus, setSelectedStatus] = useSessionState<ObjectiveStatus | 'all'>('tphub-st-status', 'all');
+  const [searchQuery, setSearchQuery] = useSessionState<string>('tphub-st-search', '');
 
-  // Expanded sections
-  const [expandedHorizons, setExpandedHorizons] = useState<Record<ObjectiveHorizon, boolean>>({
+  // Expanded sections (persisted)
+  const [expandedHorizons, setExpandedHorizons] = useSessionState<Record<ObjectiveHorizon, boolean>>('tphub-st-horizons', {
     short: true,
     medium: true,
     long: false,
@@ -182,17 +184,45 @@ export function useStrategicPageState() {
   // Default restaurant ID
   const defaultRestaurantId = restaurants[0]?.id;
 
-  // Filter objectives by category
+  // Combined filter: category + status + search
   const filteredObjectivesByHorizon = useMemo(() => {
-    if (selectedCategory === 'all') {
-      return objectivesByHorizon;
-    }
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    const filterList = (list: typeof objectivesByHorizon.short) =>
+      list.filter((o) => {
+        if (selectedCategory !== 'all' && o.category !== selectedCategory) return false;
+        if (selectedStatus !== 'all' && o.status !== selectedStatus) return false;
+        if (normalizedQuery && !o.title.toLowerCase().includes(normalizedQuery)) return false;
+        return true;
+      });
+
     return {
-      short: objectivesByHorizon.short.filter((o) => o.category === selectedCategory),
-      medium: objectivesByHorizon.medium.filter((o) => o.category === selectedCategory),
-      long: objectivesByHorizon.long.filter((o) => o.category === selectedCategory),
+      short: filterList(objectivesByHorizon.short),
+      medium: filterList(objectivesByHorizon.medium),
+      long: filterList(objectivesByHorizon.long),
     };
-  }, [objectivesByHorizon, selectedCategory]);
+  }, [objectivesByHorizon, selectedCategory, selectedStatus, searchQuery]);
+
+  // Category counts (unaffected by category filter itself)
+  const categoryCountMap = useMemo(() => {
+    const counts: Record<string, number> = { all: objectives.length };
+    for (const o of objectives) {
+      counts[o.category] = (counts[o.category] || 0) + 1;
+    }
+    return counts;
+  }, [objectives]);
+
+  // At-risk count: non-completed objectives with deadline ≤ 14 days from now
+  const atRiskCount = useMemo(() => {
+    const now = new Date();
+    const threshold = 14 * 24 * 60 * 60 * 1000;
+    return objectives.filter((o) => {
+      if (o.status === 'completed') return false;
+      if (!o.evaluationDate) return false;
+      const remaining = new Date(o.evaluationDate).getTime() - now.getTime();
+      return remaining > 0 && remaining <= threshold;
+    }).length;
+  }, [objectives]);
 
   // Flat list of all filtered objectives (for export)
   const filteredObjectives = useMemo(() => [
@@ -521,6 +551,12 @@ export function useStrategicPageState() {
     // Filter state
     selectedCategory,
     setSelectedCategory,
+    selectedStatus,
+    setSelectedStatus,
+    searchQuery,
+    setSearchQuery,
+    categoryCountMap,
+    atRiskCount,
     expandedHorizons,
     toggleHorizon,
 

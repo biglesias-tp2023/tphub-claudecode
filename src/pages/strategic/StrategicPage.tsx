@@ -1,9 +1,7 @@
 import {
   Plus,
   TrendingUp,
-  CheckCircle2,
   BarChart3,
-  Zap,
   Clock,
   Star,
   Users,
@@ -13,6 +11,7 @@ import {
   CircleDot,
   AlertTriangle,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import { Card, Spinner, ToastContainer } from '@/components/ui';
 import { ExportButtons } from '@/components/common';
@@ -25,13 +24,12 @@ import {
   SalesProjection,
   SalesProjectionSetup,
   SalesProjectionWarning,
-  MetricItem,
   HorizonSection,
   StrategicEmptyState,
 } from '@/features/strategic/components';
 import { cn } from '@/utils/cn';
 import { useStrategicPageState } from './useStrategicPageState';
-import type { ObjectiveCategory } from '@/types';
+import type { ObjectiveCategory, ObjectiveStatus } from '@/types';
 
 // ============================================
 // CATEGORY FILTER OPTIONS
@@ -46,6 +44,13 @@ const CATEGORY_FILTERS: { value: ObjectiveCategory | 'all'; label: string; icon:
   { value: 'reputacion', label: 'Reputación', icon: Star },
   { value: 'proveedores', label: 'Proveedores', icon: Handshake },
   { value: 'menu', label: 'Menú', icon: UtensilsCrossed },
+];
+
+const STATUS_FILTERS: { value: ObjectiveStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'in_progress', label: 'En progreso' },
+  { value: 'completed', label: 'Completado' },
 ];
 
 // ============================================
@@ -136,37 +141,83 @@ export function StrategicPage() {
             />
           )}
 
-          {/* Metrics Bar */}
-          <div className="flex items-center gap-8 py-4 px-5 bg-white rounded-xl border border-gray-100">
-            <MetricItem
-              label="Total"
-              value={state.objectiveStats.total}
-              icon={BarChart3}
-            />
-            <div className="w-px h-10 bg-gray-100" />
-            <MetricItem
-              label="En progreso"
-              value={state.objectiveStats.inProgress}
-              icon={Zap}
-              color={state.objectiveStats.inProgress > 0 ? 'warning' : 'default'}
-            />
-            <div className="w-px h-10 bg-gray-100" />
-            <MetricItem
-              label="Completados"
-              value={state.objectiveStats.completed}
-              icon={CheckCircle2}
-              color={state.objectiveStats.completed > 0 ? 'success' : 'default'}
-            />
-            <div className="w-px h-10 bg-gray-100" />
-            <MetricItem
-              label="Efectividad"
-              value={`${state.objectiveStats.effectiveness}%`}
-              icon={TrendingUp}
-              color={
-                state.objectiveStats.effectiveness >= 70 ? 'success' :
-                state.objectiveStats.effectiveness >= 40 ? 'warning' : 'default'
-              }
-            />
+          {/* Health Summary Bar */}
+          <div className="py-4 px-5 bg-white rounded-xl border border-gray-100 space-y-3">
+            {/* Title + effectiveness */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-900">
+                {state.objectiveStats.total} objetivo{state.objectiveStats.total !== 1 ? 's' : ''}
+              </span>
+              <span className="text-xs text-gray-500">
+                {state.objectiveStats.effectiveness}% efectividad
+              </span>
+            </div>
+
+            {/* Segmented bar */}
+            {state.objectiveStats.total > 0 && (
+              <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-100">
+                {state.objectiveStats.pending > 0 && (
+                  <div
+                    className="bg-gray-300 transition-all"
+                    style={{ width: `${(state.objectiveStats.pending / state.objectiveStats.total) * 100}%` }}
+                  />
+                )}
+                {state.objectiveStats.inProgress > 0 && (
+                  <div
+                    className="bg-primary-500 transition-all"
+                    style={{ width: `${(state.objectiveStats.inProgress / state.objectiveStats.total) * 100}%` }}
+                  />
+                )}
+                {state.objectiveStats.completed > 0 && (
+                  <div
+                    className="bg-emerald-500 transition-all"
+                    style={{ width: `${(state.objectiveStats.completed / state.objectiveStats.total) * 100}%` }}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Legend (clickable to filter by status) */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <button
+                onClick={() => state.setSelectedStatus(state.selectedStatus === 'pending' ? 'all' : 'pending')}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  state.selectedStatus === 'pending' ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-300" />
+                {state.objectiveStats.pending} Pendiente{state.objectiveStats.pending !== 1 ? 's' : ''}
+              </button>
+              <button
+                onClick={() => state.setSelectedStatus(state.selectedStatus === 'in_progress' ? 'all' : 'in_progress')}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  state.selectedStatus === 'in_progress' ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <span className="w-2 h-2 rounded-full bg-primary-500" />
+                {state.objectiveStats.inProgress} En progreso
+              </button>
+              <button
+                onClick={() => state.setSelectedStatus(state.selectedStatus === 'completed' ? 'all' : 'completed')}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  state.selectedStatus === 'completed' ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                {state.objectiveStats.completed} Completado{state.objectiveStats.completed !== 1 ? 's' : ''}
+              </button>
+            </div>
+
+            {/* At-risk alert */}
+            {state.atRiskCount > 0 && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {state.atRiskCount} objetivo{state.atRiskCount !== 1 ? 's' : ''} con fecha próxima ({'<'} 14 días)
+              </div>
+            )}
           </div>
 
           {/* Main Content: Two Column Layout */}
@@ -191,12 +242,13 @@ export function StrategicPage() {
                   </div>
                 </div>
 
-                {/* Category Filter */}
+                {/* Category Filter with counters */}
                 <div className="px-5 py-3 border-b border-gray-50 overflow-x-auto">
                   <div className="flex items-center gap-1.5">
                     {CATEGORY_FILTERS.map((cat) => {
                       const Icon = cat.icon;
                       const isSelected = state.selectedCategory === cat.value;
+                      const count = state.categoryCountMap[cat.value] || 0;
                       return (
                         <button
                           key={cat.value}
@@ -210,9 +262,45 @@ export function StrategicPage() {
                         >
                           <Icon className="w-3 h-3" />
                           {cat.label}
+                          <span className={cn(
+                            'text-[10px] min-w-[18px] h-[18px] inline-flex items-center justify-center rounded-full',
+                            isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                          )}>
+                            {count}
+                          </span>
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* Status filter + search */}
+                <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    {STATUS_FILTERS.map((sf) => (
+                      <button
+                        key={sf.value}
+                        onClick={() => state.setSelectedStatus(sf.value)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all',
+                          state.selectedStatus === sf.value
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        )}
+                      >
+                        {sf.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Buscar objetivo..."
+                      value={state.searchQuery}
+                      onChange={(e) => state.setSearchQuery(e.target.value)}
+                      className="w-48 pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                    />
                   </div>
                 </div>
 
