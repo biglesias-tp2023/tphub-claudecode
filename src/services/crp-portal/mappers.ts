@@ -90,9 +90,9 @@ export function mapBrand(db: DbCrpStore, allIds?: string[]): Brand {
  * - pk_id_address → id (string), externalId (number)
  * - des_address → name, address
  * - pfk_id_company → companyId
- * - pfk_id_store → brandId (defaults to '0' if null)
- * - pfk_id_business_area → areaId (null if not set)
- * - des_latitude/des_longitude → latitude/longitude
+ * - brandId defaults to '0' (column does not exist in table)
+ * - areaId defaults to null (column does not exist in table)
+ * - latitude/longitude default to null (use tphub_restaurant_coordinates instead)
  *
  * Note: activeChannels defaults to all channels as the database
  * doesn't store channel information per address.
@@ -104,12 +104,12 @@ export function mapRestaurant(db: DbCrpAddress, allIds?: string[]): Restaurant {
     allIds: allIds || [id],
     externalId: db.pk_id_address,
     companyId: String(db.pfk_id_company),
-    brandId: String(db.pfk_id_store || 0),
+    brandId: String(db.pfk_id_store ?? 0),
     areaId: db.pfk_id_business_area ? String(db.pfk_id_business_area) : null,
     name: db.des_address,
     address: db.des_address,
-    latitude: db.des_latitude,
-    longitude: db.des_longitude,
+    latitude: db.des_latitude ?? null,
+    longitude: db.des_longitude ?? null,
     deliveryRadiusKm: null,
     activeChannels: ['glovo', 'ubereats', 'justeat'] as ChannelId[],
     isActive: true,

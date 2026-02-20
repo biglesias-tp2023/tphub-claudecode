@@ -30,11 +30,9 @@ const TABLE_NAME = 'crp_portal__dt_address';
 /**
  * Fetches restaurants (addresses) from CRP Portal with optional filtering.
  *
- * Filtering hierarchy:
- * 1. Company (pfk_id_company) - Primary filter, always applied if provided
- * 2. Area (pfk_id_business_area) - Secondary filter, applied if provided
- *
- * Note: Brand filtering is intentionally NOT applied here. See module docs.
+ * Filtering:
+ * - Company (pfk_id_company) - Only filter applied at DB level
+ * - Area/Brand filtering is handled at the hook level (columns don't exist in table)
  *
  * Results are deduplicated by pk_id_address to handle potential
  * duplicate entries in the source database.
@@ -66,9 +64,10 @@ export async function fetchRestaurants(
   // NOTE: Do NOT filter flg_deleted here - filter AFTER deduplication (see utils.ts)
   let query = supabase
     .from(TABLE_NAME)
-    .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted, pk_ts_month')
+    .select('pk_id_address, des_address, pfk_id_company, flg_deleted, pk_ts_month')
     .order('pk_ts_month', { ascending: false })
-    .order('des_address');
+    .order('des_address')
+    .limit(50000);
 
   // Apply company filter (primary)
   if (params.companyIds && params.companyIds.length > 0) {
@@ -76,15 +75,9 @@ export async function fetchRestaurants(
     query = query.in('pfk_id_company', numericIds);
   }
 
-  // Apply area filter (secondary)
-  if (params.areaIds && params.areaIds.length > 0) {
-    const numericIds = parseNumericIds(params.areaIds);
-    query = query.in('pfk_id_business_area', numericIds);
-  }
-
-  // NOTE: Brand filtering (pfk_id_store) is intentionally omitted.
-  // Many addresses don't have this field set in the database.
-  // Brand filtering is handled at the hook level.
+  // NOTE: Area filtering (pfk_id_business_area) removed — column does not exist in table.
+  // NOTE: Brand filtering (pfk_id_store) removed — column does not exist in table.
+  // Both are handled at the hook level if needed.
 
   const { data, error } = await query;
 
@@ -131,7 +124,7 @@ export async function fetchRestaurantById(
   // NOTE: Do NOT filter flg_deleted here - check AFTER getting most recent
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('pk_id_address, des_address, pfk_id_company, pfk_id_store, pfk_id_business_area, des_latitude, des_longitude, flg_deleted, pk_ts_month')
+    .select('pk_id_address, des_address, pfk_id_company, flg_deleted, pk_ts_month')
     .eq('pk_id_address', parseInt(restaurantId, 10))
     .order('pk_ts_month', { ascending: false })
     .limit(1);

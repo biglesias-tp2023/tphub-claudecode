@@ -91,14 +91,14 @@ export interface DbCrpAddress {
   des_address: string;
   /** Foreign key to company */
   pfk_id_company: number;
-  /** Foreign key to store (nullable - not all addresses are linked to stores) */
-  pfk_id_store: number | null;
-  /** Foreign key to business area (nullable) */
-  pfk_id_business_area: number | null;
-  /** Latitude coordinate */
-  des_latitude: number | null;
-  /** Longitude coordinate */
-  des_longitude: number | null;
+  /** Foreign key to store (does NOT exist in actual table — optional for safety) */
+  pfk_id_store?: number | null;
+  /** Foreign key to business area (does NOT exist in actual table — optional for safety) */
+  pfk_id_business_area?: number | null;
+  /** Latitude coordinate (does NOT exist in actual table — use tphub_restaurant_coordinates) */
+  des_latitude?: number | null;
+  /** Longitude coordinate (does NOT exist in actual table — use tphub_restaurant_coordinates) */
+  des_longitude?: number | null;
   /** Soft delete flag */
   flg_deleted?: number;
   /** Month of the snapshot (e.g., '2026-01-01') */
@@ -246,6 +246,33 @@ export interface DbCrpOrderHead {
   amt_refunds: number | null;
   /** Customer identifier */
   cod_id_customer: string | null;
+}
+
+// ============================================
+// REVIEW (Reseñas)
+// ============================================
+
+/**
+ * Raw database row from crp_portal__ft_review table.
+ * Represents a customer review from delivery platforms.
+ */
+export interface DbCrpReview {
+  /** Primary key - unique review identifier */
+  pk_id_review: string;
+  /** Foreign key to order */
+  fk_id_order: string;
+  /** Foreign key to company */
+  pfk_id_company: string;
+  /** Foreign key to store/brand */
+  pfk_id_store: string;
+  /** Foreign key to store address */
+  pfk_id_store_address: string;
+  /** Foreign key to portal (delivery platform) */
+  pfk_id_portal: string;
+  /** Review creation timestamp */
+  ts_creation_time: string;
+  /** Rating value (1-5) */
+  amt_rating: number;
 }
 
 // ============================================
