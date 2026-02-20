@@ -86,8 +86,8 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
     }
   };
 
-  // Only disable if there are truly no restaurants to show (and not loading)
-  const isDisabled = restaurants.length === 0 && !isLoading;
+  // Always allow opening — the dropdown panel shows empty/loading state
+  const isDisabled = false;
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
