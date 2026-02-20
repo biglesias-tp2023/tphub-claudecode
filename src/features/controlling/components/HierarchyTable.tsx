@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -13,6 +13,7 @@ import { Sparkline } from '@/components/charts/Sparkline';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { cn } from '@/utils/cn';
 import type { HierarchyRow } from '@/features/controlling';
+import { useSessionState, useSessionSet } from '@/features/controlling/hooks/useSessionState';
 import type { ChannelId } from '@/types';
 
 type ViewTab = 'rendimiento' | 'operaciones' | 'publicidad' | 'promociones';
@@ -104,10 +105,54 @@ function SortableHeader({ column, label, currentSort, currentDirection, onSort, 
 }
 
 export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoading }: HierarchyTableProps) {
-  const [activeTabs, setActiveTabs] = useState<Set<ViewTab>>(new Set(['rendimiento']));
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [activeTabs, setActiveTabs] = useSessionSet<ViewTab>('tphub-ht-tabs', ['rendimiento']);
+  const [expandedRows, setExpandedRows] = useSessionSet<string>('tphub-ht-expanded', []);
+  const [sortColumn, setSortColumn] = useSessionState<SortColumn | null>('tphub-ht-sort-col', null);
+  const [sortDirection, setSortDirection] = useSessionState<SortDirection>('tphub-ht-sort-dir', null);
+
+  // Scroll restoration
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    // Restore scroll positions after first render
+    requestAnimationFrame(() => {
+      try {
+        const scrollX = sessionStorage.getItem('tphub-ht-scroll-x');
+        const scrollY = sessionStorage.getItem('tphub-ht-scroll-y');
+        if (scrollX && scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = Number(scrollX);
+        }
+        if (scrollY) {
+          window.scrollTo(0, Number(scrollY));
+        }
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
+
+  const handleTableScroll = useCallback(() => {
+    clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      try {
+        if (scrollContainerRef.current) {
+          sessionStorage.setItem('tphub-ht-scroll-x', String(scrollContainerRef.current.scrollLeft));
+        }
+        sessionStorage.setItem('tphub-ht-scroll-y', String(window.scrollY));
+      } catch {
+        // ignore
+      }
+    }, 150);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleTableScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleTableScroll);
+      clearTimeout(scrollTimerRef.current);
+    };
+  }, [handleTableScroll]);
 
   const toggleTab = (tab: ViewTab) => {
     setActiveTabs((prev) => {
@@ -318,7 +363,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
           })}
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" ref={scrollContainerRef} onScroll={handleTableScroll}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
