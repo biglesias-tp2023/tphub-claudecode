@@ -113,6 +113,7 @@ export function StrategicPage() {
               onActualPromosChange={state.handleUpdateActualPromos}
               onEditConfig={() => state.setIsSetupOpen(true)}
               realRevenueByMonth={state.realRevenueByMonth}
+              realPromosByMonth={state.realPromosByMonth}
               realSalesData={state.realSalesData?.current ? {
                 totalRevenue: state.realSalesData.current.totalRevenue,
                 totalPromos: state.realSalesData.current.totalDiscounts,

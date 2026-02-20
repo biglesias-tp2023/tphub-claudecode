@@ -133,8 +133,8 @@ export function useOrdersData(params: UseOrdersDataParams) {
 
       return result;
     },
-    // Only fetch when we have at least one company selected
-    enabled: numericCompanyIds.length > 0,
+    // Always enabled: empty companyIds means "all companies" (no filter)
+    enabled: true,
     // Keep data fresh but avoid excessive refetching
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes

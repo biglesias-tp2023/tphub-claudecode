@@ -25,6 +25,8 @@ interface UseActualRevenueParams {
 interface ActualRevenueResult {
   /** Revenue by month×channel in GridChannelMonthData format (includes current month) */
   revenueByMonth: GridChannelMonthData;
+  /** Promos (discounts) by month×channel in GridChannelMonthData format */
+  promosByMonth: GridChannelMonthData;
   /** Total revenue of the last complete (closed) month (for baseline) */
   lastMonthRevenue: number;
   /** Whether data is loading */
@@ -75,13 +77,11 @@ export function useActualRevenueByMonth({
     : companyId
       ? [companyId]
       : [];
-  const enabled = resolvedCompanyIds.length > 0;
 
   const { data, isLoading } = useQuery({
     queryKey: ['actual-revenue-by-month', resolvedCompanyIds, brandIds, addressIds, monthsCount],
     queryFn: async () => {
-      if (resolvedCompanyIds.length === 0) return null;
-
+      // Convert to numeric IDs; empty array means "all companies" (no filter)
       const companyIds = resolvedCompanyIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericBrandIds = brandIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericAddressIds = addressIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
@@ -94,7 +94,7 @@ export function useActualRevenueByMonth({
       const results = await Promise.all(
         allMonths.map((m) =>
           fetchCrpOrdersAggregated({
-            companyIds,
+            companyIds: companyIds.length > 0 ? companyIds : undefined,
             brandIds: numericBrandIds?.length ? numericBrandIds : undefined,
             addressIds: numericAddressIds?.length ? numericAddressIds : undefined,
             startDate: m.start,
@@ -103,13 +103,19 @@ export function useActualRevenueByMonth({
         )
       );
 
-      // Build GridChannelMonthData
+      // Build GridChannelMonthData for revenue AND promos
       const revenueByMonth: GridChannelMonthData = {};
+      const promosByMonth: GridChannelMonthData = {};
       for (const { key, agg } of results) {
         revenueByMonth[key] = {
           glovo: Math.round(agg.byChannel.glovo.revenue),
           ubereats: Math.round(agg.byChannel.ubereats.revenue),
           justeat: Math.round(agg.byChannel.justeat.revenue),
+        };
+        promosByMonth[key] = {
+          glovo: Math.round(agg.byChannel.glovo.discounts),
+          ubereats: Math.round(agg.byChannel.ubereats.discounts),
+          justeat: Math.round(agg.byChannel.justeat.discounts),
         };
       }
 
@@ -118,15 +124,15 @@ export function useActualRevenueByMonth({
       const lastMonthData = results.find((r) => r.key === lastMonth.key);
       const lastMonthRevenue = lastMonthData ? Math.round(lastMonthData.agg.totalRevenue) : 0;
 
-      return { revenueByMonth, lastMonthRevenue };
+      return { revenueByMonth, promosByMonth, lastMonthRevenue };
     },
-    enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   return {
     revenueByMonth: data?.revenueByMonth ?? {},
+    promosByMonth: data?.promosByMonth ?? {},
     lastMonthRevenue: data?.lastMonthRevenue ?? 0,
-    isLoading: enabled && isLoading,
+    isLoading,
   };
 }

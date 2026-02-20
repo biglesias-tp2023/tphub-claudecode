@@ -46,6 +46,7 @@ export function SalesProjection({
   realSalesData,
   isLoadingRealData = false,
   realRevenueByMonth,
+  realPromosByMonth,
 }: SalesProjectionProps) {
   const [showActual, setShowActual] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
@@ -57,6 +58,10 @@ export function SalesProjection({
   // Use CRP Portal data for actual revenue when available, fallback to localStorage
   const hasRealRevenue = !!realRevenueByMonth && Object.keys(realRevenueByMonth).length > 0;
   const effectiveActualRevenue = hasRealRevenue ? realRevenueByMonth! : actualRevenue;
+
+  // Use CRP Portal data for actual promos when available, fallback to localStorage
+  const hasRealPromos = !!realPromosByMonth && Object.keys(realPromosByMonth).length > 0;
+  const effectiveActualPromos = hasRealPromos ? realPromosByMonth! : actualPromos;
 
   // Memoized calculations
   const calculations = useMemo(() => {
@@ -79,13 +84,13 @@ export function SalesProjection({
     const totalTargetPromos = months.reduce((sum, m) =>
       sum + activeChannels.reduce((chSum, ch) => chSum + calcTargetPromos(m.key, ch), 0), 0);
     const totalActualAds = months.reduce((sum, m) => sum + getMonthTotal(actualAds, m.key), 0);
-    const totalActualPromos = months.reduce((sum, m) => sum + getMonthTotal(actualPromos, m.key), 0);
+    const totalActualPromos = months.reduce((sum, m) => sum + getMonthTotal(effectiveActualPromos, m.key), 0);
 
     return {
       getMonthTotal, getChannelTotal, grandTarget, grandActual,
       calcTargetAds, calcTargetPromos, totalTargetAds, totalTargetPromos, totalActualAds, totalActualPromos,
     };
-  }, [months, activeChannels, targetRevenue, effectiveActualRevenue, actualAds, actualPromos, config]);
+  }, [months, activeChannels, targetRevenue, effectiveActualRevenue, actualAds, effectiveActualPromos, config]);
 
   // Chart data
   const chartData = useMemo(() => months.map((m) => ({
@@ -95,9 +100,9 @@ export function SalesProjection({
     targetAds: activeChannels.reduce((sum, ch) => sum + calculations.calcTargetAds(m.key, ch), 0),
     actualAds: calculations.getMonthTotal(actualAds, m.key),
     targetPromos: activeChannels.reduce((sum, ch) => sum + calculations.calcTargetPromos(m.key, ch), 0),
-    actualPromos: calculations.getMonthTotal(actualPromos, m.key),
+    actualPromos: calculations.getMonthTotal(effectiveActualPromos, m.key),
     isCurrent: m.isCurrent,
-  })), [months, targetRevenue, effectiveActualRevenue, actualAds, actualPromos, activeChannels, calculations]);
+  })), [months, targetRevenue, effectiveActualRevenue, actualAds, effectiveActualPromos, activeChannels, calculations]);
 
   const currentMonthIndex = months.findIndex((m) => m.isCurrent);
   /* eslint-disable react-hooks/purity */
@@ -149,7 +154,7 @@ export function SalesProjection({
       targetAds: targetAdsData as unknown as Record<string, Record<string, number>>,
       actualAds: actualAds as unknown as Record<string, Record<string, number>>,
       targetPromos: targetPromosData as unknown as Record<string, Record<string, number>>,
-      actualPromos: actualPromos as unknown as Record<string, Record<string, number>>,
+      actualPromos: effectiveActualPromos as unknown as Record<string, Record<string, number>>,
     };
 
     switch (format) {
@@ -163,7 +168,7 @@ export function SalesProjection({
         exportSalesProjectionToCSV(exportData);
         break;
     }
-  }, [months, activeChannels, calculations, config, restaurantName, targetRevenue, actualRevenue, actualAds, actualPromos]);
+  }, [months, activeChannels, calculations, config, restaurantName, targetRevenue, actualRevenue, actualAds, effectiveActualPromos]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -235,11 +240,11 @@ export function SalesProjection({
         <Scorecard
           label="Promos"
           value={calculations.totalTargetPromos}
-          actual={realSalesData?.totalPromos ?? calculations.totalActualPromos}
+          actual={hasRealPromos ? calculations.totalActualPromos : (realSalesData?.totalPromos ?? calculations.totalActualPromos)}
           color="text-purple-600"
           showActual={showActual}
           isLoading={isLoadingRealData}
-          isRealData={!!realSalesData?.totalPromos}
+          isRealData={hasRealPromos || !!realSalesData?.totalPromos}
         />
       </div>
 
@@ -492,11 +497,12 @@ export function SalesProjection({
                             label={channel?.name || ch}
                             logoUrl={channel?.logo || '/images/channels/glovo.png'}
                             months={months}
-                            values={actualPromos}
+                            values={effectiveActualPromos}
                             channel={ch}
-                            onChange={(m, v) => updateActualPromos(m, ch, v)}
-                            total={calculations.getChannelTotal(actualPromos, ch)}
+                            onChange={hasRealPromos ? undefined : (m, v) => updateActualPromos(m, ch, v)}
+                            total={calculations.getChannelTotal(effectiveActualPromos, ch)}
                             variant="actual"
+                            readOnly={hasRealPromos}
                           />
                         );
                       })}
@@ -508,7 +514,7 @@ export function SalesProjection({
                             <td key={m.key} className={cn('py-2 text-center', m.isCurrent && 'bg-primary-50')}>
                               <span className="text-xs font-bold text-purple-600 tabular-nums">{fmt(monthTargetPromos)}€</span>
                               {showActual && calculations.totalActualPromos > 0 && (
-                                <span className="block text-[10px] font-medium text-purple-500 tabular-nums">{fmt(calculations.getMonthTotal(actualPromos, m.key))}€</span>
+                                <span className="block text-[10px] font-medium text-purple-500 tabular-nums">{fmt(calculations.getMonthTotal(effectiveActualPromos, m.key))}€</span>
                               )}
                             </td>
                           );
