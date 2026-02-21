@@ -20,6 +20,8 @@ interface UseActualRevenueParams {
   addressIds?: string[];
   /** Number of past months to fetch (default: 6). Current month is always included. */
   monthsCount?: number;
+  /** Explicit month offsets from today (e.g. [-2,-1,0,1,2,3]). Overrides monthsCount. */
+  monthOffsets?: number[];
 }
 
 interface ActualRevenueResult {
@@ -70,6 +72,7 @@ export function useActualRevenueByMonth({
   brandIds,
   addressIds,
   monthsCount = 6,
+  monthOffsets,
 }: UseActualRevenueParams): ActualRevenueResult {
   // Support both single companyId and array companyIds
   const resolvedCompanyIds = companyIdsProp?.length
@@ -79,17 +82,17 @@ export function useActualRevenueByMonth({
       : [];
 
   const { data, isLoading } = useQuery({
-    queryKey: ['actual-revenue-by-month', resolvedCompanyIds, brandIds, addressIds, monthsCount],
+    queryKey: ['actual-revenue-by-month', resolvedCompanyIds, brandIds, addressIds, monthOffsets ?? monthsCount],
     queryFn: async () => {
       // Convert to numeric IDs; empty array means "all companies" (no filter)
       const companyIds = resolvedCompanyIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericBrandIds = brandIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
       const numericAddressIds = addressIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
 
-      // Past months + current month (offset 0)
-      const pastMonths = Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i)));
-      const currentMonth = getMonthRange(0);
-      const allMonths = [...pastMonths, currentMonth];
+      // Use explicit offsets if provided, otherwise past months + current month
+      const allMonths = monthOffsets
+        ? monthOffsets.map((o) => getMonthRange(o))
+        : [...Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i))), getMonthRange(0)];
 
       const results = await Promise.all(
         allMonths.map((m) =>

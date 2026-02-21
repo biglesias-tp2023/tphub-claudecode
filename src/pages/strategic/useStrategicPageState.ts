@@ -167,6 +167,7 @@ export function useStrategicPageState() {
     companyIds: effectiveCompanyIds,
     brandIds: filterBrandIds.length > 0 ? filterBrandIds : undefined,
     addressIds: filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined,
+    monthOffsets: [-2, -1, 0, 1, 2, 3],
   });
 
   // Mutations - Objectives
