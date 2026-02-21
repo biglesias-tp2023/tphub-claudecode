@@ -35,12 +35,12 @@ import type { ChannelId } from '@/types';
 // ============================================
 
 export interface FetchOrdersParams {
-  /** Filter by company IDs */
-  companyIds?: number[];
-  /** Filter by brand/store IDs */
-  brandIds?: number[];
-  /** Filter by address IDs */
-  addressIds?: number[];
+  /** Filter by company IDs (string — RPC uses TEXT arrays) */
+  companyIds?: string[];
+  /** Filter by brand/store IDs (string — RPC uses TEXT arrays) */
+  brandIds?: string[];
+  /** Filter by address IDs (string — RPC uses TEXT arrays) */
+  addressIds?: string[];
   /** Filter by channels */
   channelIds?: ChannelId[];
   /** Start date (YYYY-MM-DD) */
@@ -334,9 +334,9 @@ export async function fetchCrpOrdersAggregated(
   }
 
   const { data, error } = await supabase.rpc('get_orders_aggregation', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds.map(String) : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds.map(String) : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds.map(String) : null,
+    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
     p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
     p_start_date: `${startDate}T00:00:00`,
     p_end_date: `${endDate}T23:59:59`,

@@ -120,14 +120,6 @@ function extractKpiValue(aggregation: OrdersAggregation, kpiType: string): numbe
   }
 }
 
-/**
- * Parse string ID to number, handling hex UUIDs.
- */
-function parseNumericId(id: string): number | null {
-  const parsed = parseInt(id, 10);
-  return isNaN(parsed) ? null : parsed;
-}
-
 // ============================================
 // HOOK
 // ============================================
@@ -140,10 +132,6 @@ export function useObjectiveKpiValue({
 }: UseObjectiveKpiValueParams): KpiValueResult {
   const { start, end, label } = getPreviousCompleteMonthRange();
 
-  const numericCompanyId = companyId ? parseNumericId(companyId) : null;
-  const numericBrandId = brandId ? parseNumericId(brandId) : null;
-  const numericAddressId = addressId ? parseNumericId(addressId) : null;
-
   const { data, isLoading } = useQuery({
     queryKey: [
       'objective-kpi',
@@ -155,12 +143,12 @@ export function useObjectiveKpiValue({
       end,
     ],
     queryFn: async () => {
-      if (!numericCompanyId) return null;
+      if (!companyId) return null;
 
       const aggregation = await fetchCrpOrdersAggregated({
-        companyIds: [numericCompanyId],
-        brandIds: numericBrandId ? [numericBrandId] : undefined,
-        addressIds: numericAddressId ? [numericAddressId] : undefined,
+        companyIds: [companyId],
+        brandIds: brandId ? [brandId] : undefined,
+        addressIds: addressId ? [addressId] : undefined,
         startDate: start,
         endDate: end,
       });

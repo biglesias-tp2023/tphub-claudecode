@@ -39,10 +39,6 @@ function expandRestaurantIds(selectedIds: string[], restaurants: Restaurant[]): 
   return Array.from(expanded);
 }
 
-function parseNumericIds(ids: string[]): number[] {
-  return ids.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id) && id > 0);
-}
-
 function ensureDate(date: Date | string): Date {
   return date instanceof Date ? date : new Date(date);
 }
@@ -102,16 +98,6 @@ export function useHeatmapData() {
     [restaurantIds, restaurants]
   );
 
-  const numericCompanyIds = useMemo(() => parseNumericIds(companyIds), [companyIds]);
-  const numericBrandIds = useMemo(
-    () => (expandedBrandIds.length > 0 ? parseNumericIds(expandedBrandIds) : undefined),
-    [expandedBrandIds]
-  );
-  const numericRestaurantIds = useMemo(
-    () => (expandedRestaurantIds.length > 0 ? parseNumericIds(expandedRestaurantIds) : undefined),
-    [expandedRestaurantIds]
-  );
-
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);
 
@@ -120,9 +106,9 @@ export function useHeatmapData() {
       'heatmap',
       startDate,
       endDate,
-      numericCompanyIds.sort().join(','),
-      numericBrandIds?.sort().join(',') || '',
-      numericRestaurantIds?.sort().join(',') || '',
+      [...companyIds].sort().join(','),
+      expandedBrandIds.length > 0 ? [...expandedBrandIds].sort().join(',') : '',
+      expandedRestaurantIds.length > 0 ? [...expandedRestaurantIds].sort().join(',') : '',
       channelIds.length > 0 ? channelIds.sort().join(',') : '',
     ],
     queryFn: async () => {
@@ -133,9 +119,9 @@ export function useHeatmapData() {
       lookbackEnd.setDate(lookbackEnd.getDate() - 1);
 
       const baseParams = {
-        companyIds: numericCompanyIds.length > 0 ? numericCompanyIds : undefined,
-        brandIds: numericBrandIds && numericBrandIds.length > 0 ? numericBrandIds : undefined,
-        addressIds: numericRestaurantIds && numericRestaurantIds.length > 0 ? numericRestaurantIds : undefined,
+        companyIds: companyIds.length > 0 ? companyIds : undefined,
+        brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
+        addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
         channelIds: channelIds.length > 0 ? channelIds : undefined,
       };
 
@@ -201,7 +187,7 @@ export function useHeatmapData() {
 
       return matrix;
     },
-    enabled: numericCompanyIds.length > 0,
+    enabled: companyIds.length > 0,
     staleTime: 1 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
   });

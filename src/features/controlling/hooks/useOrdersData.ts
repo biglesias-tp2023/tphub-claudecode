@@ -25,14 +25,14 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCrpOrdersComparison } from '@/services/crp-portal';
 import type { OrdersAggregation } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
-import { formatDate, getPreviousPeriodRange, parseNumericIds } from './dateUtils';
+import { formatDate, getPreviousPeriodRange } from './dateUtils';
 
 // ============================================
 // TYPES
 // ============================================
 
 export interface UseOrdersDataParams {
-  /** Company IDs to filter by (string UUIDs will be converted to numbers) */
+  /** Company IDs to filter by */
   companyIds: string[];
   /** Brand IDs to filter by */
   brandIds?: string[];
@@ -86,11 +86,6 @@ export interface OrdersDataResult {
 export function useOrdersData(params: UseOrdersDataParams) {
   const { companyIds, brandIds, addressIds, channelIds, dateRange, datePreset } = params;
 
-  // Convert string IDs to numbers for CRP Portal queries
-  const numericCompanyIds = parseNumericIds(companyIds);
-  const numericBrandIds = brandIds ? parseNumericIds(brandIds) : undefined;
-  const numericAddressIds = addressIds ? parseNumericIds(addressIds) : undefined;
-
   // Calculate date strings - ensure we get consistent string values for the query key
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);
@@ -107,25 +102,25 @@ export function useOrdersData(params: UseOrdersDataParams) {
       startDate,       // Date strings first for better cache key comparison
       endDate,
       datePreset,      // Include preset to differentiate between same dates but different presets
-      numericCompanyIds.sort().join(','), // Sort for consistent comparison
-      numericBrandIds?.sort().join(',') || '',
-      numericAddressIds?.sort().join(',') || '',
+      [...companyIds].sort().join(','), // Sort for consistent comparison
+      brandIds ? [...brandIds].sort().join(',') : '',
+      addressIds ? [...addressIds].sort().join(',') : '',
       channelIds?.sort().join(',') || '',
     ],
     queryFn: async () => {
       const result = await fetchCrpOrdersComparison(
         {
-          companyIds: numericCompanyIds.length > 0 ? numericCompanyIds : undefined,
-          brandIds: numericBrandIds && numericBrandIds.length > 0 ? numericBrandIds : undefined,
-          addressIds: numericAddressIds && numericAddressIds.length > 0 ? numericAddressIds : undefined,
+          companyIds: companyIds.length > 0 ? companyIds : undefined,
+          brandIds: brandIds && brandIds.length > 0 ? brandIds : undefined,
+          addressIds: addressIds && addressIds.length > 0 ? addressIds : undefined,
           channelIds: channelIds && channelIds.length > 0 ? channelIds : undefined,
           startDate,
           endDate,
         },
         {
-          companyIds: numericCompanyIds.length > 0 ? numericCompanyIds : undefined,
-          brandIds: numericBrandIds && numericBrandIds.length > 0 ? numericBrandIds : undefined,
-          addressIds: numericAddressIds && numericAddressIds.length > 0 ? numericAddressIds : undefined,
+          companyIds: companyIds.length > 0 ? companyIds : undefined,
+          brandIds: brandIds && brandIds.length > 0 ? brandIds : undefined,
+          addressIds: addressIds && addressIds.length > 0 ? addressIds : undefined,
           channelIds: channelIds && channelIds.length > 0 ? channelIds : undefined,
           startDate: previousStartDate,
           endDate: previousEndDate,

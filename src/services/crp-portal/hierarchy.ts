@@ -49,6 +49,9 @@ export interface HierarchyMetrics {
   adSpent: number;
   adRevenue: number;
   roas: number;
+  impressions: number;
+  clicks: number;
+  adOrders: number;
 }
 
 /**
@@ -124,7 +127,7 @@ interface AllDimensions {
  * @param companyIds - Numeric company IDs for company/store queries (INTEGER columns)
  */
 async function fetchAllDimensions(
-  companyIds: number[]
+  companyIds: string[]
 ): Promise<AllDimensions> {
   // Fetch all dimension data in parallel (ordered by pk_ts_month DESC for deduplication)
   // Note: Supabase has a default limit of 1000 rows. We need explicit limits for large datasets.
@@ -267,6 +270,9 @@ function buildHierarchyFromDimensions(
     adSpent: 0,
     adRevenue: 0,
     roas: 0,
+    impressions: 0,
+    clicks: 0,
+    adOrders: 0,
   };
 
   // =====================================================
@@ -449,6 +455,9 @@ function buildHierarchyFromDimensions(
       adSpent: 0,     // Raw orders path doesn't have ads data
       adRevenue: 0,
       roas: 0,
+      impressions: 0,
+      clicks: 0,
+      adOrders: 0,
     };
   };
 
@@ -709,6 +718,9 @@ interface RPCBaseMetrics {
   reembolsos: number;
   adSpent: number;
   adRevenue: number;
+  impressions: number;
+  clicks: number;
+  adOrders: number;
 }
 
 /**
@@ -723,6 +735,9 @@ function createEmptyRPCBase(): RPCBaseMetrics {
     reembolsos: 0,
     adSpent: 0,
     adRevenue: 0,
+    impressions: 0,
+    clicks: 0,
+    adOrders: 0,
   };
 }
 
@@ -763,6 +778,9 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.reembolsos += row.reembolsos || 0;
     agg.adSpent += row.ad_spent || 0;
     agg.adRevenue += row.ad_revenue || 0;
+    agg.impressions += row.impressions || 0;
+    agg.clicks += row.clicks || 0;
+    agg.adOrders += row.ad_orders || 0;
   }
 
   // Step 2: Aggregate ADDRESS level from portals
@@ -783,6 +801,9 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.reembolsos += metrics.reembolsos;
     agg.adSpent += metrics.adSpent;
     agg.adRevenue += metrics.adRevenue;
+    agg.impressions += metrics.impressions;
+    agg.clicks += metrics.clicks;
+    agg.adOrders += metrics.adOrders;
   }
 
   // Step 3: Aggregate STORE level from addresses
@@ -803,6 +824,9 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.reembolsos += metrics.reembolsos;
     agg.adSpent += metrics.adSpent;
     agg.adRevenue += metrics.adRevenue;
+    agg.impressions += metrics.impressions;
+    agg.clicks += metrics.clicks;
+    agg.adOrders += metrics.adOrders;
   }
 
   // Step 4: Aggregate COMPANY level from stores
@@ -822,6 +846,9 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.reembolsos += metrics.reembolsos;
     agg.adSpent += metrics.adSpent;
     agg.adRevenue += metrics.adRevenue;
+    agg.impressions += metrics.impressions;
+    agg.clicks += metrics.clicks;
+    agg.adOrders += metrics.adOrders;
   }
 
   return { byPortal, byAddress, byStore, byCompany };
@@ -859,6 +886,9 @@ function buildHierarchyFromRPCMetrics(
       adSpent: 0,
       adRevenue: 0,
       roas: 0,
+      impressions: 0,
+      clicks: 0,
+      adOrders: 0,
     };
 
     if (!base) return emptyMetrics;
@@ -875,6 +905,9 @@ function buildHierarchyFromRPCMetrics(
       adSpent: base.adSpent,
       adRevenue: base.adRevenue,
       roas: base.adSpent > 0 ? base.adRevenue / base.adSpent : 0,
+      impressions: base.impressions,
+      clicks: base.clicks,
+      adOrders: base.adOrders,
     };
   };
 
@@ -1098,12 +1131,8 @@ export async function fetchHierarchyDataRPC(
     return [];
   }
 
-  // Convert to numeric IDs for dimension fetch (company/store tables use INTEGER)
-  // Keep original string IDs for address table (uses TEXT for pfk_id_company)
-  const numericCompanyIds = companyIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-
   // Step 1: Fetch ALL dimensions for selected companies (for names)
-  const dimensions = await fetchAllDimensions(numericCompanyIds);
+  const dimensions = await fetchAllDimensions(companyIds);
 
   if (import.meta.env.DEV) {
     console.log('[fetchHierarchyDataRPC] Dimensions loaded:', {

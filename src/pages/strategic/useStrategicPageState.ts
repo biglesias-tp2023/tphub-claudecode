@@ -2,6 +2,9 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useOrdersData, useSessionState } from '@/features/controlling/hooks';
+import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
+import { useBrands } from '@/features/dashboard/hooks/useBrands';
+import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { fetchCrpCompanyById } from '@/services/crp-portal';
 import {
   useStrategicObjectives,
@@ -153,10 +156,23 @@ export function useStrategicPageState() {
 
   const effectiveCompanyIds = globalCompanyIds.length > 0 ? globalCompanyIds : companyIds;
 
+  // Expand multi-portal IDs for brand/restaurant filters
+  const { data: allBrands = [] } = useBrands();
+  const { data: allRestaurants = [] } = useRestaurants();
+
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(filterBrandIds, allBrands),
+    [filterBrandIds, allBrands]
+  );
+  const expandedRestaurantIds = useMemo(
+    () => expandRestaurantIds(filterRestaurantIds, allRestaurants),
+    [filterRestaurantIds, allRestaurants]
+  );
+
   const { data: realSalesData, isLoading: isLoadingSales } = useOrdersData({
     companyIds: effectiveCompanyIds,
-    brandIds: filterBrandIds.length > 0 ? filterBrandIds : undefined,
-    addressIds: filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined,
+    brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
+    addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
     channelIds: filterChannelIds.length > 0 ? filterChannelIds : undefined,
     dateRange,
     datePreset,
@@ -165,8 +181,8 @@ export function useStrategicPageState() {
   // Real revenue and promos by month for the SalesProjection grid rows
   const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth } = useActualRevenueByMonth({
     companyIds: effectiveCompanyIds,
-    brandIds: filterBrandIds.length > 0 ? filterBrandIds : undefined,
-    addressIds: filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined,
+    brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
+    addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
     monthOffsets: [-2, -1, 0, 1, 2, 3],
   });
 

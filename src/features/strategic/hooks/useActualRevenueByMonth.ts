@@ -84,11 +84,6 @@ export function useActualRevenueByMonth({
   const { data, isLoading } = useQuery({
     queryKey: ['actual-revenue-by-month', resolvedCompanyIds, brandIds, addressIds, monthOffsets ?? monthsCount],
     queryFn: async () => {
-      // Convert to numeric IDs; empty array means "all companies" (no filter)
-      const companyIds = resolvedCompanyIds.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
-      const numericBrandIds = brandIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
-      const numericAddressIds = addressIds?.map((id) => parseInt(id, 10)).filter((n) => !isNaN(n));
-
       // Use explicit offsets if provided, otherwise past months + current month
       const allMonths = monthOffsets
         ? monthOffsets.map((o) => getMonthRange(o))
@@ -97,9 +92,9 @@ export function useActualRevenueByMonth({
       const results = await Promise.all(
         allMonths.map((m) =>
           fetchCrpOrdersAggregated({
-            companyIds: companyIds.length > 0 ? companyIds : undefined,
-            brandIds: numericBrandIds?.length ? numericBrandIds : undefined,
-            addressIds: numericAddressIds?.length ? numericAddressIds : undefined,
+            companyIds: resolvedCompanyIds.length > 0 ? resolvedCompanyIds : undefined,
+            brandIds: brandIds?.length ? brandIds : undefined,
+            addressIds: addressIds?.length ? addressIds : undefined,
             startDate: m.start,
             endDate: m.end,
           }).then((agg) => ({ key: m.key, agg }))
