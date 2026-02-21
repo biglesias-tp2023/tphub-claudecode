@@ -87,15 +87,19 @@ export interface HierarchyRow {
   tiempoEspera?: string;
   valoraciones?: number;
 
-  // Publicidad (phase 2 - optional)
+  // Publicidad
   inversionAds?: number;
   adsPercentage?: number;
   roas?: number;
+  impressions?: number;
+  clicks?: number;
+  adOrders?: number;
 
   // Promociones (phase 2 - optional)
   inversionPromos?: number;
   promosPercentage?: number;
   promosRoas?: number;
+  organicOrders?: number;
 
   // Reembolsos (phase 2 - optional)
   reembolsos?: number;
@@ -143,6 +147,11 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     adsPercentage: row.metrics.ventas > 0
       ? (row.metrics.adSpent / row.metrics.ventas) * 100 : 0,
     roas: row.metrics.roas,
+    impressions: row.metrics.impressions,
+    clicks: row.metrics.clicks,
+    adOrders: row.metrics.adOrders,
+    // Organic = pedidos without promotion (requires promoted_orders count from RPC — TODO)
+    organicOrders: undefined,
   };
 }
 

@@ -36,9 +36,13 @@ type SortColumn =
   | 'inversionAds'
   | 'adsPercentage'
   | 'roas'
+  | 'impressions'
+  | 'clicks'
+  | 'adOrders'
   | 'inversionPromos'
   | 'promosPercentage'
-  | 'promosRoas';
+  | 'promosRoas'
+  | 'organicOrders';
 type SortDirection = 'asc' | 'desc' | null;
 
 interface HierarchyTableProps {
@@ -436,20 +440,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     currentDirection={sortDirection}
                     onSort={handleSort}
                   />
-                  <SortableHeader
-                    column="openTime"
-                    label="Open"
-                    currentSort={sortColumn}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    column="ratioConversion"
-                    label="Conv."
-                    currentSort={sortColumn}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
                 </>
               )}
               {activeTabs.has('operaciones') && (
@@ -474,7 +464,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                 <>
                   <SortableHeader
                     column="inversionAds"
-                    label="Ads"
+                    label="Inv. Ads"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
@@ -493,13 +483,34 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     currentDirection={sortDirection}
                     onSort={handleSort}
                   />
+                  <SortableHeader
+                    column="impressions"
+                    label="Impresiones"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="clicks"
+                    label="Clicks"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="adOrders"
+                    label="Orders"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                 </>
               )}
               {activeTabs.has('promociones') && (
                 <>
                   <SortableHeader
                     column="inversionPromos"
-                    label="Promos"
+                    label="Inv. Promo"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
@@ -518,6 +529,22 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     currentDirection={sortDirection}
                     onSort={handleSort}
                   />
+                  <th
+                    className="py-2.5 px-2 font-medium text-gray-500 text-xs text-right cursor-pointer hover:bg-gray-100 select-none transition-colors"
+                    onClick={() => handleSort('organicOrders')}
+                    title="Pedidos sin promocion"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {sortColumn === 'organicOrders' && (
+                        sortDirection === 'desc' ? (
+                          <ChevronDown className="w-3 h-3 text-primary-600" />
+                        ) : (
+                          <ChevronUp className="w-3 h-3 text-primary-600" />
+                        )
+                      )}
+                      <span className={sortColumn === 'organicOrders' ? 'text-primary-600' : ''}>Organico</span>
+                    </span>
+                  </th>
                 </>
               )}
             </tr>
@@ -599,8 +626,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeNuevos.toFixed(1)}%</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.recurrentesClientes)}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeRecurrentes.toFixed(1)}%</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.openTime != null ? `${row.openTime.toFixed(0)}%` : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratioConversion != null ? `${row.ratioConversion.toFixed(1)}%` : '-'}</td>
                     </>
                   )}
                   {activeTabs.has('operaciones') && (
@@ -614,6 +639,9 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionAds != null ? formatCurrency(row.inversionAds) : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adsPercentage != null ? `${row.adsPercentage.toFixed(1)}%` : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.roas != null ? row.roas.toFixed(1) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.impressions ? formatNumber(row.impressions) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.clicks ? formatNumber(row.clicks) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adOrders ? formatNumber(row.adOrders) : '-'}</td>
                     </>
                   )}
                   {activeTabs.has('promociones') && (
@@ -621,6 +649,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? formatNumber(row.organicOrders) : '-'}</td>
                     </>
                   )}
                 </tr>
