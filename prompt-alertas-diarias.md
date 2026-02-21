@@ -153,8 +153,11 @@ des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
 | `full_name` | text | Nombre completo |
 | `role` | text | 'consultant', 'admin', 'manager' |
 | `assigned_company_ids` | text[] | Array de company IDs asignados (como strings) |
+| `slack_user_id` | text (nullable) | **NUEVA** — Slack User ID (ej: 'U04ABCDEF') para menciones directas |
 
 **Nota**: `assigned_company_ids` contiene strings (ej: `['1', '23', '45']`), no numeros. Al comparar con `pfk_id_company` (number) del RPC, convertir con `::text`.
+
+**Nota sobre `slack_user_id`**: Esta columna hay que crearla con una migracion (ver Paso 0). El Slack User ID se obtiene desde Slack: perfil del usuario → "..." → "Copy member ID". Formato: `U` seguido de 8-10 caracteres alfanumericos (ej: `U04ABCDEF`). Si un consultor no tiene `slack_user_id`, se muestra su nombre sin mencion.
 
 ### Tabla de resenas: `crp_portal__ft_review`
 
@@ -201,7 +204,20 @@ des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
 
 ## Lo que necesito que construyas
 
-### Paso 1: Funcion SQL — RPC `get_daily_anomalies`
+### Paso 0: Migracion — Columna `slack_user_id` en `profiles`
+
+Crear archivo: `supabase/migrations/20260222_profiles_slack_user_id.sql`
+
+```sql
+-- Add Slack User ID column to profiles for direct mentions in alerts
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS slack_user_id text;
+
+COMMENT ON COLUMN profiles.slack_user_id IS 'Slack User ID (e.g. U04ABCDEF) for @mentions in daily alert messages. Obtain from Slack profile → Copy member ID.';
+```
+
+Migracion simple, sin downtime. Los valores se rellenan manualmente desde el admin o directamente en Supabase Table Editor.
+
+### Paso 1: Funciones SQL — RPCs de anomalias
 
 Crear archivo: `supabase/migrations/20260222_daily_alerts_rpc.sql`
 
@@ -470,10 +486,10 @@ if (totalAnomalies === 0) {
   return res.status(200).json({ message: 'No anomalies', count: 0 });
 }
 
-// 7. Consultar perfiles de consultores
+// 7. Consultar perfiles de consultores (incluir slack_user_id para menciones)
 const { data: profiles } = await supabase
   .from('profiles')
-  .select('id, email, full_name, assigned_company_ids, role')
+  .select('id, email, full_name, assigned_company_ids, role, slack_user_id')
   .in('role', ['consultant', 'manager', 'admin']);
 
 // 8. Agrupar TODAS las anomalias (orders + reviews + ads) por consultor
@@ -486,11 +502,15 @@ const { data: profiles } = await supabase
 //
 //    Estructura por consultor:
 //    {
-//      consultant: { name, email },
+//      consultant: { name, email, slackUserId },  // slackUserId puede ser null
 //      orders: [...orderAnomalies filtradas],
 //      reviews: [...reviewAnomalies filtradas],
 //      ads: [...adsAnomalies filtradas],
 //    }
+//
+//    Para el header de cada seccion en Slack:
+//    - Si slack_user_id existe: usar "<@U04ABCDEF>" (Slack lo renderiza como mencion con notificacion)
+//    - Si no existe: usar el nombre en texto plano "*Maria Garcia*"
 
 // 9. Para cada grupo de consultor, llamar a Claude API para formatear
 //    Modelo: claude-sonnet-4-5-20250929
@@ -534,7 +554,7 @@ Si una dimension (reviews o ads) no tiene anomalias, omitirla del mensaje.
 ```
 *📊 Alertas diarias — viernes 21 feb 2026*
 
-*👤 Maria Garcia*
+👤 <@U04ABC123> ← Slack renderiza esto como mencion con notificacion push
 
 *📦 Pedidos:*
 🔴 *Restalia — 100 Montaditos* | C/ Gran Via 42 (Glovo) — 32 pedidos ayer (media 6 viernes: 45) → *-29%*
@@ -556,7 +576,7 @@ Si una dimension (reviews o ads) no tiene anomalias, omitirla del mensaje.
 
 ---
 
-*👤 Carlos Lopez*
+👤 <@U04DEF456>
 
 *📦 Pedidos:*
 🔴 *Pizza Group — Pizza Roma* | Pl. Mayor 8 (Glovo) — 15 pedidos (media: 42) → *-64%*
@@ -565,6 +585,8 @@ Si una dimension (reviews o ads) no tiene anomalias, omitirla del mensaje.
 
 _Datos de ayer (viernes) vs media 6 viernes anteriores_
 ```
+
+**Formato de mencion Slack**: `<@SLACK_USER_ID>` (ej: `<@U04ABC123>`). Slack lo renderiza como "@Maria Garcia" con highlight azul y envia notificacion push al usuario. Si el consultor no tiene `slack_user_id` en `profiles`, usar `*Nombre Completo*` en texto plano (sin notificacion).
 
 **Estructura del mensaje por tipo de anomalia:**
 - **Pedidos**: `Empresa — Marca | Direccion (Canal) — X pedidos ayer (media Y dias: Z) → W%`
@@ -703,7 +725,8 @@ tphub/
 │       └── test.ts        ← Endpoint de testing
 ├── supabase/
 │   └── migrations/
-│       └── 20260222_daily_alerts_rpc.sql  ← 3 funciones SQL (orders, reviews, ads)
+│       ├── 20260222_profiles_slack_user_id.sql  ← Columna slack_user_id en profiles
+│       └── 20260222_daily_alerts_rpc.sql        ← 3 funciones SQL (orders, reviews, ads)
 └── vercel.json            ← Actualizar con cron config
 ```
 
