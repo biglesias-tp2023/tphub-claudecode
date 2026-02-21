@@ -183,8 +183,8 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
 
   autoTable(doc, {
     startY: startY + 8,
-    head: [['Canal', 'Rating', 'Reviews', 'Tendencia']],
-    body: data.channelRatings.map((r) => [r.channel, r.rating.toFixed(1), formatNumber(r.totalReviews), `${r.trend >= 0 ? '+' : ''}${r.trend.toFixed(1)}%`]),
+    head: [['Canal', 'Rating', 'Reviews', '% Positivo', '% Negativo']],
+    body: data.channelRatings.map((r) => [r.channel, r.rating.toFixed(1), formatNumber(r.totalReviews), `${r.positivePercent.toFixed(1)}%`, `${r.negativePercent.toFixed(1)}%`]),
     ...BRANDED_TABLE_STYLES,
   });
 
@@ -197,18 +197,18 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...BRAND.colors.gray);
-  doc.text(`Facturacion Total: ${formatNumber(data.summary.totalBilling)}\u20AC`, 14, summaryY + 8);
-  doc.text(`Reembolsos Totales: ${formatNumber(data.summary.totalRefunds)}\u20AC`, 14, summaryY + 14);
+  doc.text(`Total Resenas: ${formatNumber(data.summary.totalReviews)}`, 14, summaryY + 8);
+  doc.text(`Resenas Negativas: ${formatNumber(data.summary.negativeReviews)}`, 14, summaryY + 14);
 
   doc.setFontSize(11);
   doc.setTextColor(...BRAND.colors.dark);
   doc.setFont('helvetica', 'bold');
-  doc.text('Tipos de Error', 14, summaryY + 26);
+  doc.text('Distribucion de Valoraciones', 14, summaryY + 26);
 
   autoTable(doc, {
     startY: summaryY + 30,
-    head: [['Tipo', 'Cantidad', '%']],
-    body: data.errorTypes.map((e) => [e.type, e.count, `${e.percentage.toFixed(1)}%`]),
+    head: [['Rating', 'Cantidad', '%']],
+    body: data.ratingDistribution.map((r) => [`${r.rating} estrellas`, formatNumber(r.count), `${r.percentage.toFixed(1)}%`]),
     ...BRANDED_TABLE_STYLES,
   });
 
@@ -217,8 +217,8 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
 
   autoTable(doc, {
     startY: reviewsStartY,
-    head: [['Fecha', 'Canal', 'Productos', 'Rating', 'Comentario']],
-    body: data.reviews.slice(0, 50).map((r) => [r.date, r.channel, r.restaurant.substring(0, 25), r.rating.toString(), r.comment.substring(0, 50) + (r.comment.length > 50 ? '...' : '')]),
+    head: [['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating']],
+    body: data.reviews.slice(0, 50).map((r) => [r.date, r.time, r.channel, r.id.substring(0, 12), r.orderId.substring(0, 12), `${r.rating}★`]),
     ...BRANDED_TABLE_STYLES,
     bodyStyles: { ...BRANDED_TABLE_STYLES.bodyStyles, fontSize: 7 },
   });
@@ -449,8 +449,8 @@ export async function generateReputationPdfBlob(data: ReputationExportData): Pro
 
   autoTable(doc, {
     startY: startY + 4,
-    head: [['Canal', 'Rating', 'Reviews', 'Tendencia']],
-    body: data.channelRatings.map((r) => [r.channel, r.rating.toFixed(1), formatNumber(r.totalReviews), `${r.trend >= 0 ? '+' : ''}${r.trend.toFixed(1)}%`]),
+    head: [['Canal', 'Rating', 'Reviews', '% Positivo', '% Negativo']],
+    body: data.channelRatings.map((r) => [r.channel, r.rating.toFixed(1), formatNumber(r.totalReviews), `${r.positivePercent.toFixed(1)}%`, `${r.negativePercent.toFixed(1)}%`]),
     ...BRANDED_TABLE_STYLES,
   });
 

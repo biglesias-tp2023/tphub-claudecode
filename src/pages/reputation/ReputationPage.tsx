@@ -7,7 +7,7 @@ import {
   ChannelRatingCard,
   SummaryCard,
   ErrorHeatmap,
-  ErrorTypesChart,
+  RatingDistributionChart,
   ReviewsTable,
   useReputationData,
 } from '@/features/reputation';
@@ -45,32 +45,32 @@ export function ReputationPage() {
   const buildExportData = useCallback((): ReputationExportData | null => {
     if (!data) return null;
 
-    const totalErrors = data.errorTypes.reduce((sum, e) => sum + e.count, 0);
+    const totalReviews = data.ratingDistribution.reduce((sum, r) => sum + r.count, 0);
 
     return {
       channelRatings: data.channelRatings.map((r) => ({
         channel: r.name,
         rating: r.rating,
         totalReviews: r.totalReviews,
-        trend: r.positivePercent - 50,
+        positivePercent: r.positivePercent,
+        negativePercent: r.negativePercent,
       })),
       summary: {
-        totalBilling: data.summary.totalBilling,
-        totalRefunds: data.summary.totalRefunds,
+        totalReviews: data.summary.totalReviews,
+        negativeReviews: data.summary.negativeReviews,
       },
-      errorTypes: data.errorTypes.map((e) => ({
-        type: e.label,
-        count: e.count,
-        percentage: totalErrors > 0 ? (e.count / totalErrors) * 100 : 0,
+      ratingDistribution: data.ratingDistribution.map((r) => ({
+        rating: r.rating,
+        count: r.count,
+        percentage: totalReviews > 0 ? (r.count / totalReviews) * 100 : 0,
       })),
       reviews: data.reviews.map((r) => ({
         id: r.id,
         channel: r.channel,
-        restaurant: r.products.join(', ') || 'N/A',
-        rating: typeof r.rating === 'number' ? r.rating : (r.rating === 'thumbsUp' ? 5 : 1),
-        comment: r.comment || '',
-        date: new Date(r.orderDate).toLocaleDateString('es-ES'),
-        orderNumber: r.orderId,
+        orderId: r.orderId,
+        rating: r.rating,
+        date: new Date(r.date).toLocaleDateString('es-ES'),
+        time: r.time,
       })),
       dateRange: `${periodLabels.current} vs. ${periodLabels.comparison}`,
     };
@@ -106,16 +106,14 @@ export function ReputationPage() {
     if (!data) return { headers: [], rows: [] };
 
     return {
-      headers: ['Canal', 'Order ID', 'Fecha', 'Hora', 'Importe', 'Rating', 'Tag', 'Comentario'],
+      headers: ['Canal', 'Review ID', 'Order ID', 'Fecha', 'Hora', 'Rating'],
       rows: data.reviews.slice(0, 15).map((r) => [
         r.channel === 'glovo' ? 'Glovo' : r.channel === 'ubereats' ? 'Uber Eats' : 'Just Eat',
-        r.orderId,
-        new Date(r.orderDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
-        r.orderTime,
-        `${r.value.toFixed(2)} €`,
-        typeof r.rating === 'number' ? `${r.rating}★` : (r.rating === 'thumbsUp' ? '👍' : '👎'),
-        r.tag,
-        r.comment || '-',
+        r.id.slice(0, 12),
+        r.orderId.slice(0, 12),
+        new Date(r.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+        r.time,
+        `${r.rating}★`,
       ]),
       totalRows: data.reviews.length,
     };
@@ -139,9 +137,9 @@ export function ReputationPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Reputación</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Reputacion</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Valoraciones, reseñas y análisis de errores
+            Valoraciones y resenas de clientes
             <span className="mx-2">·</span>
             <span className="font-medium text-gray-700">{periodLabels.current}</span>
             <span className="italic text-gray-400 ml-1.5">vs. {periodLabels.comparison}</span>
@@ -152,7 +150,7 @@ export function ReputationPage() {
             onExport={handleExport}
             getPreviewData={getPreviewData}
             generatePdfBlob={generatePdfBlob}
-            previewTitle="Reputación"
+            previewTitle="Reputacion"
             previewSubtitle={`${periodLabels.current} vs. ${periodLabels.comparison}`}
           />
         )}
@@ -173,14 +171,14 @@ export function ReputationPage() {
               <ChannelRatingCard key={rating.channel} data={rating} />
             ))}
             <SummaryCard
-              type="billing"
-              value={data.summary.totalBilling}
-              subtitle="Esta semana"
+              type="totalReviews"
+              value={data.summary.totalReviews}
+              change={data.summary.totalReviewsChange}
             />
             <SummaryCard
-              type="refunds"
-              value={data.summary.totalRefunds}
-              subtitle="Devoluciones"
+              type="negativeReviews"
+              value={data.summary.negativeReviews}
+              change={data.summary.negativeReviewsChange}
             />
           </div>
 
@@ -211,11 +209,14 @@ export function ReputationPage() {
                 <ErrorHeatmap data={data.heatmap} />
               </div>
               <div>
-                <ErrorTypesChart data={data.errorTypes} />
+                <RatingDistributionChart data={data.ratingDistribution} />
               </div>
             </div>
           ) : (
-            <ReviewsTable data={data.reviews} />
+            <ReviewsTable
+              data={data.reviews}
+              totalInPeriod={data.totalReviewsInPeriod}
+            />
           )}
         </>
       )}

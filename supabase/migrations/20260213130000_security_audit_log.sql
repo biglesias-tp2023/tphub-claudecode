@@ -32,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
 -- Only owner/superadmin can view audit logs
+DROP POLICY IF EXISTS "Owner and superadmin can view audit logs" ON audit_log;
 CREATE POLICY "Owner and superadmin can view audit logs"
 ON audit_log FOR SELECT
 TO authenticated
@@ -44,6 +45,7 @@ USING (
 );
 
 -- System can insert audit logs (via triggers)
+DROP POLICY IF EXISTS "System can insert audit logs" ON audit_log;
 CREATE POLICY "System can insert audit logs"
 ON audit_log FOR INSERT
 TO authenticated
@@ -104,10 +106,11 @@ BEGIN
     ALTER TABLE user_invitations
     DROP CONSTRAINT IF EXISTS valid_invitation_email_domain;
 
-    -- Add new constraint
+    -- Add new constraint (NOT VALID to skip existing rows)
     ALTER TABLE user_invitations
     ADD CONSTRAINT valid_invitation_email_domain
-    CHECK (email ~* '^[A-Za-z0-9._%+-]+@thinkpaladar\.com$');
+    CHECK (email ~* '^[A-Za-z0-9._%+-]+@thinkpaladar\.com$')
+    NOT VALID;
   END IF;
 END $$;
 
@@ -153,6 +156,7 @@ ON invitation_rate_limit(admin_id, invited_at DESC);
 ALTER TABLE invitation_rate_limit ENABLE ROW LEVEL SECURITY;
 
 -- Admins can see their own rate limit entries
+DROP POLICY IF EXISTS "Admins can view own rate limits" ON invitation_rate_limit;
 CREATE POLICY "Admins can view own rate limits"
 ON invitation_rate_limit FOR SELECT
 TO authenticated

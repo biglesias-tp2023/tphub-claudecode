@@ -63,6 +63,7 @@ export interface OrdersDataResult {
     refundRateChange: number;
     uniqueCustomersChange: number;
     ordersPerCustomerChange: number;
+    adSpentChange: number;
   };
 }
 

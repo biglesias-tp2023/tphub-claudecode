@@ -110,25 +110,25 @@ export interface ReputationExportData {
     channel: string;
     rating: number;
     totalReviews: number;
-    trend: number;
+    positivePercent: number;
+    negativePercent: number;
   }[];
   summary: {
-    totalBilling: number;
-    totalRefunds: number;
+    totalReviews: number;
+    negativeReviews: number;
   };
-  errorTypes: {
-    type: string;
+  ratingDistribution: {
+    rating: number;
     count: number;
     percentage: number;
   }[];
   reviews: {
     id: string;
     channel: string;
-    restaurant: string;
+    orderId: string;
     rating: number;
-    comment: string;
     date: string;
-    orderNumber: string;
+    time: string;
   }[];
   dateRange: string;
 }

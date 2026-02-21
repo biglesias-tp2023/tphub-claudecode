@@ -140,16 +140,16 @@ export async function exportReputationToExcel(data: ReputationExportData): Promi
 
   const summaryData: (string | number)[][] = [
     ['REPUTACION', data.dateRange], [''], ['RATINGS POR CANAL'],
-    ['Canal', 'Rating', 'Reviews', 'Tendencia %'],
-    ...data.channelRatings.map((r) => [r.channel, r.rating, r.totalReviews, r.trend]), [''],
-    ['RESUMEN'], ['Facturacion Total', data.summary.totalBilling], ['Reembolsos Totales', data.summary.totalRefunds],
+    ['Canal', 'Rating', 'Reviews', '% Positivo', '% Negativo'],
+    ...data.channelRatings.map((r) => [r.channel, r.rating, r.totalReviews, r.positivePercent, r.negativePercent]), [''],
+    ['RESUMEN'], ['Total Resenas', data.summary.totalReviews], ['Resenas Negativas', data.summary.negativeReviews],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumen');
 
-  const errorsData: (string | number)[][] = [['TIPOS DE ERROR'], [''], ['Tipo', 'Cantidad', 'Porcentaje'], ...data.errorTypes.map((e) => [e.type, e.count, e.percentage])];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(errorsData), 'Errores');
+  const ratingsData: (string | number)[][] = [['DISTRIBUCION DE VALORACIONES'], [''], ['Rating', 'Cantidad', 'Porcentaje'], ...data.ratingDistribution.map((r) => [`${r.rating} estrellas`, r.count, r.percentage])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ratingsData), 'Valoraciones');
 
-  const reviewsData: (string | number)[][] = [['RESENAS'], [''], ['Fecha', 'Canal', 'Restaurante', 'Rating', 'Pedido', 'Comentario'], ...data.reviews.map((r) => [r.date, r.channel, r.restaurant, r.rating, r.orderNumber, r.comment])];
+  const reviewsData: (string | number)[][] = [['RESENAS'], [''], ['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating'], ...data.reviews.map((r) => [r.date, r.time, r.channel, r.id, r.orderId, r.rating])];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reviewsData), 'Resenas');
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

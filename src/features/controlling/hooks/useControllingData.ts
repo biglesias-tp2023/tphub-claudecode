@@ -138,7 +138,11 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     porcentajeNuevos: row.metrics.porcentajeNuevos,
     recurrentesClientes,
     porcentajeRecurrentes,
-    // Phase 2 metrics (not yet available - will be undefined)
+    // Ads from CRP Portal advertising table
+    inversionAds: row.metrics.adSpent,
+    adsPercentage: row.metrics.ventas > 0
+      ? (row.metrics.adSpent / row.metrics.ventas) * 100 : 0,
+    roas: row.metrics.roas,
   };
 }
 
@@ -281,10 +285,11 @@ export function useControllingData() {
         // Open time not yet available from CRP Portal
         openTime: 80, // Default
         openTimeChange: 0,
-        // Ads not yet available from CRP Portal
-        inversionAds: 0,
-        inversionAdsChange: 0,
-        adsPercentage: 0,
+        // Ads from CRP Portal advertising table
+        inversionAds: current.totalAdSpent,
+        inversionAdsChange: changes.adSpentChange,
+        adsPercentage: current.totalRevenue > 0
+          ? (current.totalAdSpent / current.totalRevenue) * 100 : 0,
         // Promos/discounts from real data
         inversionPromos: current.totalDiscounts,
         inversionPromosChange: changes.discountsChange,
@@ -339,8 +344,9 @@ export function useControllingData() {
           pedidosPercentage: totalChannelOrders > 0 ? (channelData.orders / totalChannelOrders) * 100 : 0,
           ticketMedio: channelData.orders > 0 ? channelData.revenue / channelData.orders : 0,
           openTime: 80, // Default
-          ads: 0, // Not yet available
-          adsPercentage: 0,
+          ads: channelData.adSpent,
+          adsPercentage: channelData.revenue > 0
+            ? (channelData.adSpent / channelData.revenue) * 100 : 0,
           promos: channelData.discounts,
           promosPercentage: channelData.revenue > 0 ? (channelData.discounts / channelData.revenue) * 100 : 0,
           reembolsos: channelData.refunds,

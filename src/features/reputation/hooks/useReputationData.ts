@@ -1,7 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
+/**
+ * useReputationData Hook
+ *
+ * Orchestrates real review data from CRP Portal for the Reputation dashboard.
+ * Reads filters from Zustand stores, expands multi-portal IDs, and transforms
+ * service-level data into component-ready types.
+ *
+ * @module features/reputation/hooks/useReputationData
+ */
+
 import { useMemo } from 'react';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useBrands } from '@/features/dashboard/hooks/useBrands';
+import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
+import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
+import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw } from './useReviewsData';
+import { portalIdToChannelId } from '@/services/crp-portal/reviews';
 import type { ChannelId } from '@/types';
+import type { ChannelReviewAggregation } from '@/services/crp-portal';
 
 // ============================================
 // TYPES
@@ -19,9 +34,10 @@ export interface ChannelRating {
 }
 
 export interface ReputationSummary {
-  totalBilling: number;
-  totalRefunds: number;
-  refundsCount: number;
+  totalReviews: number;
+  totalReviewsChange: number;
+  negativeReviews: number;
+  negativeReviewsChange: number;
 }
 
 export interface HeatmapCell {
@@ -30,262 +46,96 @@ export interface HeatmapCell {
   count: number;
 }
 
-export interface ErrorType {
-  id: string;
+export interface RatingDistributionItem {
+  rating: number; // 1-5
   label: string;
   count: number;
   color: string;
 }
 
-export type ReviewTag =
-  | 'POSITIVE'
-  | 'NOT_FRESH'
-  | 'MISSING_OR_MISTAKEN_ITEMS'
-  | 'SPEED'
-  | 'PACKAGING_QUALITY'
-  | 'TASTED_BAD'
-  | 'TEMPERATURE'
-  | 'QUALITY';
-
 export interface Review {
   id: string;
   orderId: string;
   channel: ChannelId;
-  orderDate: string; // ISO date string (YYYY-MM-DD)
-  orderTime: string; // Time string (HH:MM)
-  value: number;
-  deliveryTime: number; // minutes
-  isDelayed: boolean;
-  tag: ReviewTag;
-  products: string[];
-  rating: 'thumbsUp' | 'thumbsDown' | number; // number for stars (1-5)
-  comment: string | null;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  rating: number; // 1-5
 }
 
 export interface ReputationData {
   channelRatings: ChannelRating[];
   summary: ReputationSummary;
   heatmap: HeatmapCell[];
-  errorTypes: ErrorType[];
+  ratingDistribution: RatingDistributionItem[];
   reviews: Review[];
+  totalReviewsInPeriod: number;
 }
 
 // ============================================
-// DEMO DATA
+// CONSTANTS
 // ============================================
 
-const DEMO_CHANNEL_RATINGS: ChannelRating[] = [
-  {
-    channel: 'glovo',
-    name: 'Glovo',
-    color: '#FFC244',
-    rating: 91,
-    totalReviews: 234,
-    positivePercent: 91,
-    negativePercent: 9,
-    ratingType: 'percent',
-  },
-  {
-    channel: 'ubereats',
-    name: 'Uber Eats',
-    color: '#06C167',
-    rating: 4.3,
-    totalReviews: 156,
-    positivePercent: 86,
-    negativePercent: 14,
-    ratingType: 'stars',
-  },
-];
-
-const DEMO_SUMMARY: ReputationSummary = {
-  totalBilling: 4594,
-  totalRefunds: 127,
-  refundsCount: 8,
+const CHANNEL_CONFIG: Record<ChannelId, { name: string; color: string }> = {
+  glovo: { name: 'Glovo', color: '#FFC244' },
+  ubereats: { name: 'Uber Eats', color: '#06C167' },
+  justeat: { name: 'Just Eat', color: '#FF8000' },
 };
 
-const DEMO_HEATMAP: HeatmapCell[] = [
-  // Lunes
-  { day: 0, hour: 13, count: 1 },
-  // Martes
-  { day: 1, hour: 14, count: 2 },
-  // Miércoles
-  { day: 2, hour: 12, count: 1 },
-  // Viernes
-  { day: 4, hour: 13, count: 1 },
-  { day: 4, hour: 21, count: 2 },
-  // Sábado
-  { day: 5, hour: 20, count: 1 },
-  { day: 5, hour: 21, count: 3 },
-  // Domingo
-  { day: 6, hour: 14, count: 1 },
-];
+const RATING_COLORS: Record<number, string> = {
+  1: '#EF4444', // red-500
+  2: '#FB923C', // orange-400
+  3: '#FACC15', // yellow-400
+  4: '#86EFAC', // green-300
+  5: '#22C55E', // green-500
+};
 
-const DEMO_ERROR_TYPES: ErrorType[] = [
-  { id: 'not_fresh', label: 'No fresco', count: 4, color: '#DC2626' },
-  { id: 'missing', label: 'Producto incorrecto/faltante', count: 3, color: '#8B5CF6' },
-  { id: 'bad_taste', label: 'Mal sabor', count: 3, color: '#EF4444' },
-  { id: 'packaging', label: 'Calidad del empaque', count: 2, color: '#14B8A6' },
-  { id: 'quality', label: 'Calidad', count: 2, color: '#6366F1' },
-  { id: 'notes', label: 'No siguió notas del pedido', count: 1, color: '#EC4899' },
-  { id: 'portion', label: 'Tamaño de porción', count: 2, color: '#3B82F6' },
-];
-
-const DEMO_REVIEWS: Review[] = [
-  {
-    id: '1',
-    orderId: '89234',
-    channel: 'glovo',
-    orderDate: '2026-01-21',
-    orderTime: '13:45',
-    value: 24.50,
-    deliveryTime: 42,
-    isDelayed: true,
-    tag: 'NOT_FRESH',
-    products: ['Kale Caesar Salad', 'Agua mineral'],
-    rating: 'thumbsUp',
-    comment: 'La burrata estaba pasada.',
-  },
-  {
-    id: '2',
-    orderId: '45123',
-    channel: 'ubereats',
-    orderDate: '2026-01-21',
-    orderTime: '12:30',
-    value: 18.90,
-    deliveryTime: 22,
-    isDelayed: false,
-    tag: 'POSITIVE',
-    products: ['ELG Salad', 'Zumo natural'],
-    rating: 5,
-    comment: 'Todo perfecto, muy rico!',
-  },
-  {
-    id: '3',
-    orderId: '89456',
-    channel: 'glovo',
-    orderDate: '2026-01-20',
-    orderTime: '20:15',
-    value: 32.00,
-    deliveryTime: 35,
-    isDelayed: true,
-    tag: 'MISSING_OR_MISTAKEN_ITEMS',
-    products: ['Buddha Bowl', 'Hummus'],
-    rating: 'thumbsDown',
-    comment: 'No lleva aguacate',
-  },
-  {
-    id: '4',
-    orderId: '45789',
-    channel: 'ubereats',
-    orderDate: '2026-01-20',
-    orderTime: '14:00',
-    value: 15.50,
-    deliveryTime: 55,
-    isDelayed: true,
-    tag: 'SPEED',
-    products: ['Poke Bowl'],
-    rating: 4,
-    comment: 'Tardó demasiado en llegar, comida fría.',
-  },
-  {
-    id: '5',
-    orderId: '89567',
-    channel: 'glovo',
-    orderDate: '2026-01-19',
-    orderTime: '21:30',
-    value: 28.75,
-    deliveryTime: 18,
-    isDelayed: false,
-    tag: 'POSITIVE',
-    products: ['Quinoa Salad', 'Smoothie verde'],
-    rating: 'thumbsUp',
-    comment: 'Excelente como siempre',
-  },
-  {
-    id: '6',
-    orderId: '45456',
-    channel: 'ubereats',
-    orderDate: '2026-01-19',
-    orderTime: '13:15',
-    value: 22.30,
-    deliveryTime: 28,
-    isDelayed: false,
-    tag: 'PACKAGING_QUALITY',
-    products: ['Wrap mediterráneo', 'Patatas'],
-    rating: 4,
-    comment: 'El envase venía abierto, todo mezclado',
-  },
-  {
-    id: '7',
-    orderId: '89678',
-    channel: 'glovo',
-    orderDate: '2026-01-18',
-    orderTime: '19:45',
-    value: 41.20,
-    deliveryTime: 31,
-    isDelayed: true,
-    tag: 'TASTED_BAD',
-    products: ['Ensalada griega', 'Falafel'],
-    rating: 'thumbsUp',
-    comment: 'El falafel estaba rancio, muy decepcionante',
-  },
-  {
-    id: '8',
-    orderId: '45234',
-    channel: 'ubereats',
-    orderDate: '2026-01-18',
-    orderTime: '12:00',
-    value: 19.90,
-    deliveryTime: 20,
-    isDelayed: false,
-    tag: 'POSITIVE',
-    products: ['Açaí Bowl'],
-    rating: 5,
-    comment: null,
-  },
-  {
-    id: '9',
-    orderId: '89789',
-    channel: 'glovo',
-    orderDate: '2026-01-17',
-    orderTime: '20:30',
-    value: 27.50,
-    deliveryTime: 48,
-    isDelayed: true,
-    tag: 'TEMPERATURE',
-    products: ['Sopa del día', 'Ensalada templada'],
-    rating: 'thumbsUp',
-    comment: 'La sopa llegó fría',
-  },
-  {
-    id: '10',
-    orderId: '45567',
-    channel: 'ubereats',
-    orderDate: '2026-01-17',
-    orderTime: '14:30',
-    value: 35.00,
-    deliveryTime: 25,
-    isDelayed: false,
-    tag: 'QUALITY',
-    products: ['Menu ejecutivo', 'Postre del día'],
-    rating: 4,
-    comment: 'Buena calidad en general',
-  },
-];
+const RATING_LABELS: Record<number, string> = {
+  1: '1 estrella',
+  2: '2 estrellas',
+  3: '3 estrellas',
+  4: '4 estrellas',
+  5: '5 estrellas',
+};
 
 // ============================================
-// FETCH FUNCTION
+// HELPERS
 // ============================================
 
-async function fetchReputationData(): Promise<ReputationData> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
+function buildChannelRating(
+  channel: ChannelId,
+  agg: ChannelReviewAggregation | null
+): ChannelRating | null {
+  if (!agg || agg.totalReviews === 0) return null;
 
+  const config = CHANNEL_CONFIG[channel];
+
+  if (channel === 'glovo') {
+    // Glovo uses thumbs up/down → show as percentage of positive (rating >= 4)
+    const positivePercent = agg.totalReviews > 0
+      ? Math.round((agg.positiveReviews / agg.totalReviews) * 100)
+      : 0;
+    return {
+      channel,
+      name: config.name,
+      color: config.color,
+      rating: positivePercent,
+      totalReviews: agg.totalReviews,
+      positivePercent,
+      negativePercent: 100 - positivePercent,
+      ratingType: 'percent',
+    };
+  }
+
+  // UberEats and others use star rating
   return {
-    channelRatings: DEMO_CHANNEL_RATINGS,
-    summary: DEMO_SUMMARY,
-    heatmap: DEMO_HEATMAP,
-    errorTypes: DEMO_ERROR_TYPES,
-    reviews: DEMO_REVIEWS,
+    channel,
+    name: config.name,
+    color: config.color,
+    rating: Math.round(agg.avgRating * 10) / 10,
+    totalReviews: agg.totalReviews,
+    positivePercent: Math.round(agg.positivePercent),
+    negativePercent: Math.round(agg.negativePercent),
+    ratingType: 'stars',
   };
 }
 
@@ -295,72 +145,106 @@ async function fetchReputationData(): Promise<ReputationData> {
 
 export function useReputationData() {
   const { companyIds } = useGlobalFiltersStore();
-  const { channelIds } = useDashboardFiltersStore();
+  const { brandIds, areaIds, channelIds, dateRange, datePreset } = useDashboardFiltersStore();
 
-  const query = useQuery({
-    queryKey: ['reputation', companyIds],
-    queryFn: fetchReputationData,
-    staleTime: 2 * 60 * 1000,
-  });
+  // Expand multi-portal IDs
+  const { data: brands = [] } = useBrands();
+  const { data: restaurants = [] } = useRestaurants();
 
-  // Filter data based on selected channels
-  const filteredData = useMemo<ReputationData | undefined>(() => {
-    if (!query.data) return undefined;
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brands),
+    [brandIds, brands]
+  );
+  const expandedRestaurantIds = useMemo(
+    () => expandRestaurantIds(areaIds, restaurants),
+    [areaIds, restaurants]
+  );
 
-    const data = query.data;
+  const reviewParams = useMemo(() => ({
+    companyIds,
+    brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
+    addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
+    channelIds: channelIds.length > 0 ? channelIds : undefined,
+    dateRange,
+    datePreset,
+  }), [companyIds, expandedBrandIds, expandedRestaurantIds, channelIds, dateRange, datePreset]);
 
-    // If no channel filter, return all data
-    if (channelIds.length === 0) {
-      return data;
-    }
+  // Fetch all data in parallel via React Query
+  const aggQuery = useReviewsAggregation(reviewParams);
+  const heatmapQuery = useReviewsHeatmap(reviewParams);
+  const rawQuery = useReviewsRaw(reviewParams);
 
-    // Filter channel ratings
-    const filteredRatings = data.channelRatings.filter((r) =>
-      channelIds.includes(r.channel)
-    );
+  const isLoading = aggQuery.isLoading || heatmapQuery.isLoading || rawQuery.isLoading;
+  const error = aggQuery.error || heatmapQuery.error || rawQuery.error;
 
-    // Filter reviews by channel
-    const filteredReviews = data.reviews.filter((r) =>
-      channelIds.includes(r.channel)
-    );
+  // Transform data into component-ready format
+  const data = useMemo<ReputationData | undefined>(() => {
+    if (!aggQuery.data) return undefined;
 
-    // Recalculate summary from filtered reviews
-    const filteredSummary: ReputationSummary = {
-      totalBilling: filteredReviews.reduce((sum, r) => sum + r.value, 0),
-      totalRefunds: filteredReviews
-        .filter((r) => r.tag !== 'POSITIVE')
-        .reduce((sum, r) => sum + r.value * 0.1, 0),
-      refundsCount: filteredReviews.filter((r) => r.tag !== 'POSITIVE').length,
+    const { current, changes } = aggQuery.data;
+
+    // Build channel ratings
+    const channelRatings: ChannelRating[] = [];
+    const glovoRating = buildChannelRating('glovo', current.byChannel.glovo);
+    if (glovoRating) channelRatings.push(glovoRating);
+    const ubereatsRating = buildChannelRating('ubereats', current.byChannel.ubereats);
+    if (ubereatsRating) channelRatings.push(ubereatsRating);
+    const justeatRating = buildChannelRating('justeat', current.byChannel.justeat);
+    if (justeatRating) channelRatings.push(justeatRating);
+
+    // Build summary
+    const summary: ReputationSummary = {
+      totalReviews: current.totalReviews,
+      totalReviewsChange: changes.totalReviewsChange,
+      negativeReviews: current.totalNegative,
+      negativeReviewsChange: changes.negativeChange,
     };
 
-    // Recalculate error types from filtered reviews
-    const errorCounts: Record<string, number> = {};
-    filteredReviews
-      .filter((r) => r.tag !== 'POSITIVE')
-      .forEach((r) => {
-        const errorId = r.tag.toLowerCase();
-        errorCounts[errorId] = (errorCounts[errorId] || 0) + 1;
-      });
+    // Build heatmap from RPC data
+    const heatmap: HeatmapCell[] = (heatmapQuery.data || []).map((cell) => ({
+      day: cell.dayOfWeek,
+      hour: cell.hourOfDay,
+      count: cell.count,
+    }));
 
-    const filteredErrorTypes = data.errorTypes
-      .map((et) => ({
-        ...et,
-        count: errorCounts[et.id] || 0,
-      }))
-      .filter((et) => et.count > 0);
+    // Build rating distribution
+    const ratingDistribution: RatingDistributionItem[] = [5, 4, 3, 2, 1].map((rating) => {
+      const key = `rating${rating}` as keyof typeof current.ratingDistribution;
+      return {
+        rating,
+        label: RATING_LABELS[rating],
+        count: current.ratingDistribution[key],
+        color: RATING_COLORS[rating],
+      };
+    });
+
+    // Build reviews from raw data
+    const reviews: Review[] = (rawQuery.data || []).map((raw) => {
+      const channel = portalIdToChannelId(raw.pfk_id_portal) || 'glovo';
+      const ts = new Date(raw.ts_creation_time);
+      return {
+        id: raw.pk_id_review,
+        orderId: raw.fk_id_order,
+        channel,
+        date: ts.toISOString().slice(0, 10),
+        time: ts.toTimeString().slice(0, 5),
+        rating: raw.val_rating,
+      };
+    });
 
     return {
-      channelRatings: filteredRatings,
-      summary: filteredSummary,
-      heatmap: data.heatmap, // Heatmap stays the same for demo
-      errorTypes: filteredErrorTypes.length > 0 ? filteredErrorTypes : data.errorTypes,
-      reviews: filteredReviews,
+      channelRatings,
+      summary,
+      heatmap,
+      ratingDistribution,
+      reviews,
+      totalReviewsInPeriod: current.totalReviews,
     };
-  }, [query.data, channelIds]);
+  }, [aggQuery.data, heatmapQuery.data, rawQuery.data]);
 
   return {
-    data: filteredData,
-    isLoading: query.isLoading,
-    error: query.error,
+    data,
+    isLoading,
+    error,
   };
 }

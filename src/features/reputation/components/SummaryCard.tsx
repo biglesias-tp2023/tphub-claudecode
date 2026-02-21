@@ -1,16 +1,22 @@
 import { cn } from '@/utils/cn';
-import { Euro, RotateCcw } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatters';
+import { MessageSquare, ThumbsDown, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface SummaryCardProps {
-  type: 'billing' | 'refunds';
+  type: 'totalReviews' | 'negativeReviews';
   value: number;
-  subtitle: string;
+  change?: number;
   className?: string;
 }
 
-export function SummaryCard({ type, value, subtitle, className }: SummaryCardProps) {
-  const isBilling = type === 'billing';
+function formatNumber(n: number): string {
+  if (n >= 1000) {
+    return `${(n / 1000).toFixed(1)}k`;
+  }
+  return n.toLocaleString('es-ES');
+}
+
+export function SummaryCard({ type, value, change, className }: SummaryCardProps) {
+  const isTotal = type === 'totalReviews';
 
   return (
     <div
@@ -22,29 +28,48 @@ export function SummaryCard({ type, value, subtitle, className }: SummaryCardPro
       <div className="flex items-start justify-between">
         <div>
           <div className="text-sm font-medium text-gray-600 mb-2">
-            {isBilling ? 'Facturación Total' : 'Reembolso Total'}
+            {isTotal ? 'Total Resenas' : 'Resenas Negativas'}
           </div>
           <div
             className={cn(
               'text-3xl font-bold',
-              isBilling ? 'text-green-600' : 'text-red-500'
+              isTotal ? 'text-primary-600' : 'text-red-500'
             )}
           >
-            {formatCurrency(value)}
+            {formatNumber(value)}
           </div>
-          <div className="text-sm text-gray-500 mt-1">{subtitle}</div>
+          {change !== undefined && change !== 0 && (
+            <div className="flex items-center gap-1 mt-1.5">
+              {change > 0 ? (
+                <TrendingUp className={cn('w-3.5 h-3.5', isTotal ? 'text-green-500' : 'text-red-500')} />
+              ) : (
+                <TrendingDown className={cn('w-3.5 h-3.5', isTotal ? 'text-red-500' : 'text-green-500')} />
+              )}
+              <span
+                className={cn(
+                  'text-sm font-medium',
+                  isTotal
+                    ? (change > 0 ? 'text-green-600' : 'text-red-500')
+                    : (change > 0 ? 'text-red-500' : 'text-green-600')
+                )}
+              >
+                {change > 0 ? '+' : ''}{change.toFixed(1)}%
+              </span>
+              <span className="text-xs text-gray-400">vs anterior</span>
+            </div>
+          )}
         </div>
 
         <div
           className={cn(
             'w-10 h-10 rounded-full flex items-center justify-center',
-            isBilling ? 'bg-green-50' : 'bg-red-50'
+            isTotal ? 'bg-primary-50' : 'bg-red-50'
           )}
         >
-          {isBilling ? (
-            <Euro className="w-5 h-5 text-green-600" />
+          {isTotal ? (
+            <MessageSquare className="w-5 h-5 text-primary-600" />
           ) : (
-            <RotateCcw className="w-5 h-5 text-red-500" />
+            <ThumbsDown className="w-5 h-5 text-red-500" />
           )}
         </div>
       </div>

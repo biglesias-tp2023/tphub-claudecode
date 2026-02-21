@@ -46,6 +46,9 @@ export interface HierarchyMetrics {
   ticketMedio: number;
   nuevosClientes: number;
   porcentajeNuevos: number;
+  adSpent: number;
+  adRevenue: number;
+  roas: number;
 }
 
 /**
@@ -261,6 +264,9 @@ function buildHierarchyFromDimensions(
     ticketMedio: 0,
     nuevosClientes: 0,
     porcentajeNuevos: 0,
+    adSpent: 0,
+    adRevenue: 0,
+    roas: 0,
   };
 
   // =====================================================
@@ -440,6 +446,9 @@ function buildHierarchyFromDimensions(
       ticketMedio: base.pedidos > 0 ? base.ventas / base.pedidos : 0,
       nuevosClientes: base.nuevos,
       porcentajeNuevos: base.pedidos > 0 ? (base.nuevos / base.pedidos) * 100 : 0,
+      adSpent: 0,     // Raw orders path doesn't have ads data
+      adRevenue: 0,
+      roas: 0,
     };
   };
 
@@ -698,6 +707,8 @@ interface RPCBaseMetrics {
   nuevos: number;
   descuentos: number;
   reembolsos: number;
+  adSpent: number;
+  adRevenue: number;
 }
 
 /**
@@ -710,6 +721,8 @@ function createEmptyRPCBase(): RPCBaseMetrics {
     nuevos: 0,
     descuentos: 0,
     reembolsos: 0,
+    adSpent: 0,
+    adRevenue: 0,
   };
 }
 
@@ -748,6 +761,8 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += row.nuevos || 0;
     agg.descuentos += row.descuentos || 0;
     agg.reembolsos += row.reembolsos || 0;
+    agg.adSpent += row.ad_spent || 0;
+    agg.adRevenue += row.ad_revenue || 0;
   }
 
   // Step 2: Aggregate ADDRESS level from portals
@@ -766,6 +781,8 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += metrics.nuevos;
     agg.descuentos += metrics.descuentos;
     agg.reembolsos += metrics.reembolsos;
+    agg.adSpent += metrics.adSpent;
+    agg.adRevenue += metrics.adRevenue;
   }
 
   // Step 3: Aggregate STORE level from addresses
@@ -784,6 +801,8 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += metrics.nuevos;
     agg.descuentos += metrics.descuentos;
     agg.reembolsos += metrics.reembolsos;
+    agg.adSpent += metrics.adSpent;
+    agg.adRevenue += metrics.adRevenue;
   }
 
   // Step 4: Aggregate COMPANY level from stores
@@ -801,6 +820,8 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += metrics.nuevos;
     agg.descuentos += metrics.descuentos;
     agg.reembolsos += metrics.reembolsos;
+    agg.adSpent += metrics.adSpent;
+    agg.adRevenue += metrics.adRevenue;
   }
 
   return { byPortal, byAddress, byStore, byCompany };
@@ -835,6 +856,9 @@ function buildHierarchyFromRPCMetrics(
       ticketMedio: 0,
       nuevosClientes: 0,
       porcentajeNuevos: 0,
+      adSpent: 0,
+      adRevenue: 0,
+      roas: 0,
     };
 
     if (!base) return emptyMetrics;
@@ -848,6 +872,9 @@ function buildHierarchyFromRPCMetrics(
       ticketMedio: base.pedidos > 0 ? base.ventas / base.pedidos : 0,
       nuevosClientes: base.nuevos,
       porcentajeNuevos: base.pedidos > 0 ? (base.nuevos / base.pedidos) * 100 : 0,
+      adSpent: base.adSpent,
+      adRevenue: base.adRevenue,
+      roas: base.adSpent > 0 ? base.adRevenue / base.adSpent : 0,
     };
   };
 

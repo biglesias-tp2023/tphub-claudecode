@@ -65,6 +65,7 @@ export type {
   DbCrpBusinessArea,
   DbCrpPortal,
   DbCrpOrderHead,
+  DbCrpReview,
   DbRestaurantCoordinate,
   DbHubspotContact,
   DbHubspotCompanyContact,
@@ -130,6 +131,23 @@ export type {
   OrdersChanges,
   ControllingMetricsRow,
 } from './orders';
+
+// Reviews
+export {
+  fetchCrpReviewsAggregated,
+  fetchCrpReviewsHeatmap,
+  fetchCrpReviewsComparison,
+  fetchCrpReviewsRaw,
+} from './reviews';
+
+export type {
+  FetchReviewsParams,
+  ReviewsAggregation,
+  ChannelReviewAggregation,
+  ReviewsChanges,
+  ReviewsHeatmapCell,
+  RawReview,
+} from './reviews';
 
 // Hierarchy (Company → Brand → Address → Channel)
 export {

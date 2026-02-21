@@ -58,6 +58,16 @@ export interface ChannelAggregation {
   netRevenue: number;
   /** Unique customer count */
   uniqueCustomers: number;
+  /** Ad spend for this channel */
+  adSpent: number;
+  /** Revenue attributed to ads for this channel */
+  adRevenue: number;
+  /** Total impressions for this channel */
+  impressions: number;
+  /** Total clicks for this channel */
+  clicks: number;
+  /** Orders attributed to ads for this channel */
+  adOrders: number;
 }
 
 export interface OrdersAggregation {
@@ -83,6 +93,18 @@ export interface OrdersAggregation {
   uniqueCustomers: number;
   /** Average orders per customer (totalOrders / uniqueCustomers) */
   ordersPerCustomer: number;
+  /** Total ad spend across all channels */
+  totalAdSpent: number;
+  /** Total revenue attributed to ads */
+  totalAdRevenue: number;
+  /** Total ad impressions */
+  totalImpressions: number;
+  /** Total ad clicks */
+  totalClicks: number;
+  /** Total orders attributed to ads */
+  totalAdOrders: number;
+  /** Return on ad spend (totalAdRevenue / totalAdSpent) */
+  roas: number;
   /** Aggregation by channel */
   byChannel: {
     glovo: ChannelAggregation;
@@ -152,6 +174,11 @@ function createEmptyChannelAggregation(): ChannelAggregation {
     refunds: 0,
     netRevenue: 0,
     uniqueCustomers: 0,
+    adSpent: 0,
+    adRevenue: 0,
+    impressions: 0,
+    clicks: 0,
+    adOrders: 0,
   };
 }
 
@@ -264,6 +291,11 @@ interface OrdersAggregationRPCRow {
   total_discounts: number;
   total_refunds: number;
   unique_customers: number;
+  total_ad_spent: number;
+  total_ad_revenue: number;
+  total_impressions: number;
+  total_clicks: number;
+  total_ad_orders: number;
 }
 
 /**
@@ -330,6 +362,12 @@ export async function fetchCrpOrdersAggregated(
     avgDiscountPerOrder: 0,
     uniqueCustomers: 0,
     ordersPerCustomer: 0,
+    totalAdSpent: 0,
+    totalAdRevenue: 0,
+    totalImpressions: 0,
+    totalClicks: 0,
+    totalAdOrders: 0,
+    roas: 0,
     byChannel: {
       glovo: createEmptyChannelAggregation(),
       ubereats: createEmptyChannelAggregation(),
@@ -344,12 +382,22 @@ export async function fetchCrpOrdersAggregated(
     const discounts = Number(row.total_discounts) || 0;
     const refunds = Number(row.total_refunds) || 0;
     const customers = Number(row.unique_customers) || 0;
+    const adSpent = Number(row.total_ad_spent) || 0;
+    const adRevenue = Number(row.total_ad_revenue) || 0;
+    const impressions = Number(row.total_impressions) || 0;
+    const clicks = Number(row.total_clicks) || 0;
+    const adOrders = Number(row.total_ad_orders) || 0;
 
     // Add to global totals
     result.totalRevenue += revenue;
     result.totalOrders += orders;
     result.totalDiscounts += discounts;
     result.totalRefunds += refunds;
+    result.totalAdSpent += adSpent;
+    result.totalAdRevenue += adRevenue;
+    result.totalImpressions += impressions;
+    result.totalClicks += clicks;
+    result.totalAdOrders += adOrders;
 
     // Map channel row to byChannel
     const channelKey = row.channel as ChannelId;
@@ -360,6 +408,11 @@ export async function fetchCrpOrdersAggregated(
       result.byChannel[channelKey].refunds = refunds;
       result.byChannel[channelKey].netRevenue = revenue - refunds;
       result.byChannel[channelKey].uniqueCustomers = customers;
+      result.byChannel[channelKey].adSpent = adSpent;
+      result.byChannel[channelKey].adRevenue = adRevenue;
+      result.byChannel[channelKey].impressions = impressions;
+      result.byChannel[channelKey].clicks = clicks;
+      result.byChannel[channelKey].adOrders = adOrders;
     }
     // 'other' channel (e.g. JustEat or unknown portals) adds to totals but not byChannel
   }
@@ -391,6 +444,10 @@ export async function fetchCrpOrdersAggregated(
 
   result.ordersPerCustomer = result.uniqueCustomers > 0
     ? result.totalOrders / result.uniqueCustomers
+    : 0;
+
+  result.roas = result.totalAdSpent > 0
+    ? result.totalAdRevenue / result.totalAdSpent
     : 0;
 
   return result;
@@ -429,6 +486,7 @@ export interface OrdersChanges {
   refundRateChange: number;
   uniqueCustomersChange: number;
   ordersPerCustomerChange: number;
+  adSpentChange: number;
 }
 
 export async function fetchCrpOrdersComparison(
@@ -462,6 +520,7 @@ export async function fetchCrpOrdersComparison(
       refundRateChange: calcChange(current.refundRate, previous.refundRate),
       uniqueCustomersChange: calcChange(current.uniqueCustomers, previous.uniqueCustomers),
       ordersPerCustomerChange: calcChange(current.ordersPerCustomer, previous.ordersPerCustomer),
+      adSpentChange: calcChange(current.totalAdSpent, previous.totalAdSpent),
     },
   };
 }
@@ -484,6 +543,11 @@ export interface ControllingMetricsRow {
   nuevos: number;
   descuentos: number;
   reembolsos: number;
+  ad_spent: number;
+  ad_revenue: number;
+  impressions: number;
+  clicks: number;
+  ad_orders: number;
 }
 
 /**

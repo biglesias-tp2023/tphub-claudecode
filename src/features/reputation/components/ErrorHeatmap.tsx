@@ -6,19 +6,19 @@ interface ErrorHeatmapProps {
   className?: string;
 }
 
-const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const DAYS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 10); // 10h to 23h
 
 function getHeatColor(count: number): string {
   if (count === 0) return 'bg-gray-100';
-  if (count === 1) return 'bg-yellow-300';
-  if (count === 2) return 'bg-orange-400';
+  if (count <= 3) return 'bg-yellow-300';
+  if (count <= 10) return 'bg-orange-400';
   return 'bg-red-500';
 }
 
 function getHeatTextColor(count: number): string {
   if (count === 0) return 'text-transparent';
-  if (count <= 2) return 'text-gray-800';
+  if (count <= 10) return 'text-gray-800';
   return 'text-white';
 }
 
@@ -36,10 +36,10 @@ export function ErrorHeatmap({ data, className }: ErrorHeatmapProps) {
     <div className={cn('bg-white rounded-xl border border-gray-200 p-5', className)}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900">
-          Mapa de Calor - Errores por Hora
+          Mapa de Calor - Resenas Negativas
         </h3>
         <p className="text-sm text-gray-500">
-          Distribución de errores por día y hora
+          Distribucion de resenas negativas (1-2 estrellas) por dia y hora
         </p>
       </div>
 
@@ -74,7 +74,7 @@ export function ErrorHeatmap({ data, className }: ErrorHeatmapProps) {
                       getHeatColor(count),
                       getHeatTextColor(count)
                     )}
-                    title={count > 0 ? `${count} error${count > 1 ? 'es' : ''}` : 'Sin errores'}
+                    title={count > 0 ? `${count} resena${count > 1 ? 's' : ''} negativa${count > 1 ? 's' : ''}` : 'Sin resenas negativas'}
                   >
                     {count > 0 ? count : ''}
                   </div>
@@ -92,7 +92,7 @@ export function ErrorHeatmap({ data, className }: ErrorHeatmapProps) {
               <div className="w-6 h-4 rounded bg-orange-400" />
               <div className="w-6 h-4 rounded bg-red-500" />
             </div>
-            <span>Más</span>
+            <span>Mas</span>
           </div>
         </div>
       </div>

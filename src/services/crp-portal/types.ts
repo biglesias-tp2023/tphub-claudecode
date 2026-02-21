@@ -272,7 +272,7 @@ export interface DbCrpReview {
   /** Review creation timestamp */
   ts_creation_time: string;
   /** Rating value (1-5) */
-  amt_rating: number;
+  val_rating: number;
 }
 
 // ============================================

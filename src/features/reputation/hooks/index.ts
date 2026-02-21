@@ -3,8 +3,7 @@ export type {
   ChannelRating,
   ReputationSummary,
   HeatmapCell,
-  ErrorType,
-  ReviewTag,
+  RatingDistributionItem,
   Review,
   ReputationData,
 } from './useReputationData';

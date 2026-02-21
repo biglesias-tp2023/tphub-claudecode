@@ -160,13 +160,13 @@ export function exportControllingToCSV(data: ControllingExportData) {
 export function exportReputationToCSV(data: ReputationExportData) {
   const csvContent = [
     `REPUTACION - ${data.dateRange}`, '',
-    'RATINGS POR CANAL', 'Canal;Rating;Reviews;Tendencia',
-    ...data.channelRatings.map((r) => `${r.channel};${r.rating.toFixed(1)};${r.totalReviews};${r.trend.toFixed(1)}%`), '',
-    'RESUMEN', `Facturacion Total;${data.summary.totalBilling}`, `Reembolsos Totales;${data.summary.totalRefunds}`, '',
-    'TIPOS DE ERROR', 'Tipo;Cantidad;Porcentaje',
-    ...data.errorTypes.map((e) => `${e.type};${e.count};${e.percentage.toFixed(1)}%`), '',
-    'RESENAS', 'Fecha;Canal;Restaurante;Rating;Pedido;Comentario',
-    ...data.reviews.map((r) => `${r.date};${r.channel};${r.restaurant};${r.rating};${r.orderNumber};"${r.comment.replace(/"/g, '""')}"`),
+    'RATINGS POR CANAL', 'Canal;Rating;Reviews;% Positivo;% Negativo',
+    ...data.channelRatings.map((r) => `${r.channel};${r.rating.toFixed(1)};${r.totalReviews};${r.positivePercent.toFixed(1)}%;${r.negativePercent.toFixed(1)}%`), '',
+    'RESUMEN', `Total Resenas;${data.summary.totalReviews}`, `Resenas Negativas;${data.summary.negativeReviews}`, '',
+    'DISTRIBUCION DE VALORACIONES', 'Rating;Cantidad;Porcentaje',
+    ...data.ratingDistribution.map((r) => `${r.rating} estrellas;${r.count};${r.percentage.toFixed(1)}%`), '',
+    'RESENAS', 'Fecha;Hora;Canal;Review ID;Order ID;Rating',
+    ...data.reviews.map((r) => `${r.date};${r.time};${r.channel};${r.id};${r.orderId};${r.rating}`),
   ].join('\n');
 
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
