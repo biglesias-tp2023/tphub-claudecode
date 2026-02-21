@@ -254,10 +254,10 @@ export function FilterDropdown({
                     setIsOpen(false);
                     setSearchQuery('');
                   }}
-                  disabled={selectedIds.length === 0}
+                  disabled={selectedIds.length === 0 && !isAllSelected}
                   className={cn(
                     'px-2 py-1 text-xs font-medium rounded-lg transition-colors',
-                    selectedIds.length > 0
+                    (selectedIds.length > 0 || isAllSelected)
                       ? 'text-error-600 hover:bg-error-50'
                       : 'text-gray-400 cursor-not-allowed'
                   )}
