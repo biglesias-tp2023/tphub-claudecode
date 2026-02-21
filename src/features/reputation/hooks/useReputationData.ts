@@ -26,11 +26,11 @@ export interface ChannelRating {
   channel: ChannelId;
   name: string;
   color: string;
-  rating: number; // 0-100 for Glovo (%), 1-5 for UberEats (stars)
+  rating: number; // percentage (0-100) for Glovo, star rating (1-5) for others
+  ratingType: 'percent' | 'stars';
   totalReviews: number;
   positivePercent: number;
   negativePercent: number;
-  ratingType: 'percent' | 'stars';
 }
 
 export interface ReputationSummary {
