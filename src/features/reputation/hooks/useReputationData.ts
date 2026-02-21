@@ -145,7 +145,7 @@ function buildChannelRating(
 
 export function useReputationData() {
   const { companyIds } = useGlobalFiltersStore();
-  const { brandIds, areaIds, channelIds, dateRange, datePreset } = useDashboardFiltersStore();
+  const { brandIds, areaIds, restaurantIds, channelIds, dateRange, datePreset } = useDashboardFiltersStore();
 
   // Expand multi-portal IDs
   const { data: brands = [] } = useBrands();
@@ -156,8 +156,8 @@ export function useReputationData() {
     [brandIds, brands]
   );
   const expandedRestaurantIds = useMemo(
-    () => expandRestaurantIds(areaIds, restaurants),
-    [areaIds, restaurants]
+    () => expandRestaurantIds(restaurantIds, restaurants),
+    [restaurantIds, restaurants]
   );
 
   const reviewParams = useMemo(() => ({
