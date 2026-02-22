@@ -84,6 +84,9 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
     [sortedCompanies]
   );
 
+  // Treat empty selection as "all selected"
+  const isEmptyAsAll = companyIds.length === 0;
+
   // Filter companies based on search, tab, status, and KAM
   const filteredCompanies = useMemo(() => {
     let result = sortedCompanies;
@@ -107,13 +110,13 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
       result = result.filter((c) => c.keyAccountManager && kamFilters.includes(c.keyAccountManager));
     }
 
-    // Apply tab filter
-    if (activeTab === 'selected') {
+    // Apply tab filter — when empty = all, "selected" tab shows all companies
+    if (activeTab === 'selected' && !isEmptyAsAll) {
       result = result.filter((c) => companyIds.includes(c.id));
     }
 
     return result;
-  }, [searchQuery, sortedCompanies, fuse, activeTab, companyIds, statusFilters, kamFilters]);
+  }, [searchQuery, sortedCompanies, fuse, activeTab, companyIds, isEmptyAsAll, statusFilters, kamFilters]);
 
   // Get selected companies for display
   const selectedCompanies = useMemo(() => {
@@ -134,13 +137,18 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
     }
   }, [sortedCompanies, companyIds, setCompanyIds]);
 
-  // Handle company selection
+  // Handle company selection — when empty (all selected), select all EXCEPT the toggled one
   const handleToggleCompany = useCallback(
     (company: Company) => {
-      toggleCompanyId(company.id);
+      if (isEmptyAsAll) {
+        const allExceptThis = sortedCompanies.filter((c) => c.id !== company.id).map((c) => c.id);
+        setCompanyIds(allExceptThis);
+      } else {
+        toggleCompanyId(company.id);
+      }
       resetDashboardFilters();
     },
-    [toggleCompanyId, resetDashboardFilters]
+    [isEmptyAsAll, sortedCompanies, setCompanyIds, toggleCompanyId, resetDashboardFilters]
   );
 
   // Handle select all visible
@@ -378,7 +386,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                       : 'text-gray-600 hover:bg-gray-100'
                   )}
                 >
-                  Seleccionados ({selectedCompanies.length})
+                  Seleccionados ({isEmptyAsAll ? sortedCompanies.length : selectedCompanies.length})
                 </button>
 
                 <div className="flex-1" />
@@ -412,7 +420,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                   </div>
                 ) : filteredCompanies.length === 0 ? (
                   <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                    {activeTab === 'selected'
+                    {activeTab === 'selected' && !isEmptyAsAll
                       ? 'No hay compañías seleccionadas'
                       : `No se encontraron compañías para "${searchQuery}"`}
                   </div>
@@ -422,7 +430,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                       <CompanyItem
                         key={company.id}
                         company={company}
-                        isSelected={companyIds.includes(company.id)}
+                        isSelected={isEmptyAsAll || companyIds.includes(company.id)}
                         isHighlighted={index === boundedHighlightedIndex}
                         onSelect={() => handleToggleCompany(company)}
                       />
@@ -452,13 +460,8 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                   </button>
                   <button
                     onClick={handleClearAll}
-                    disabled={companyIds.length === 0}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
-                      companyIds.length > 0
-                        ? 'text-error-600 hover:bg-error-50'
-                        : 'text-gray-400 cursor-not-allowed'
-                    )}
+                    disabled={false}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors text-error-600 hover:bg-error-50"
                   >
                     Borrar
                   </button>
