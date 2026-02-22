@@ -111,7 +111,7 @@ const chartSeries: AreaSeriesConfig[] = [
 export function MarketingPage() {
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const dateRange = useDashboardFiltersStore((s) => s.dateRange);
-  const { data, isLoading, error } = useMarketingData();
+  const { data, isLoading, error, timeseriesLoading } = useMarketingData();
 
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
 
@@ -248,7 +248,11 @@ export function MarketingPage() {
           Tendencia Diaria
         </h2>
         <div className="bg-white rounded-xl border border-gray-100 p-4">
-          {chartData.length > 0 ? (
+          {timeseriesLoading ? (
+            <div className="h-80 flex items-center justify-center">
+              <Spinner size="md" />
+            </div>
+          ) : chartData.length > 0 ? (
             <div className="h-80">
               <AreaChart
                 data={chartData}

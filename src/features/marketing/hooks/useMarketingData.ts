@@ -200,7 +200,9 @@ export function useMarketingData() {
 
   return {
     data,
-    isLoading: ordersQuery.isLoading || timeseriesQuery.isLoading,
-    error: ordersQuery.error || timeseriesQuery.error,
+    isLoading: ordersQuery.isLoading,
+    timeseriesLoading: timeseriesQuery.isLoading,
+    error: ordersQuery.error,
+    timeseriesError: timeseriesQuery.error,
   };
 }
