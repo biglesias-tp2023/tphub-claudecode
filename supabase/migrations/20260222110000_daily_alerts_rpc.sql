@@ -1,9 +1,10 @@
 -- ============================================
 -- Migration: 20260222_daily_alerts_rpc.sql
--- Description: 3 RPC functions for daily anomaly detection:
+-- Description: 4 RPC functions for daily anomaly detection:
 --   1. get_daily_order_anomalies — Orders (pedidos)
 --   2. get_daily_review_anomalies — Reviews (resenas)
 --   3. get_daily_ads_anomalies — Advertising (publicidad)
+--   4. get_daily_promo_anomalies — Promotions (descuentos/promos)
 --
 -- Each function compares yesterday's metrics against the
 -- baseline of the same day-of-week over the previous 6 weeks.
@@ -647,3 +648,226 @@ $$;
 GRANT EXECUTE ON FUNCTION get_daily_ads_anomalies(numeric, numeric, numeric) TO authenticated;
 
 COMMENT ON FUNCTION get_daily_ads_anomalies IS 'Detects advertising anomalies: compares yesterday ads metrics per restaurant/channel against baseline (same day-of-week, previous 6 weeks). Detects low ROAS, spend spikes without returns, and impressions drops. Requires minimum spend to avoid noise.';
+
+
+-- ============================================
+-- RPC 4: get_daily_promo_anomalies
+-- ============================================
+
+DROP FUNCTION IF EXISTS get_daily_promo_anomalies(numeric, numeric, numeric);
+
+CREATE OR REPLACE FUNCTION get_daily_promo_anomalies(
+  p_promo_rate_threshold numeric DEFAULT 15,
+  p_promo_spike_pct numeric DEFAULT 50,
+  p_min_orders numeric DEFAULT 10
+)
+RETURNS TABLE (
+  company_id text,
+  company_name text,
+  key_account_manager text,
+  store_id text,
+  store_name text,
+  address_id text,
+  address_name text,
+  channel text,
+  anomaly_type text,
+  yesterday_orders bigint,
+  yesterday_revenue numeric,
+  yesterday_promos numeric,
+  yesterday_promo_rate numeric,
+  baseline_avg_promos numeric,
+  baseline_avg_promo_rate numeric,
+  promo_rate_deviation_pct numeric,
+  promo_spend_deviation_pct numeric,
+  weeks_with_data bigint
+)
+LANGUAGE sql
+STABLE
+AS $$
+  WITH
+  active_companies AS (
+    SELECT * FROM (
+      SELECT DISTINCT ON (pk_id_company)
+        pk_id_company, des_company_name, des_key_account_manager, des_status, flg_deleted
+      FROM crp_portal__dt_company
+      ORDER BY pk_id_company, pk_ts_month DESC
+    ) deduped
+    WHERE COALESCE(flg_deleted, 0) != 1
+      AND des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
+  ),
+  active_stores AS (
+    SELECT * FROM (
+      SELECT DISTINCT ON (pk_id_store)
+        pk_id_store, des_store, pfk_id_company, flg_deleted
+      FROM crp_portal__dt_store
+      ORDER BY pk_id_store, pk_ts_month DESC
+    ) deduped
+    WHERE COALESCE(flg_deleted, 0) != 1
+  ),
+  active_addresses AS (
+    SELECT * FROM (
+      SELECT DISTINCT ON (pk_id_address)
+        pk_id_address, des_address, pfk_id_company, flg_deleted
+      FROM crp_portal__dt_address
+      ORDER BY pk_id_address, pk_ts_month DESC
+    ) deduped
+    WHERE COALESCE(flg_deleted, 0) != 1
+  ),
+  yesterday_date AS (
+    SELECT ((NOW() AT TIME ZONE 'Europe/Madrid')::date - 1) AS d
+  ),
+  -- Promo data from yesterday (same table as orders: ft_order_head, integer FKs)
+  promos_yesterday AS (
+    SELECT
+      o.pfk_id_company AS cid,
+      o.pfk_id_store AS sid,
+      o.pfk_id_store_address AS aid,
+      CASE
+        WHEN o.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
+        WHEN o.pfk_id_portal = '3CCD6861' THEN 'ubereats'
+        ELSE 'other'
+      END AS ch,
+      COUNT(*)::bigint AS total_orders,
+      COALESCE(SUM(o.amt_total_price), 0) AS total_revenue,
+      COALESCE(SUM(o.amt_promotions), 0) AS total_promos,
+      CASE
+        WHEN SUM(o.amt_total_price) > 0
+        THEN (COALESCE(SUM(o.amt_promotions), 0) / SUM(o.amt_total_price)) * 100
+        ELSE 0
+      END AS promo_rate
+    FROM crp_portal__ft_order_head o
+    INNER JOIN active_companies ac ON ac.pk_id_company = o.pfk_id_company
+    CROSS JOIN yesterday_date yd
+    WHERE (o.td_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date = yd.d
+    GROUP BY o.pfk_id_company, o.pfk_id_store, o.pfk_id_store_address,
+      CASE
+        WHEN o.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
+        WHEN o.pfk_id_portal = '3CCD6861' THEN 'ubereats'
+        ELSE 'other'
+      END
+  ),
+  -- Baseline: same day-of-week over previous 6 weeks
+  promos_baseline_daily AS (
+    SELECT
+      o.pfk_id_company AS cid,
+      o.pfk_id_store AS sid,
+      o.pfk_id_store_address AS aid,
+      CASE
+        WHEN o.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
+        WHEN o.pfk_id_portal = '3CCD6861' THEN 'ubereats'
+        ELSE 'other'
+      END AS ch,
+      (o.td_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date AS order_date,
+      COALESCE(SUM(o.amt_total_price), 0) AS daily_revenue,
+      COALESCE(SUM(o.amt_promotions), 0) AS daily_promos,
+      CASE
+        WHEN SUM(o.amt_total_price) > 0
+        THEN (COALESCE(SUM(o.amt_promotions), 0) / SUM(o.amt_total_price)) * 100
+        ELSE 0
+      END AS daily_promo_rate
+    FROM crp_portal__ft_order_head o
+    INNER JOIN active_companies ac ON ac.pk_id_company = o.pfk_id_company
+    CROSS JOIN yesterday_date yd
+    WHERE
+      (o.td_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date
+        BETWEEN (yd.d - 42) AND (yd.d - 1)
+      AND EXTRACT(ISODOW FROM (o.td_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date)
+        = EXTRACT(ISODOW FROM yd.d)
+    GROUP BY o.pfk_id_company, o.pfk_id_store, o.pfk_id_store_address,
+      CASE
+        WHEN o.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
+        WHEN o.pfk_id_portal = '3CCD6861' THEN 'ubereats'
+        ELSE 'other'
+      END,
+      (o.td_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date
+  ),
+  promos_baseline AS (
+    SELECT
+      cid, sid, aid, ch,
+      AVG(daily_promos) AS avg_promos,
+      AVG(daily_promo_rate) AS avg_promo_rate,
+      COUNT(*)::bigint AS wks
+    FROM promos_baseline_daily
+    GROUP BY cid, sid, aid, ch
+  ),
+  -- Detect anomalies
+  promo_anomalies AS (
+    SELECT
+      y.cid, y.sid, y.aid, y.ch,
+      y.total_orders,
+      y.total_revenue,
+      y.total_promos,
+      y.promo_rate AS y_promo_rate,
+      b.avg_promos,
+      b.avg_promo_rate,
+      b.wks,
+      -- Anomaly type detection (priority order)
+      CASE
+        -- High promo rate: yesterday rate > threshold AND baseline was significantly lower
+        WHEN y.promo_rate > p_promo_rate_threshold
+          AND b.avg_promo_rate < p_promo_rate_threshold
+          THEN 'high_promo_rate'
+        -- Promo spend spike: spending much more on promos than baseline
+        WHEN b.avg_promos > 0
+          AND y.total_promos > b.avg_promos * (1 + p_promo_spike_pct / 100.0)
+          THEN 'promo_spike'
+        -- Promo rate spike: rate jumped significantly even if baseline was already >0
+        WHEN b.avg_promo_rate > 0
+          AND ((y.promo_rate - b.avg_promo_rate) / b.avg_promo_rate) * 100 > p_promo_spike_pct
+          THEN 'promo_rate_spike'
+        ELSE NULL
+      END AS atype,
+      -- Deviation metrics
+      CASE
+        WHEN b.avg_promo_rate > 0 THEN
+          ROUND(((y.promo_rate - b.avg_promo_rate) / b.avg_promo_rate) * 100, 1)
+        ELSE NULL
+      END AS promo_rate_dev,
+      CASE
+        WHEN b.avg_promos > 0 THEN
+          ROUND(((y.total_promos - b.avg_promos) / b.avg_promos) * 100, 1)
+        ELSE NULL
+      END AS promo_spend_dev
+    FROM promos_yesterday y
+    INNER JOIN promos_baseline b
+      ON y.cid = b.cid AND y.sid = b.sid AND y.aid = b.aid AND y.ch = b.ch
+    WHERE
+      b.wks >= 3
+      AND y.total_orders >= p_min_orders
+  )
+  SELECT
+    a.cid::text AS company_id,
+    COALESCE(ac.des_company_name, 'Desconocida') AS company_name,
+    ac.des_key_account_manager AS key_account_manager,
+    a.sid::text AS store_id,
+    COALESCE(s.des_store, 'Desconocida') AS store_name,
+    a.aid::text AS address_id,
+    COALESCE(addr.des_address, 'Desconocida') AS address_name,
+    a.ch AS channel,
+    a.atype AS anomaly_type,
+    a.total_orders AS yesterday_orders,
+    ROUND(a.total_revenue, 2) AS yesterday_revenue,
+    ROUND(a.total_promos, 2) AS yesterday_promos,
+    ROUND(a.y_promo_rate, 1) AS yesterday_promo_rate,
+    ROUND(a.avg_promos, 2) AS baseline_avg_promos,
+    ROUND(a.avg_promo_rate, 1) AS baseline_avg_promo_rate,
+    a.promo_rate_dev AS promo_rate_deviation_pct,
+    a.promo_spend_dev AS promo_spend_deviation_pct,
+    a.wks AS weeks_with_data
+  FROM promo_anomalies a
+  LEFT JOIN active_companies ac ON ac.pk_id_company = a.cid
+  LEFT JOIN active_stores s ON s.pk_id_store = a.sid
+  LEFT JOIN active_addresses addr ON addr.pk_id_address = a.aid
+  WHERE a.atype IS NOT NULL
+  ORDER BY
+    CASE a.atype
+      WHEN 'high_promo_rate' THEN 1
+      WHEN 'promo_spike' THEN 2
+      WHEN 'promo_rate_spike' THEN 3
+    END,
+    a.promo_rate_dev DESC NULLS LAST;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_daily_promo_anomalies(numeric, numeric, numeric) TO authenticated;
+
+COMMENT ON FUNCTION get_daily_promo_anomalies IS 'Detects promotion anomalies: compares yesterday promo metrics (amt_promotions from ft_order_head) per restaurant/channel against baseline (same day-of-week, previous 6 weeks). Detects high promo rates, promo spend spikes, and promo rate spikes. Requires minimum orders to avoid noise.';

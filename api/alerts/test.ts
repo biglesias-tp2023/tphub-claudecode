@@ -44,10 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Call 3 RPCs in parallel
+  // Call 4 RPCs in parallel
   const threshold = Number(process.env.ALERT_THRESHOLD ?? -20);
 
-  const [ordersResult, reviewsResult, adsResult] = await Promise.all([
+  const [ordersResult, reviewsResult, adsResult, promosResult] = await Promise.all([
     supabase.rpc('get_daily_order_anomalies', { p_threshold: threshold }),
     supabase.rpc('get_daily_review_anomalies', {
       p_min_reviews: 3,
@@ -59,6 +59,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       p_spend_threshold: 10,
       p_spend_deviation_pct: 50,
     }),
+    supabase.rpc('get_daily_promo_anomalies', {
+      p_promo_rate_threshold: 15,
+      p_promo_spike_pct: 50,
+      p_min_orders: 10,
+    }),
   ]);
 
   // Collect errors
@@ -66,11 +71,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ordersResult.error && { rpc: 'orders', message: ordersResult.error.message },
     reviewsResult.error && { rpc: 'reviews', message: reviewsResult.error.message },
     adsResult.error && { rpc: 'ads', message: adsResult.error.message },
+    promosResult.error && { rpc: 'promos', message: promosResult.error.message },
   ].filter(Boolean);
 
   const orderAnomalies = ordersResult.data ?? [];
   const reviewAnomalies = reviewsResult.data ?? [];
   const adsAnomalies = adsResult.data ?? [];
+  const promoAnomalies = promosResult.data ?? [];
 
   // Fetch profiles for grouping
   const { data: profiles, error: profilesError } = await supabase
@@ -93,20 +100,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Build grouped view
   type AnomalyItem = { company_id: string; [key: string]: unknown };
-  const grouped: Record<string, { consultant: string; email: string; slackUserId: string | null; orders: unknown[]; reviews: unknown[]; ads: unknown[] }> = {};
+  const grouped: Record<string, { consultant: string; email: string; slackUserId: string | null; orders: unknown[]; reviews: unknown[]; promos: unknown[]; ads: unknown[] }> = {};
 
-  const assignAnomaly = (anomaly: AnomalyItem, type: 'orders' | 'reviews' | 'ads') => {
+  const assignAnomaly = (anomaly: AnomalyItem, type: 'orders' | 'reviews' | 'promos' | 'ads') => {
     const consultants = companyToConsultants.get(anomaly.company_id);
     if (consultants && consultants.length > 0) {
       for (const c of consultants) {
         if (!grouped[c.id]) {
-          grouped[c.id] = { consultant: c.full_name, email: c.email, slackUserId: c.slack_user_id, orders: [], reviews: [], ads: [] };
+          grouped[c.id] = { consultant: c.full_name, email: c.email, slackUserId: c.slack_user_id, orders: [], reviews: [], promos: [], ads: [] };
         }
         grouped[c.id][type].push(anomaly);
       }
     } else {
       if (!grouped['__unassigned__']) {
-        grouped['__unassigned__'] = { consultant: 'Sin asignar', email: '', slackUserId: null, orders: [], reviews: [], ads: [] };
+        grouped['__unassigned__'] = { consultant: 'Sin asignar', email: '', slackUserId: null, orders: [], reviews: [], promos: [], ads: [] };
       }
       grouped['__unassigned__'][type].push(anomaly);
     }
@@ -114,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   for (const a of orderAnomalies) assignAnomaly(a, 'orders');
   for (const a of reviewAnomalies) assignAnomaly(a, 'reviews');
+  for (const a of promoAnomalies) assignAnomaly(a, 'promos');
   for (const a of adsAnomalies) assignAnomaly(a, 'ads');
 
   return res.status(200).json({
@@ -125,12 +133,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       order_anomalies: orderAnomalies.length,
       review_anomalies: reviewAnomalies.length,
       ads_anomalies: adsAnomalies.length,
-      total: orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length,
+      promo_anomalies: promoAnomalies.length,
+      total: orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length + promoAnomalies.length,
       consultants: Object.keys(grouped).length,
     },
     raw: {
       orders: orderAnomalies,
       reviews: reviewAnomalies,
+      promos: promoAnomalies,
       ads: adsAnomalies,
     },
     grouped,

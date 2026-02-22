@@ -63,6 +63,25 @@ interface AdsAnomaly {
   weeks_with_data: number;
 }
 
+interface PromoAnomaly {
+  company_id: string;
+  company_name: string;
+  key_account_manager: string | null;
+  store_name: string;
+  address_name: string;
+  channel: string;
+  anomaly_type: string;
+  yesterday_orders: number;
+  yesterday_revenue: number;
+  yesterday_promos: number;
+  yesterday_promo_rate: number;
+  baseline_avg_promos: number;
+  baseline_avg_promo_rate: number;
+  promo_rate_deviation_pct: number;
+  promo_spend_deviation_pct: number;
+  weeks_with_data: number;
+}
+
 interface ConsultantProfile {
   id: string;
   email: string;
@@ -81,6 +100,7 @@ interface ConsultantGroup {
   orders: OrderAnomaly[];
   reviews: ReviewAnomaly[];
   ads: AdsAnomaly[];
+  promos: PromoAnomaly[];
 }
 
 // ============================================
@@ -116,6 +136,7 @@ function groupAnomaliesByConsultant(
   orderAnomalies: OrderAnomaly[],
   reviewAnomalies: ReviewAnomaly[],
   adsAnomalies: AdsAnomaly[],
+  promoAnomalies: PromoAnomaly[],
 ): Record<string, ConsultantGroup> {
   const groups: Record<string, ConsultantGroup> = {};
 
@@ -141,6 +162,7 @@ function groupAnomaliesByConsultant(
         orders: [],
         reviews: [],
         ads: [],
+        promos: [],
       };
     }
     return groups[profile.id];
@@ -154,6 +176,7 @@ function groupAnomaliesByConsultant(
         orders: [],
         reviews: [],
         ads: [],
+        promos: [],
       };
     }
     return groups[key];
@@ -189,6 +212,16 @@ function groupAnomaliesByConsultant(
     }
   }
 
+  // Group promo anomalies
+  for (const anomaly of promoAnomalies) {
+    const consultants = companyToConsultants.get(anomaly.company_id);
+    if (consultants && consultants.length > 0) {
+      for (const c of consultants) getOrCreateGroup(c).promos.push(anomaly);
+    } else {
+      getUnassignedGroup().promos.push(anomaly);
+    }
+  }
+
   return groups;
 }
 
@@ -196,7 +229,7 @@ function buildFallbackMessage(groups: Record<string, ConsultantGroup>): string {
   const lines: string[] = [`*Alertas diarias — ${getYesterdayLabel()}*\n`];
 
   for (const group of Object.values(groups)) {
-    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length;
+    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
     if (totalAnomalies === 0) continue;
 
     const mention = group.consultant.slackUserId
@@ -219,6 +252,15 @@ function buildFallbackMessage(groups: Record<string, ConsultantGroup>): string {
       for (const a of group.reviews) {
         lines.push(
           `:star: *${a.company_name} — ${a.store_name}* | ${a.address_name} (${a.channel}) — Rating: *${a.yesterday_avg_rating}* (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`,
+        );
+      }
+    }
+
+    if (group.promos.length > 0) {
+      lines.push('*Promos:*');
+      for (const a of group.promos) {
+        lines.push(
+          `:ticket: *${a.company_name} — ${a.store_name}* | ${a.address_name} (${a.channel}) — Promos: *${a.yesterday_promos}€* (${a.yesterday_promo_rate}% de ventas, media: ${a.baseline_avg_promo_rate}%) → *+${a.promo_spend_deviation_pct}%*`,
         );
       }
     }
@@ -248,18 +290,19 @@ async function formatWithClaude(groups: Record<string, ConsultantGroup>): Promis
   // Build data summary for Claude
   const dataForClaude: Record<string, unknown>[] = [];
   for (const group of Object.values(groups)) {
-    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length;
+    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
     if (totalAnomalies === 0) continue;
     dataForClaude.push({
       consultant: group.consultant,
       orders: group.orders,
       reviews: group.reviews,
+      promos: group.promos,
       ads: group.ads,
     });
   }
 
   if (dataForClaude.length === 0) {
-    return ':large_green_circle: Todos los restaurantes dentro de rango normal ayer (pedidos, resenas y ads).';
+    return ':large_green_circle: Todos los restaurantes dentro de rango normal ayer (pedidos, resenas, promos y ads).';
   }
 
   try {
@@ -279,6 +322,7 @@ REGLAS:
 - Para cada consultor: si tiene slack_user_id, usar <@SLACK_USER_ID> como mencion. Si no, usar *nombre* en negrita.
 - PEDIDOS: Agrupa en :red_circle: Criticos (>25% caida) y :large_yellow_circle: Vigilancia (20-25% caida). Formato: Empresa — Marca | Direccion (Canal) — X pedidos (media Y) → Z%
 - RESENAS: Usa :star: con rating ayer vs media y negativas. Solo si hay anomalias.
+- PROMOS: Usa :ticket: con gasto en promos, % sobre ventas ayer vs media. Solo si hay anomalias.
 - ADS: Usa :loudspeaker: con ROAS y gasto. Solo si hay anomalias.
 - Si desviacion > 30%, anade hipotesis breve de causa.
 - Al final indica cuantos restaurantes estan en rango normal (total activos - anomalias).
@@ -329,11 +373,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 4. Call 3 RPCs in parallel
+  // 4. Call 4 RPCs in parallel
   const threshold = Number(process.env.ALERT_THRESHOLD ?? -20);
   console.log(`[daily-alerts] Calling RPCs with threshold=${threshold}`);
 
-  const [ordersResult, reviewsResult, adsResult] = await Promise.all([
+  const [ordersResult, reviewsResult, adsResult, promosResult] = await Promise.all([
     supabase.rpc('get_daily_order_anomalies', { p_threshold: threshold }),
     supabase.rpc('get_daily_review_anomalies', {
       p_min_reviews: 3,
@@ -345,6 +389,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       p_spend_threshold: 10,
       p_spend_deviation_pct: 50,
     }),
+    supabase.rpc('get_daily_promo_anomalies', {
+      p_promo_rate_threshold: 15,
+      p_promo_spike_pct: 50,
+      p_min_orders: 10,
+    }),
   ]);
 
   // 5. Check for errors
@@ -352,12 +401,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ordersResult.error && `Orders: ${ordersResult.error.message}`,
     reviewsResult.error && `Reviews: ${reviewsResult.error.message}`,
     adsResult.error && `Ads: ${adsResult.error.message}`,
+    promosResult.error && `Promos: ${promosResult.error.message}`,
   ].filter(Boolean) as string[];
 
   if (errors.length > 0) {
     console.error('[daily-alerts] RPC errors:', errors);
     await sendSlack(`:warning: Errores en alertas diarias:\n${errors.join('\n')}`);
-    if (errors.length === 3) {
+    if (errors.length === 4) {
       return res.status(500).json({ errors });
     }
   }
@@ -365,16 +415,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const orderAnomalies: OrderAnomaly[] = ordersResult.data ?? [];
   const reviewAnomalies: ReviewAnomaly[] = reviewsResult.data ?? [];
   const adsAnomalies: AdsAnomaly[] = adsResult.data ?? [];
-  const totalAnomalies = orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length;
+  const promoAnomalies: PromoAnomaly[] = promosResult.data ?? [];
+  const totalAnomalies = orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length + promoAnomalies.length;
 
   console.log(
-    `[daily-alerts] Found anomalies: orders=${orderAnomalies.length}, reviews=${reviewAnomalies.length}, ads=${adsAnomalies.length}`,
+    `[daily-alerts] Found anomalies: orders=${orderAnomalies.length}, reviews=${reviewAnomalies.length}, ads=${adsAnomalies.length}, promos=${promoAnomalies.length}`,
   );
 
   // 6. No anomalies → send "all ok"
   if (totalAnomalies === 0) {
     await sendSlack(
-      `:large_green_circle: *Alertas diarias — ${getYesterdayLabel()}*\nTodos los restaurantes dentro de rango normal ayer (pedidos, resenas y ads).`,
+      `:large_green_circle: *Alertas diarias — ${getYesterdayLabel()}*\nTodos los restaurantes dentro de rango normal ayer (pedidos, resenas, promos y ads).`,
     );
     return res.status(200).json({ message: 'No anomalies', count: 0 });
   }
@@ -396,6 +447,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     orderAnomalies,
     reviewAnomalies,
     adsAnomalies,
+    promoAnomalies,
   );
 
   console.log(`[daily-alerts] Grouped into ${Object.keys(groups).length} consultant groups`);
@@ -415,6 +467,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     order_anomalies: orderAnomalies.length,
     review_anomalies: reviewAnomalies.length,
     ads_anomalies: adsAnomalies.length,
+    promo_anomalies: promoAnomalies.length,
     consultants_notified: Object.keys(groups).length,
   });
 }

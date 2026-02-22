@@ -726,7 +726,7 @@ tphub/
 ├── supabase/
 │   └── migrations/
 │       ├── 20260222_profiles_slack_user_id.sql  ← Columna slack_user_id en profiles
-│       └── 20260222_daily_alerts_rpc.sql        ← 3 funciones SQL (orders, reviews, ads)
+│       └── 20260222_daily_alerts_rpc.sql        ← 4 funciones SQL (orders, reviews, ads, promos)
 └── vercel.json            ← Actualizar con cron config
 ```
 
