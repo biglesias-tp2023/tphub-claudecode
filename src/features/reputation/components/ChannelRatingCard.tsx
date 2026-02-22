@@ -1,6 +1,7 @@
 import { cn } from '@/utils/cn';
 import type { ChannelRating } from '../hooks/useReputationData';
 import { ThumbsUp, ThumbsDown, Star } from 'lucide-react';
+import { CHANNELS } from '@/constants/channels';
 
 interface ChannelRatingCardProps {
   data: ChannelRating;
@@ -17,11 +18,12 @@ export function ChannelRatingCard({ data, className }: ChannelRatingCardProps) {
         className
       )}
     >
-      {/* Header with channel indicator */}
-      <div className="flex items-center gap-2 mb-4">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: data.color }}
+      {/* Header with channel logo */}
+      <div className="flex items-center gap-2.5 mb-4">
+        <img
+          src={CHANNELS[data.channel].logoUrl}
+          alt={data.name}
+          className="w-7 h-7 rounded-full object-cover"
         />
         <span className="font-medium text-gray-900">{data.name}</span>
       </div>

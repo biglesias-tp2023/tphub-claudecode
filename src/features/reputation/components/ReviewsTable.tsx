@@ -1,13 +1,8 @@
 import { cn } from '@/utils/cn';
 import { ThumbsUp, ThumbsDown, Star } from 'lucide-react';
+import { CHANNELS } from '@/constants/channels';
 import type { Review } from '../hooks/useReputationData';
 import type { ChannelId } from '@/types';
-
-const CHANNEL_CONFIG: Record<ChannelId, { name: string; color: string }> = {
-  glovo: { name: 'Glovo', color: '#FFC244' },
-  ubereats: { name: 'Uber Eats', color: '#06C167' },
-  justeat: { name: 'Just Eat', color: '#FF8000' },
-};
 
 interface ReviewsTableProps {
   data: Review[];
@@ -88,7 +83,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
           </thead>
           <tbody>
             {data.map((review) => {
-              const channelInfo = CHANNEL_CONFIG[review.channel];
+              const channel = CHANNELS[review.channel];
 
               return (
                 <tr
@@ -97,11 +92,12 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: channelInfo.color }}
+                      <img
+                        src={channel.logoUrl}
+                        alt={channel.name}
+                        className="w-5 h-5 rounded-full object-cover shrink-0"
                       />
-                      <span className="text-sm text-gray-900">{channelInfo.name}</span>
+                      <span className="text-sm text-gray-900">{channel.name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-600">
