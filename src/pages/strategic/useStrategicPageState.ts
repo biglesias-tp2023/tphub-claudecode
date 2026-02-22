@@ -179,7 +179,7 @@ export function useStrategicPageState() {
   });
 
   // Real revenue and promos by month for the SalesProjection grid rows
-  const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth } = useActualRevenueByMonth({
+  const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth({
     companyIds: effectiveCompanyIds,
     brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
     addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
@@ -562,6 +562,7 @@ export function useStrategicPageState() {
     realSalesData,
     realRevenueByMonth,
     realPromosByMonth,
+    realAdsByMonth,
     salesProjection,
     defaultRestaurantId,
 

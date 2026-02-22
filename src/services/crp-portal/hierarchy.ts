@@ -46,6 +46,8 @@ export interface HierarchyMetrics {
   ticketMedio: number;
   nuevosClientes: number;
   porcentajeNuevos: number;
+  descuentos: number;
+  promotedOrders: number;
   adSpent: number;
   adRevenue: number;
   roas: number;
@@ -267,6 +269,8 @@ function buildHierarchyFromDimensions(
     ticketMedio: 0,
     nuevosClientes: 0,
     porcentajeNuevos: 0,
+    descuentos: 0,
+    promotedOrders: 0,
     adSpent: 0,
     adRevenue: 0,
     roas: 0,
@@ -452,7 +456,9 @@ function buildHierarchyFromDimensions(
       ticketMedio: base.pedidos > 0 ? base.ventas / base.pedidos : 0,
       nuevosClientes: base.nuevos,
       porcentajeNuevos: base.pedidos > 0 ? (base.nuevos / base.pedidos) * 100 : 0,
-      adSpent: 0,     // Raw orders path doesn't have ads data
+      descuentos: 0,  // Raw orders path doesn't have promo/ads data
+      promotedOrders: 0,
+      adSpent: 0,
       adRevenue: 0,
       roas: 0,
       impressions: 0,
@@ -716,6 +722,7 @@ interface RPCBaseMetrics {
   nuevos: number;
   descuentos: number;
   reembolsos: number;
+  promotedOrders: number;
   adSpent: number;
   adRevenue: number;
   impressions: number;
@@ -733,6 +740,7 @@ function createEmptyRPCBase(): RPCBaseMetrics {
     nuevos: 0,
     descuentos: 0,
     reembolsos: 0,
+    promotedOrders: 0,
     adSpent: 0,
     adRevenue: 0,
     impressions: 0,
@@ -776,6 +784,7 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += row.nuevos || 0;
     agg.descuentos += row.descuentos || 0;
     agg.reembolsos += row.reembolsos || 0;
+    agg.promotedOrders += row.promoted_orders || 0;
     agg.adSpent += row.ad_spent || 0;
     agg.adRevenue += row.ad_revenue || 0;
     agg.impressions += row.impressions || 0;
@@ -799,6 +808,7 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += metrics.nuevos;
     agg.descuentos += metrics.descuentos;
     agg.reembolsos += metrics.reembolsos;
+    agg.promotedOrders += metrics.promotedOrders;
     agg.adSpent += metrics.adSpent;
     agg.adRevenue += metrics.adRevenue;
     agg.impressions += metrics.impressions;
@@ -822,6 +832,7 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += metrics.nuevos;
     agg.descuentos += metrics.descuentos;
     agg.reembolsos += metrics.reembolsos;
+    agg.promotedOrders += metrics.promotedOrders;
     agg.adSpent += metrics.adSpent;
     agg.adRevenue += metrics.adRevenue;
     agg.impressions += metrics.impressions;
@@ -844,6 +855,7 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.nuevos += metrics.nuevos;
     agg.descuentos += metrics.descuentos;
     agg.reembolsos += metrics.reembolsos;
+    agg.promotedOrders += metrics.promotedOrders;
     agg.adSpent += metrics.adSpent;
     agg.adRevenue += metrics.adRevenue;
     agg.impressions += metrics.impressions;
@@ -883,6 +895,8 @@ function buildHierarchyFromRPCMetrics(
       ticketMedio: 0,
       nuevosClientes: 0,
       porcentajeNuevos: 0,
+      descuentos: 0,
+      promotedOrders: 0,
       adSpent: 0,
       adRevenue: 0,
       roas: 0,
@@ -902,6 +916,8 @@ function buildHierarchyFromRPCMetrics(
       ticketMedio: base.pedidos > 0 ? base.ventas / base.pedidos : 0,
       nuevosClientes: base.nuevos,
       porcentajeNuevos: base.pedidos > 0 ? (base.nuevos / base.pedidos) * 100 : 0,
+      descuentos: base.descuentos,
+      promotedOrders: base.promotedOrders,
       adSpent: base.adSpent,
       adRevenue: base.adRevenue,
       roas: base.adSpent > 0 ? base.adRevenue / base.adSpent : 0,

@@ -649,7 +649,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? formatNumber(row.organicOrders) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? `${row.organicOrders.toFixed(1)}%` : '-'}</td>
                     </>
                   )}
                 </tr>

@@ -123,6 +123,7 @@ RETURNS TABLE (
   nuevos bigint,
   descuentos numeric,
   reembolsos numeric,
+  promoted_orders bigint,
   -- Advertising fields
   ad_spent numeric,
   ad_revenue numeric,
@@ -143,7 +144,8 @@ AS $$
       COUNT(*)::bigint AS pedidos,
       COUNT(*) FILTER (WHERE o.flg_customer_new = true)::bigint AS nuevos,
       COALESCE(SUM(o.amt_promotions), 0) AS descuentos,
-      COALESCE(SUM(o.amt_refunds), 0) AS reembolsos
+      COALESCE(SUM(o.amt_refunds), 0) AS reembolsos,
+      COUNT(*) FILTER (WHERE o.amt_promotions > 0)::bigint AS promoted_orders
     FROM crp_portal__ft_order_head o
     WHERE
       o.pfk_id_company::text = ANY(p_company_ids)
@@ -182,6 +184,7 @@ AS $$
     COALESCE(o.nuevos, 0) AS nuevos,
     COALESCE(o.descuentos, 0) AS descuentos,
     COALESCE(o.reembolsos, 0) AS reembolsos,
+    COALESCE(o.promoted_orders, 0) AS promoted_orders,
     COALESCE(a.ad_spent, 0) AS ad_spent,
     COALESCE(a.ad_revenue, 0) AS ad_revenue,
     COALESCE(a.impressions, 0) AS impressions,

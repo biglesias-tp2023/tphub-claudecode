@@ -150,8 +150,15 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     impressions: row.metrics.impressions,
     clicks: row.metrics.clicks,
     adOrders: row.metrics.adOrders,
-    // Organic = pedidos without promotion (requires promoted_orders count from RPC — TODO)
-    organicOrders: undefined,
+    // Promos from CRP Portal order data
+    inversionPromos: row.metrics.descuentos,
+    promosPercentage: row.metrics.ventas > 0
+      ? (row.metrics.descuentos / row.metrics.ventas) * 100 : 0,
+    promosRoas: row.metrics.descuentos > 0
+      ? row.metrics.ventas / row.metrics.descuentos : 0,
+    // Organico = % of orders without promotion
+    organicOrders: row.metrics.pedidos > 0
+      ? ((row.metrics.pedidos - row.metrics.promotedOrders) / row.metrics.pedidos) * 100 : 0,
   };
 }
 

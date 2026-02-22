@@ -526,6 +526,51 @@ export async function fetchCrpOrdersComparison(
 }
 
 // ============================================
+// MONTHLY REVENUE BY CHANNEL (Lightweight RPC)
+// ============================================
+
+/**
+ * Row returned by get_monthly_revenue_by_channel RPC.
+ */
+interface MonthlyRevenueRow {
+  month_key: string;
+  channel: string;
+  total_revenue: number;
+  total_discounts: number;
+  total_ad_spent: number;
+}
+
+/**
+ * Fetches revenue, promos, and ads grouped by month×channel in ONE call.
+ *
+ * This replaces calling `fetchCrpOrdersAggregated` 6 times (once per month).
+ * The RPC is much lighter: no COUNT(DISTINCT), single query, ~12 result rows.
+ *
+ * @param params - companyIds, brandIds, addressIds, startDate, endDate
+ * @returns Array of { month_key, channel, total_revenue, total_discounts, total_ad_spent }
+ */
+export async function fetchMonthlyRevenueByChannel(
+  params: Omit<FetchOrdersParams, 'channelIds'>
+): Promise<MonthlyRevenueRow[]> {
+  const { companyIds, brandIds, addressIds, startDate, endDate } = params;
+
+  const { data, error } = await supabase.rpc('get_monthly_revenue_by_channel', {
+    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+    p_start_date: `${startDate}T00:00:00`,
+    p_end_date: `${endDate}T23:59:59`,
+  });
+
+  if (error) {
+    console.error('Error fetching monthly revenue by channel:', error);
+    throw error;
+  }
+
+  return (data || []) as MonthlyRevenueRow[];
+}
+
+// ============================================
 // CONTROLLING METRICS RPC
 // ============================================
 
@@ -543,6 +588,7 @@ export interface ControllingMetricsRow {
   nuevos: number;
   descuentos: number;
   reembolsos: number;
+  promoted_orders: number;
   ad_spent: number;
   ad_revenue: number;
   impressions: number;

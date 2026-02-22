@@ -46,6 +46,8 @@ export interface SalesProjectionProps {
   realRevenueByMonth?: GridChannelMonthData;
   /** Real promos (discounts) by month×channel from CRP Portal for grid rows */
   realPromosByMonth?: GridChannelMonthData;
+  /** Real ads (ad spend) by month×channel from CRP Portal for grid rows */
+  realAdsByMonth?: GridChannelMonthData;
 }
 
 export interface MonthInfo {
