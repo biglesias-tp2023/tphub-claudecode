@@ -199,14 +199,18 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
   doc.setTextColor(...BRAND.colors.gray);
   doc.text(`Total Resenas: ${formatNumber(data.summary.totalReviews)}`, 14, summaryY + 8);
   doc.text(`Resenas Negativas: ${formatNumber(data.summary.negativeReviews)}`, 14, summaryY + 14);
+  if (data.summary.totalRefunds != null) {
+    doc.text(`Reembolsos: ${data.summary.totalRefunds.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR (${(data.summary.refundRate ?? 0).toFixed(1)}%)`, 14, summaryY + 20);
+  }
 
   doc.setFontSize(11);
   doc.setTextColor(...BRAND.colors.dark);
   doc.setFont('helvetica', 'bold');
-  doc.text('Distribucion de Valoraciones', 14, summaryY + 26);
+  const distY = data.summary.totalRefunds != null ? summaryY + 32 : summaryY + 26;
+  doc.text('Distribucion de Valoraciones', 14, distY);
 
   autoTable(doc, {
-    startY: summaryY + 30,
+    startY: distY + 4,
     head: [['Rating', 'Cantidad', '%']],
     body: data.ratingDistribution.map((r) => [`${r.rating} estrellas`, formatNumber(r.count), `${r.percentage.toFixed(1)}%`]),
     ...BRANDED_TABLE_STYLES,
@@ -217,10 +221,14 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
 
   autoTable(doc, {
     startY: reviewsStartY,
-    head: [['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating']],
-    body: data.reviews.slice(0, 50).map((r) => [r.date, r.time, r.channel, r.id.substring(0, 12), r.orderId.substring(0, 12), `${r.rating}★`]),
+    head: [['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating', 'Comentario', 'Tags', 'T. Entrega', 'Reembolso']],
+    body: data.reviews.slice(0, 50).map((r) => [
+      r.date, r.time, r.channel, r.id.substring(0, 12), r.orderId.substring(0, 12), `${r.rating}★`,
+      r.comment?.substring(0, 30) ?? '', r.tags?.join(', ') ?? '', r.deliveryTime != null ? `${r.deliveryTime} min` : '',
+      r.refundAmount != null ? `${r.refundAmount.toFixed(2)} €` : '',
+    ]),
     ...BRANDED_TABLE_STYLES,
-    bodyStyles: { ...BRANDED_TABLE_STYLES.bodyStyles, fontSize: 7 },
+    bodyStyles: { ...BRANDED_TABLE_STYLES.bodyStyles, fontSize: 6 },
   });
 
   addBrandedFooter(doc);

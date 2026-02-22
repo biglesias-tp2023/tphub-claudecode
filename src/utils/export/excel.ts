@@ -143,13 +143,14 @@ export async function exportReputationToExcel(data: ReputationExportData): Promi
     ['Canal', 'Rating', 'Reviews', '% Positivo', '% Negativo'],
     ...data.channelRatings.map((r) => [r.channel, r.rating, r.totalReviews, r.positivePercent, r.negativePercent]), [''],
     ['RESUMEN'], ['Total Resenas', data.summary.totalReviews], ['Resenas Negativas', data.summary.negativeReviews],
+    ...(data.summary.totalRefunds != null ? [['Reembolsos (EUR)', data.summary.totalRefunds], ['Tasa Reembolso (%)', data.summary.refundRate ?? 0]] : []),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumen');
 
   const ratingsData: (string | number)[][] = [['DISTRIBUCION DE VALORACIONES'], [''], ['Rating', 'Cantidad', 'Porcentaje'], ...data.ratingDistribution.map((r) => [`${r.rating} estrellas`, r.count, r.percentage])];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ratingsData), 'Valoraciones');
 
-  const reviewsData: (string | number)[][] = [['RESENAS'], [''], ['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating'], ...data.reviews.map((r) => [r.date, r.time, r.channel, r.id, r.orderId, r.rating])];
+  const reviewsData: (string | number)[][] = [['RESENAS'], [''], ['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating', 'Comentario', 'Tags', 'T. Entrega (min)', 'Reembolso (EUR)'], ...data.reviews.map((r) => [r.date, r.time, r.channel, r.id, r.orderId, r.rating, r.comment ?? '', r.tags?.join(', ') ?? '', r.deliveryTime ?? '', r.refundAmount ?? ''])];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reviewsData), 'Resenas');
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

@@ -72,6 +72,18 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
                 Rating
               </th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
+                Comentario
+              </th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
+                Tags
+              </th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
+                T. Entrega
+              </th>
+              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">
+                Reembolso
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -109,6 +121,40 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                   </td>
                   <td className="px-4 py-3">
                     <RatingDisplay rating={review.rating} channel={review.channel} />
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate">
+                    {review.comment ?? <span className="text-gray-300">&mdash;</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {review.tags && review.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {review.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-block text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-300">&mdash;</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {review.deliveryTime != null
+                      ? `${review.deliveryTime} min`
+                      : <span className="text-gray-300">&mdash;</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    {review.refundAmount != null && review.refundAmount > 0 ? (
+                      <span className="text-amber-600 font-medium">
+                        {review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">&mdash;</span>
+                    )}
                   </td>
                 </tr>
               );

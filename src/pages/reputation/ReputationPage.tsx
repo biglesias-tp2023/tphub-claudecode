@@ -58,6 +58,8 @@ export function ReputationPage() {
       summary: {
         totalReviews: data.summary.totalReviews,
         negativeReviews: data.summary.negativeReviews,
+        totalRefunds: data.summary.totalRefunds,
+        refundRate: data.summary.refundRate,
       },
       ratingDistribution: data.ratingDistribution.map((r) => ({
         rating: r.rating,
@@ -71,6 +73,10 @@ export function ReputationPage() {
         rating: r.rating,
         date: new Date(r.date).toLocaleDateString('es-ES'),
         time: r.time,
+        comment: r.comment ?? undefined,
+        tags: r.tags ?? undefined,
+        deliveryTime: r.deliveryTime ?? undefined,
+        refundAmount: r.refundAmount ?? undefined,
       })),
       dateRange: `${periodLabels.current} vs. ${periodLabels.comparison}`,
     };
@@ -106,7 +112,7 @@ export function ReputationPage() {
     if (!data) return { headers: [], rows: [] };
 
     return {
-      headers: ['Canal', 'Review ID', 'Order ID', 'Fecha', 'Hora', 'Rating'],
+      headers: ['Canal', 'Review ID', 'Order ID', 'Fecha', 'Hora', 'Rating', 'Comentario', 'Tags', 'T. Entrega', 'Reembolso'],
       rows: data.reviews.slice(0, 15).map((r) => [
         r.channel === 'glovo' ? 'Glovo' : r.channel === 'ubereats' ? 'Uber Eats' : 'Just Eat',
         r.id.slice(0, 12),
@@ -114,6 +120,10 @@ export function ReputationPage() {
         new Date(r.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
         r.time,
         `${r.rating}★`,
+        r.comment ?? '—',
+        r.tags?.join(', ') ?? '—',
+        r.deliveryTime != null ? `${r.deliveryTime} min` : '—',
+        r.refundAmount != null && r.refundAmount > 0 ? `${r.refundAmount.toFixed(2)} €` : '—',
       ]),
       totalRows: data.reviews.length,
     };
@@ -179,6 +189,12 @@ export function ReputationPage() {
               type="negativeReviews"
               value={data.summary.negativeReviews}
               change={data.summary.negativeReviewsChange}
+            />
+            <SummaryCard
+              type="refunds"
+              value={data.summary.totalRefunds}
+              change={data.summary.totalRefundsChange}
+              subtitle={`${data.summary.refundRate.toFixed(1)}% de ventas`}
             />
           </div>
 

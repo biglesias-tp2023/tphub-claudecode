@@ -57,7 +57,7 @@ export function BrandSelector({ className }: BrandSelectorProps) {
       isLoading={brandsLoading}
       disabled={filteredBrands.length === 0 && !brandsLoading}
       className={className}
-      treatEmptyAsAll={false}
+      treatEmptyAsAll
       showHeader={true}
       headerTitle="Seleccionar marcas"
     />

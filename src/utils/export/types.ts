@@ -116,6 +116,8 @@ export interface ReputationExportData {
   summary: {
     totalReviews: number;
     negativeReviews: number;
+    totalRefunds?: number;
+    refundRate?: number;
   };
   ratingDistribution: {
     rating: number;
@@ -129,6 +131,10 @@ export interface ReputationExportData {
     rating: number;
     date: string;
     time: string;
+    comment?: string;
+    tags?: string[];
+    deliveryTime?: number;
+    refundAmount?: number;
   }[];
   dateRange: string;
 }
