@@ -180,18 +180,16 @@ export function SalesProjection({
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
-            <TrendingUp className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary-600 text-white">
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Proyección de ventas</span>
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Proyección de ventas</h2>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Calendar className="w-3 h-3" />
-              <span>{config.startDate} → {config.endDate}</span>
-              {daysRemaining <= 60 && daysRemaining > 0 && (
-                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">{daysRemaining}d restantes</span>
-              )}
-            </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <Calendar className="w-3 h-3" />
+            <span>{config.startDate} → {config.endDate}</span>
+            {daysRemaining <= 60 && daysRemaining > 0 && (
+              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">{daysRemaining}d restantes</span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

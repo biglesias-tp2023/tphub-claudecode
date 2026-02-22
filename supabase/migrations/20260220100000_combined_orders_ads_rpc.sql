@@ -129,7 +129,10 @@ RETURNS TABLE (
   ad_revenue numeric,
   impressions bigint,
   clicks bigint,
-  ad_orders bigint
+  ad_orders bigint,
+  -- Review fields
+  avg_rating numeric,
+  total_reviews bigint
 )
 LANGUAGE sql
 STABLE
@@ -173,34 +176,76 @@ AS $$
       AND a.pk_ts_hour <= p_end_date
     GROUP BY
       a.pfk_id_company, a.pfk_id_store, a.pfk_id_store_address, a.pfk_id_portal
+  ),
+  review_metrics AS (
+    SELECT
+      r.pfk_id_company::text AS pfk_id_company,
+      r.pfk_id_store::text AS pfk_id_store,
+      r.pfk_id_store_address::text AS pfk_id_store_address,
+      r.pfk_id_portal::text AS pfk_id_portal,
+      COALESCE(AVG(r.val_rating), 0) AS avg_rating,
+      COUNT(*)::bigint AS total_reviews
+    FROM crp_portal__ft_review r
+    WHERE
+      r.pfk_id_company::text = ANY(p_company_ids)
+      AND r.ts_creation_time >= p_start_date
+      AND r.ts_creation_time < p_end_date + interval '1 day'
+    GROUP BY
+      r.pfk_id_company, r.pfk_id_store, r.pfk_id_store_address, r.pfk_id_portal
+  ),
+  orders_ads AS (
+    SELECT
+      COALESCE(o.pfk_id_company, a.pfk_id_company) AS pfk_id_company,
+      COALESCE(o.pfk_id_store, a.pfk_id_store) AS pfk_id_store,
+      COALESCE(o.pfk_id_store_address, a.pfk_id_store_address) AS pfk_id_store_address,
+      COALESCE(o.pfk_id_portal, a.pfk_id_portal) AS pfk_id_portal,
+      COALESCE(o.ventas, 0) AS ventas,
+      COALESCE(o.pedidos, 0) AS pedidos,
+      COALESCE(o.nuevos, 0) AS nuevos,
+      COALESCE(o.descuentos, 0) AS descuentos,
+      COALESCE(o.reembolsos, 0) AS reembolsos,
+      COALESCE(o.promoted_orders, 0) AS promoted_orders,
+      COALESCE(a.ad_spent, 0) AS ad_spent,
+      COALESCE(a.ad_revenue, 0) AS ad_revenue,
+      COALESCE(a.impressions, 0) AS impressions,
+      COALESCE(a.clicks, 0) AS clicks,
+      COALESCE(a.ad_orders, 0) AS ad_orders
+    FROM order_metrics o
+    FULL OUTER JOIN ads_metrics a
+      ON o.pfk_id_company = a.pfk_id_company
+      AND o.pfk_id_store = a.pfk_id_store
+      AND o.pfk_id_store_address = a.pfk_id_store_address
+      AND o.pfk_id_portal = a.pfk_id_portal
   )
   SELECT
-    COALESCE(o.pfk_id_company, a.pfk_id_company) AS pfk_id_company,
-    COALESCE(o.pfk_id_store, a.pfk_id_store) AS pfk_id_store,
-    COALESCE(o.pfk_id_store_address, a.pfk_id_store_address) AS pfk_id_store_address,
-    COALESCE(o.pfk_id_portal, a.pfk_id_portal) AS pfk_id_portal,
-    COALESCE(o.ventas, 0) AS ventas,
-    COALESCE(o.pedidos, 0) AS pedidos,
-    COALESCE(o.nuevos, 0) AS nuevos,
-    COALESCE(o.descuentos, 0) AS descuentos,
-    COALESCE(o.reembolsos, 0) AS reembolsos,
-    COALESCE(o.promoted_orders, 0) AS promoted_orders,
-    COALESCE(a.ad_spent, 0) AS ad_spent,
-    COALESCE(a.ad_revenue, 0) AS ad_revenue,
-    COALESCE(a.impressions, 0) AS impressions,
-    COALESCE(a.clicks, 0) AS clicks,
-    COALESCE(a.ad_orders, 0) AS ad_orders
-  FROM order_metrics o
-  FULL OUTER JOIN ads_metrics a
-    ON o.pfk_id_company = a.pfk_id_company
-    AND o.pfk_id_store = a.pfk_id_store
-    AND o.pfk_id_store_address = a.pfk_id_store_address
-    AND o.pfk_id_portal = a.pfk_id_portal
+    COALESCE(oa.pfk_id_company, rv.pfk_id_company) AS pfk_id_company,
+    COALESCE(oa.pfk_id_store, rv.pfk_id_store) AS pfk_id_store,
+    COALESCE(oa.pfk_id_store_address, rv.pfk_id_store_address) AS pfk_id_store_address,
+    COALESCE(oa.pfk_id_portal, rv.pfk_id_portal) AS pfk_id_portal,
+    COALESCE(oa.ventas, 0) AS ventas,
+    COALESCE(oa.pedidos, 0) AS pedidos,
+    COALESCE(oa.nuevos, 0) AS nuevos,
+    COALESCE(oa.descuentos, 0) AS descuentos,
+    COALESCE(oa.reembolsos, 0) AS reembolsos,
+    COALESCE(oa.promoted_orders, 0) AS promoted_orders,
+    COALESCE(oa.ad_spent, 0) AS ad_spent,
+    COALESCE(oa.ad_revenue, 0) AS ad_revenue,
+    COALESCE(oa.impressions, 0) AS impressions,
+    COALESCE(oa.clicks, 0) AS clicks,
+    COALESCE(oa.ad_orders, 0) AS ad_orders,
+    COALESCE(rv.avg_rating, 0) AS avg_rating,
+    COALESCE(rv.total_reviews, 0) AS total_reviews
+  FROM orders_ads oa
+  FULL OUTER JOIN review_metrics rv
+    ON oa.pfk_id_company = rv.pfk_id_company
+    AND oa.pfk_id_store = rv.pfk_id_store
+    AND oa.pfk_id_store_address = rv.pfk_id_store_address
+    AND oa.pfk_id_portal = rv.pfk_id_portal
   ORDER BY
-    COALESCE(o.pfk_id_company, a.pfk_id_company),
-    COALESCE(o.pfk_id_store, a.pfk_id_store),
-    COALESCE(o.pfk_id_store_address, a.pfk_id_store_address),
-    COALESCE(o.pfk_id_portal, a.pfk_id_portal);
+    COALESCE(oa.pfk_id_company, rv.pfk_id_company),
+    COALESCE(oa.pfk_id_store, rv.pfk_id_store),
+    COALESCE(oa.pfk_id_store_address, rv.pfk_id_store_address),
+    COALESCE(oa.pfk_id_portal, rv.pfk_id_portal);
 $$;
 
 GRANT EXECUTE ON FUNCTION get_controlling_metrics(text[], timestamp, timestamp) TO authenticated;

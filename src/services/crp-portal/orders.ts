@@ -594,6 +594,8 @@ export interface ControllingMetricsRow {
   impressions: number;
   clicks: number;
   ad_orders: number;
+  avg_rating: number;
+  total_reviews: number;
 }
 
 /**
