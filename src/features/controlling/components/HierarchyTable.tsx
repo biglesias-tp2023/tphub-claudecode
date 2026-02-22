@@ -16,7 +16,7 @@ import type { HierarchyRow } from '@/features/controlling';
 import { useSessionState, useSessionSet } from '@/features/controlling/hooks/useSessionState';
 import type { ChannelId } from '@/types';
 
-type ViewTab = 'rendimiento' | 'operaciones' | 'publicidad' | 'promociones';
+type ViewTab = 'rendimiento' | 'publicidad' | 'promociones';
 
 // Sortable columns
 type SortColumn =
@@ -29,10 +29,6 @@ type SortColumn =
   | 'porcentajeNuevos'
   | 'recurrentesClientes'
   | 'porcentajeRecurrentes'
-  | 'openTime'
-  | 'ratioConversion'
-  | 'tiempoEspera'
-  | 'valoraciones'
   | 'inversionAds'
   | 'adsPercentage'
   | 'roas'
@@ -244,16 +240,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
       childrenByParent.get(parentId)!.push(row);
     }
 
-    // Helper to parse time string "mm:ss" to seconds for comparison
-    const parseTimeToSeconds = (time: string | undefined): number => {
-      if (!time) return 0;
-      const parts = time.split(':');
-      if (parts.length === 2) {
-        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-      }
-      return 0;
-    };
-
     // Sort comparator
     const compare = (a: HierarchyRow, b: HierarchyRow): number => {
       let valA: string | number;
@@ -262,10 +248,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
       if (sortColumn === 'name') {
         valA = a.name.toLowerCase();
         valB = b.name.toLowerCase();
-      } else if (sortColumn === 'tiempoEspera') {
-        // Parse time strings like "5:30" to seconds for proper numeric comparison
-        valA = parseTimeToSeconds(a.tiempoEspera);
-        valB = parseTimeToSeconds(b.tiempoEspera);
       } else {
         valA = a[sortColumn] ?? 0;
         valB = b[sortColumn] ?? 0;
@@ -331,7 +313,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
 
   const tabs: { id: ViewTab; label: string }[] = [
     { id: 'rendimiento', label: 'Rendimiento' },
-    { id: 'operaciones', label: 'Operaciones' },
     { id: 'publicidad', label: 'Publicidad' },
     { id: 'promociones', label: 'Promociones' },
   ];
@@ -436,24 +417,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                   <SortableHeader
                     column="porcentajeRecurrentes"
                     label="% Recurrentes"
-                    currentSort={sortColumn}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                </>
-              )}
-              {activeTabs.has('operaciones') && (
-                <>
-                  <SortableHeader
-                    column="tiempoEspera"
-                    label="T.Espera"
-                    currentSort={sortColumn}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    column="valoraciones"
-                    label="Rating"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
@@ -626,12 +589,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeNuevos.toFixed(1)}%</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.recurrentesClientes)}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeRecurrentes.toFixed(1)}%</td>
-                    </>
-                  )}
-                  {activeTabs.has('operaciones') && (
-                    <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm">{row.tiempoEspera || '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.valoraciones != null ? row.valoraciones.toFixed(1) : '-'}</td>
                     </>
                   )}
                   {activeTabs.has('publicidad') && (

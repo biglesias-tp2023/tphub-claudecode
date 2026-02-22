@@ -15,8 +15,10 @@ import {
   fetchCrpReviewsComparison,
   fetchCrpReviewsHeatmap,
   fetchCrpReviewsRaw,
+  fetchOrderRefunds,
+  fetchCrpOrdersComparison,
 } from '@/services/crp-portal';
-import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview } from '@/services/crp-portal';
+import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
 import { formatDate, getPreviousPeriodRange } from '@/features/controlling/hooks/dateUtils';
 
@@ -141,6 +143,65 @@ export function useReviewsRaw(params: UseReviewsParams, limit = 200) {
         },
         limit
       );
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useOrderRefunds(orderIds: string[]) {
+  return useQuery<Map<string, number>>({
+    queryKey: ['order-refunds', [...orderIds].sort().join(',')],
+    queryFn: () => fetchOrderRefunds(orderIds),
+    enabled: orderIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export interface RefundsSummaryResult {
+  totalRefunds: number;
+  refundRate: number;
+  totalRefundsChange: number;
+}
+
+export function useRefundsSummary(params: UseReviewsParams) {
+  const { companyIds, brandIds, addressIds, channelIds, dateRange } = params;
+
+  const startDate = formatDate(dateRange.start);
+  const endDate = formatDate(dateRange.end);
+  const previousRange = getPreviousPeriodRange(dateRange);
+  const previousStartDate = formatDate(previousRange.start);
+  const previousEndDate = formatDate(previousRange.end);
+
+  return useQuery<RefundsSummaryResult>({
+    queryKey: [
+      'reputation-refunds-summary',
+      startDate,
+      endDate,
+      [...companyIds].sort().join(','),
+      [...(brandIds || [])].sort().join(','),
+      [...(addressIds || [])].sort().join(','),
+      [...(channelIds || [])].sort().join(','),
+    ],
+    queryFn: async () => {
+      const baseParams: Omit<FetchOrdersParams, 'startDate' | 'endDate'> = {
+        companyIds: companyIds.length > 0 ? companyIds : undefined,
+        brandIds: brandIds && brandIds.length > 0 ? brandIds : undefined,
+        addressIds: addressIds && addressIds.length > 0 ? addressIds : undefined,
+        channelIds: channelIds && channelIds.length > 0 ? channelIds : undefined,
+      };
+
+      const result = await fetchCrpOrdersComparison(
+        { ...baseParams, startDate, endDate },
+        { ...baseParams, startDate: previousStartDate, endDate: previousEndDate }
+      );
+
+      return {
+        totalRefunds: result.current.totalRefunds,
+        refundRate: result.current.refundRate,
+        totalRefundsChange: result.changes.refundsChange,
+      };
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

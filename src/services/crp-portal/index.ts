@@ -139,6 +139,7 @@ export {
   fetchCrpReviewsHeatmap,
   fetchCrpReviewsComparison,
   fetchCrpReviewsRaw,
+  fetchOrderRefunds,
 } from './reviews';
 
 export type {

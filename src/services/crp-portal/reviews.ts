@@ -322,6 +322,41 @@ export async function fetchCrpReviewsComparison(
  * Fetches raw review records for the detail table.
  * Returns most recent reviews first, limited to `limit` rows.
  */
+/**
+ * Fetches refund amounts for a batch of order IDs from ft_order_head.
+ * Returns a Map of orderId → refundAmount (EUR).
+ */
+export async function fetchOrderRefunds(
+  orderIds: string[]
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (orderIds.length === 0) return result;
+
+  // Supabase IN filter has a practical limit; batch in chunks of 200
+  const CHUNK_SIZE = 200;
+  for (let i = 0; i < orderIds.length; i += CHUNK_SIZE) {
+    const chunk = orderIds.slice(i, i + CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from('crp_portal__ft_order_head')
+      .select('pk_uuid_order, amt_refunds')
+      .in('pk_uuid_order', chunk);
+
+    if (error) {
+      console.error('Error fetching order refunds:', error);
+      throw error;
+    }
+
+    for (const row of data || []) {
+      const amount = Number(row.amt_refunds) || 0;
+      if (amount > 0) {
+        result.set(row.pk_uuid_order, amount);
+      }
+    }
+  }
+
+  return result;
+}
+
 export async function fetchCrpReviewsRaw(
   params: FetchReviewsParams,
   limit = 200

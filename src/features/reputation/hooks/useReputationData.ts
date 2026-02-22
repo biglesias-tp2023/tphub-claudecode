@@ -13,7 +13,7 @@ import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filter
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
-import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw } from './useReviewsData';
+import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw, useOrderRefunds, useRefundsSummary } from './useReviewsData';
 import { portalIdToChannelId } from '@/services/crp-portal/reviews';
 import type { ChannelId } from '@/types';
 import type { ChannelReviewAggregation } from '@/services/crp-portal';
@@ -38,6 +38,9 @@ export interface ReputationSummary {
   totalReviewsChange: number;
   negativeReviews: number;
   negativeReviewsChange: number;
+  totalRefunds: number;
+  totalRefundsChange: number;
+  refundRate: number;
 }
 
 export interface HeatmapCell {
@@ -60,6 +63,10 @@ export interface Review {
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   rating: number; // 1-5
+  comment?: string | null;
+  tags?: string[] | null;
+  deliveryTime?: number | null; // minutes
+  refundAmount?: number | null; // EUR from ft_order_head.amt_refunds
 }
 
 export interface ReputationData {
@@ -173,6 +180,14 @@ export function useReputationData() {
   const aggQuery = useReviewsAggregation(reviewParams);
   const heatmapQuery = useReviewsHeatmap(reviewParams);
   const rawQuery = useReviewsRaw(reviewParams);
+  const refundsSummaryQuery = useRefundsSummary(reviewParams);
+
+  // Extract order IDs from raw reviews for per-review refund lookup
+  const orderIds = useMemo(
+    () => (rawQuery.data || []).map((r) => r.fk_id_order),
+    [rawQuery.data]
+  );
+  const refundsQuery = useOrderRefunds(orderIds);
 
   const isLoading = aggQuery.isLoading || heatmapQuery.isLoading || rawQuery.isLoading;
   const error = aggQuery.error || heatmapQuery.error || rawQuery.error;
@@ -192,12 +207,16 @@ export function useReputationData() {
     const justeatRating = buildChannelRating('justeat', current.byChannel.justeat);
     if (justeatRating) channelRatings.push(justeatRating);
 
-    // Build summary
+    // Build summary (refund KPIs from orders aggregation)
+    const refundData = refundsSummaryQuery.data;
     const summary: ReputationSummary = {
       totalReviews: current.totalReviews,
       totalReviewsChange: changes.totalReviewsChange,
       negativeReviews: current.totalNegative,
       negativeReviewsChange: changes.negativeChange,
+      totalRefunds: refundData?.totalRefunds ?? 0,
+      totalRefundsChange: refundData?.totalRefundsChange ?? 0,
+      refundRate: refundData?.refundRate ?? 0,
     };
 
     // Build heatmap from RPC data
@@ -218,10 +237,12 @@ export function useReputationData() {
       };
     });
 
-    // Build reviews from raw data
+    // Build reviews from raw data, merging per-order refund amounts
+    const refundsMap = refundsQuery.data;
     const reviews: Review[] = (rawQuery.data || []).map((raw) => {
       const channel = portalIdToChannelId(raw.pfk_id_portal) || 'glovo';
       const ts = new Date(raw.ts_creation_time);
+      const refundAmount = refundsMap?.get(raw.fk_id_order) ?? null;
       return {
         id: raw.pk_id_review,
         orderId: raw.fk_id_order,
@@ -229,6 +250,7 @@ export function useReputationData() {
         date: ts.toISOString().slice(0, 10),
         time: ts.toTimeString().slice(0, 5),
         rating: raw.val_rating,
+        refundAmount,
       };
     });
 
@@ -240,7 +262,7 @@ export function useReputationData() {
       reviews,
       totalReviewsInPeriod: current.totalReviews,
     };
-  }, [aggQuery.data, heatmapQuery.data, rawQuery.data]);
+  }, [aggQuery.data, heatmapQuery.data, rawQuery.data, refundsQuery.data, refundsSummaryQuery.data]);
 
   return {
     data,
