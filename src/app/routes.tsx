@@ -26,6 +26,8 @@ const CompsetPage = lazyWithRetry(() => import('@/pages/compset').then(m => ({ d
 // Audits: large pages with extensive forms
 const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditsPage })));
 const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
+// Marketing: advertising analytics
+const MarketingPage = lazyWithRetry(() => import('@/pages/marketing').then(m => ({ default: m.MarketingPage })));
 // Public shared pages
 const SharedObjectivePage = lazyWithRetry(() => import('@/pages/shared/SharedObjectivePage').then(m => ({ default: m.SharedObjectivePage })));
 
@@ -134,6 +136,7 @@ export const router = createBrowserRouter([
       { path: 'heatmap', element: <LazyPage><HeatmapPage /></LazyPage> },
       { path: 'audits', element: <LazyPage><AuditsPage /></LazyPage> },
       { path: 'audits/:id', element: <LazyPage><AuditDetailPage /></LazyPage> },
+      { path: 'marketing', element: <LazyPage><MarketingPage /></LazyPage> },
       { path: 'maps', element: <LazyPage><MapsPage /></LazyPage> },
       { path: 'admin', element: <AdminPage /> },
       { path: 'admin/users', element: <AdminPage /> },

@@ -122,6 +122,7 @@ export {
   fetchCrpOrdersRaw,
   fetchCrpOrdersComparison,
   fetchControllingMetricsRPC,
+  fetchMonthlyRevenueByChannel,
 } from './orders';
 
 export type {
@@ -177,6 +178,14 @@ export {
 } from './products';
 
 export type { CrpProduct } from './products';
+
+// Ads (timeseries for Marketing dashboard)
+export { fetchAdsTimeseries } from './ads';
+
+export type {
+  AdsTimeseriesParams,
+  AdsTimeseriesRow,
+} from './ads';
 
 // Customers (analytics)
 export {

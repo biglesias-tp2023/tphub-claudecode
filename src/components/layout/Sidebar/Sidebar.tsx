@@ -11,6 +11,7 @@ import {
   Crosshair,
   Grid3X3,
   Map,
+  Megaphone,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -39,11 +40,12 @@ const navItems: NavItem[] = [
   { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
   { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
   { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
+  { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'New!', color: 'green' } },
+  { label: 'Marketing', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
-  { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'Soon!', color: 'gray' } },
   { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
 ];
 

@@ -2,12 +2,13 @@
  * useActualRevenueByMonth - Fetches real revenue from CRP Portal
  * broken down by channel and month for the GridChannelMonth component.
  *
- * Uses fetchCrpOrdersAggregated to get revenue per month.
- * Includes past closed months AND the current month (up to yesterday).
+ * Uses the lightweight `get_monthly_revenue_by_channel` RPC that returns
+ * all months×channels in ONE call (instead of 6 separate heavy RPCs).
  */
 import { useQuery } from '@tanstack/react-query';
-import { fetchCrpOrdersAggregated } from '@/services/crp-portal';
+import { fetchMonthlyRevenueByChannel } from '@/services/crp-portal';
 import type { GridChannelMonthData } from '@/types';
+import type { ChannelId } from '@/types';
 
 interface UseActualRevenueParams {
   /** CRP company ID (single, for backward compat) */
@@ -29,6 +30,8 @@ interface ActualRevenueResult {
   revenueByMonth: GridChannelMonthData;
   /** Promos (discounts) by month×channel in GridChannelMonthData format */
   promosByMonth: GridChannelMonthData;
+  /** Ads (ad spend) by month×channel in GridChannelMonthData format */
+  adsByMonth: GridChannelMonthData;
   /** Total revenue of the last complete (closed) month (for baseline) */
   lastMonthRevenue: number;
   /** Whether data is loading */
@@ -51,12 +54,12 @@ function getMonthRange(offset: number): { start: string; end: string; key: strin
 
   let end: string;
   if (offset === 0) {
-    // Current month: end = yesterday
+    // Current month: end = yesterday (use local date, not UTC)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    end = yesterday.toISOString().split('T')[0];
+    end = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
   } else {
-    // Past months: end = last day of the month
+    // Past/future months: end = last day of the month
     const lastDay = new Date(year, month + 1, 0).getDate();
     end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   }
@@ -89,40 +92,49 @@ export function useActualRevenueByMonth({
         ? monthOffsets.map((o) => getMonthRange(o))
         : [...Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i))), getMonthRange(0)];
 
-      const results = await Promise.all(
-        allMonths.map((m) =>
-          fetchCrpOrdersAggregated({
-            companyIds: resolvedCompanyIds.length > 0 ? resolvedCompanyIds : undefined,
-            brandIds: brandIds?.length ? brandIds : undefined,
-            addressIds: addressIds?.length ? addressIds : undefined,
-            startDate: m.start,
-            endDate: m.end,
-          }).then((agg) => ({ key: m.key, agg }))
-        )
-      );
+      // Full date range for the single RPC call
+      const startDate = allMonths[0].start;
+      const endDate = allMonths[allMonths.length - 1].end;
 
-      // Build GridChannelMonthData for revenue AND promos
+      // ONE call instead of 6 — the RPC groups by month+channel server-side
+      const rows = await fetchMonthlyRevenueByChannel({
+        companyIds: resolvedCompanyIds.length > 0 ? resolvedCompanyIds : undefined,
+        brandIds: brandIds?.length ? brandIds : undefined,
+        addressIds: addressIds?.length ? addressIds : undefined,
+        startDate,
+        endDate,
+      });
+
+      // Initialize all months with zero values
       const revenueByMonth: GridChannelMonthData = {};
       const promosByMonth: GridChannelMonthData = {};
-      for (const { key, agg } of results) {
-        revenueByMonth[key] = {
-          glovo: Math.round(agg.byChannel.glovo.revenue),
-          ubereats: Math.round(agg.byChannel.ubereats.revenue),
-          justeat: Math.round(agg.byChannel.justeat.revenue),
-        };
-        promosByMonth[key] = {
-          glovo: Math.round(agg.byChannel.glovo.discounts),
-          ubereats: Math.round(agg.byChannel.ubereats.discounts),
-          justeat: Math.round(agg.byChannel.justeat.discounts),
-        };
+      const adsByMonth: GridChannelMonthData = {};
+      for (const m of allMonths) {
+        revenueByMonth[m.key] = { glovo: 0, ubereats: 0, justeat: 0 };
+        promosByMonth[m.key] = { glovo: 0, ubereats: 0, justeat: 0 };
+        adsByMonth[m.key] = { glovo: 0, ubereats: 0, justeat: 0 };
+      }
+
+      // Fill from RPC results (~12 rows: 6 months × 2 channels)
+      for (const row of rows) {
+        const monthKey = row.month_key;
+        const channel = row.channel as ChannelId;
+
+        // Only process known months and channels
+        if (!revenueByMonth[monthKey]) continue;
+        if (channel !== 'glovo' && channel !== 'ubereats' && channel !== 'justeat') continue;
+
+        revenueByMonth[monthKey][channel] = Math.round(Number(row.total_revenue) || 0);
+        promosByMonth[monthKey][channel] = Math.round(Math.abs(Number(row.total_discounts) || 0));
+        adsByMonth[monthKey][channel] = Math.round(Number(row.total_ad_spent) || 0);
       }
 
       // Last complete (closed) month revenue (offset -1)
       const lastMonth = getMonthRange(-1);
-      const lastMonthData = results.find((r) => r.key === lastMonth.key);
-      const lastMonthRevenue = lastMonthData ? Math.round(lastMonthData.agg.totalRevenue) : 0;
+      const lm = revenueByMonth[lastMonth.key];
+      const lastMonthRevenue = lm ? lm.glovo + lm.ubereats + lm.justeat : 0;
 
-      return { revenueByMonth, promosByMonth, lastMonthRevenue };
+      return { revenueByMonth, promosByMonth, adsByMonth, lastMonthRevenue };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -130,6 +142,7 @@ export function useActualRevenueByMonth({
   return {
     revenueByMonth: data?.revenueByMonth ?? {},
     promosByMonth: data?.promosByMonth ?? {},
+    adsByMonth: data?.adsByMonth ?? {},
     lastMonthRevenue: data?.lastMonthRevenue ?? 0,
     isLoading,
   };
