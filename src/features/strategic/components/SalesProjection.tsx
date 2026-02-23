@@ -89,9 +89,19 @@ export function SalesProjection({
     const totalActualAds = months.reduce((sum, m) => sum + getMonthTotal(effectiveActualAds, m.key), 0);
     const totalActualPromos = months.reduce((sum, m) => sum + getMonthTotal(effectiveActualPromos, m.key), 0);
 
+    // Current month only (for scorecards)
+    const currentKey = months.find((m) => m.isCurrent)?.key || '';
+    const currentTarget = getMonthTotal(targetRevenue, currentKey);
+    const currentActual = getMonthTotal(effectiveActualRevenue, currentKey);
+    const currentTargetAds = activeChannels.reduce((sum, ch) => sum + calcTargetAds(currentKey, ch), 0);
+    const currentActualAds = getMonthTotal(effectiveActualAds, currentKey);
+    const currentTargetPromos = activeChannels.reduce((sum, ch) => sum + calcTargetPromos(currentKey, ch), 0);
+    const currentActualPromos = getMonthTotal(effectiveActualPromos, currentKey);
+
     return {
       getMonthTotal, getChannelTotal, grandTarget, grandActual,
       calcTargetAds, calcTargetPromos, totalTargetAds, totalTargetPromos, totalActualAds, totalActualPromos,
+      currentTarget, currentActual, currentTargetAds, currentActualAds, currentTargetPromos, currentActualPromos,
     };
   }, [months, activeChannels, targetRevenue, effectiveActualRevenue, effectiveActualAds, effectiveActualPromos, config]);
 
@@ -222,24 +232,24 @@ export function SalesProjection({
       <div className="grid grid-cols-3 gap-4 px-5 py-4 bg-gray-50 border-b border-gray-100">
         <Scorecard
           label="Ventas"
-          value={calculations.grandTarget}
-          actual={calculations.grandActual}
+          value={calculations.currentTarget}
+          actual={calculations.currentActual}
           color="text-primary-600"
           showActual={showActual}
           isRealData={hasRealRevenue}
         />
         <Scorecard
           label="ADS"
-          value={calculations.totalTargetAds}
-          actual={calculations.totalActualAds}
+          value={calculations.currentTargetAds}
+          actual={calculations.currentActualAds}
           color="text-amber-600"
           showActual={showActual}
           isRealData={hasRealAds}
         />
         <Scorecard
           label="Promos"
-          value={calculations.totalTargetPromos}
-          actual={calculations.totalActualPromos}
+          value={calculations.currentTargetPromos}
+          actual={calculations.currentActualPromos}
           color="text-purple-600"
           showActual={showActual}
           isRealData={hasRealPromos}
