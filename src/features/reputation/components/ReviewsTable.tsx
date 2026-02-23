@@ -1,6 +1,7 @@
 import { cn } from '@/utils/cn';
 import { ThumbsUp, ThumbsDown, Star } from 'lucide-react';
 import { CHANNELS } from '@/constants/channels';
+import { getTagClasses } from '../utils/tagCategories';
 import type { Review } from '../hooks/useReputationData';
 import type { ChannelId } from '@/types';
 
@@ -115,7 +116,7 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
                         {review.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="inline-block text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5"
+                            className={`inline-block text-xs rounded px-1.5 py-0.5 ${getTagClasses(tag)}`}
                           >
                             {tag}
                           </span>

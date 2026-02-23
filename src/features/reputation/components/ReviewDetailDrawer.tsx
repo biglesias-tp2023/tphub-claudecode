@@ -4,6 +4,7 @@ import { cn } from '@/utils/cn';
 import { Drawer } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { CHANNELS } from '@/constants/channels';
+import { getTagClasses } from '../utils/tagCategories';
 import type { Review } from '../hooks/useReputationData';
 import type { ChannelId } from '@/types';
 
@@ -205,7 +206,7 @@ export function ReviewDetailDrawer({ review, isOpen, onClose }: ReviewDetailDraw
                 {review.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-block text-xs bg-gray-100 text-gray-600 rounded-full px-2.5 py-1"
+                    className={`inline-block text-xs rounded-full px-2.5 py-1 ${getTagClasses(tag)}`}
                   >
                     {tag}
                   </span>
