@@ -120,26 +120,6 @@ export function StrategicPage() {
               realRevenueByMonth={state.realRevenueByMonth}
               realPromosByMonth={state.realPromosByMonth}
               realAdsByMonth={state.realAdsByMonth}
-              realSalesData={state.realSalesData?.current ? {
-                totalRevenue: state.realSalesData.current.totalRevenue,
-                totalPromos: state.realSalesData.current.totalDiscounts,
-                totalAds: state.realSalesData.current.totalAdSpent,
-                byChannel: {
-                  glovo: {
-                    revenue: state.realSalesData.current.byChannel.glovo?.revenue || 0,
-                    promos: state.realSalesData.current.byChannel.glovo?.discounts || 0,
-                  },
-                  ubereats: {
-                    revenue: state.realSalesData.current.byChannel.ubereats?.revenue || 0,
-                    promos: state.realSalesData.current.byChannel.ubereats?.discounts || 0,
-                  },
-                  justeat: {
-                    revenue: state.realSalesData.current.byChannel.justeat?.revenue || 0,
-                    promos: state.realSalesData.current.byChannel.justeat?.discounts || 0,
-                  },
-                },
-              } : undefined}
-              isLoadingRealData={state.isLoadingSales}
             />
           )}
 

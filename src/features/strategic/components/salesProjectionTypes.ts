@@ -14,18 +14,6 @@ import type {
 // TYPES
 // ============================================
 
-/** Real sales data from CRP Portal (filtered by brand/restaurant) */
-export interface RealSalesData {
-  totalRevenue: number;
-  totalPromos: number;
-  totalAds?: number;  // Not available in order data, optional
-  byChannel?: {
-    glovo: { revenue: number; promos: number };
-    ubereats: { revenue: number; promos: number };
-    justeat: { revenue: number; promos: number };
-  };
-}
-
 export interface SalesProjectionProps {
   config: SalesProjectionConfig;
   targetRevenue: GridChannelMonthData;
@@ -38,10 +26,6 @@ export interface SalesProjectionProps {
   onActualPromosChange?: (data: GridChannelMonthData) => void;
   onEditConfig?: () => void;
   restaurantName?: string;
-  /** Real sales data from CRP Portal (filtered by selected brand/restaurant) */
-  realSalesData?: RealSalesData;
-  /** Loading state for real sales data */
-  isLoadingRealData?: boolean;
   /** Real revenue by month×channel from CRP Portal for grid rows */
   realRevenueByMonth?: GridChannelMonthData;
   /** Real promos (discounts) by month×channel from CRP Portal for grid rows */

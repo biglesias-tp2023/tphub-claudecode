@@ -43,8 +43,6 @@ export function SalesProjection({
   config, targetRevenue, actualRevenue, actualAds, actualPromos,
   onTargetChange, onActualRevenueChange, onActualAdsChange, onActualPromosChange, onEditConfig,
   restaurantName = 'Restaurante',
-  realSalesData,
-  isLoadingRealData = false,
   realRevenueByMonth,
   realPromosByMonth,
   realAdsByMonth,
@@ -225,29 +223,26 @@ export function SalesProjection({
         <Scorecard
           label="Ventas"
           value={calculations.grandTarget}
-          actual={realSalesData?.totalRevenue ?? calculations.grandActual}
+          actual={calculations.grandActual}
           color="text-primary-600"
           showActual={showActual}
-          isLoading={isLoadingRealData}
-          isRealData={!!realSalesData?.totalRevenue}
+          isRealData={hasRealRevenue}
         />
         <Scorecard
           label="ADS"
           value={calculations.totalTargetAds}
-          actual={hasRealAds ? calculations.totalActualAds : (realSalesData?.totalAds ?? calculations.totalActualAds)}
+          actual={calculations.totalActualAds}
           color="text-amber-600"
           showActual={showActual}
-          isLoading={isLoadingRealData}
-          isRealData={hasRealAds || !!realSalesData?.totalAds}
+          isRealData={hasRealAds}
         />
         <Scorecard
           label="Promos"
           value={calculations.totalTargetPromos}
-          actual={hasRealPromos ? calculations.totalActualPromos : (realSalesData?.totalPromos ?? calculations.totalActualPromos)}
+          actual={calculations.totalActualPromos}
           color="text-purple-600"
           showActual={showActual}
-          isLoading={isLoadingRealData}
-          isRealData={hasRealPromos || !!realSalesData?.totalPromos}
+          isRealData={hasRealPromos}
         />
       </div>
 

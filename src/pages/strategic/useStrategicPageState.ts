@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import { useOrdersData, useSessionState } from '@/features/controlling/hooks';
+import { useSessionState } from '@/features/controlling/hooks';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
@@ -149,9 +149,6 @@ export function useStrategicPageState() {
   const {
     brandIds: filterBrandIds,
     restaurantIds: filterRestaurantIds,
-    channelIds: filterChannelIds,
-    dateRange,
-    datePreset,
   } = useDashboardFiltersStore();
 
   const effectiveCompanyIds = globalCompanyIds.length > 0 ? globalCompanyIds : companyIds;
@@ -169,16 +166,7 @@ export function useStrategicPageState() {
     [filterRestaurantIds, allRestaurants]
   );
 
-  const { data: realSalesData, isLoading: isLoadingSales } = useOrdersData({
-    companyIds: effectiveCompanyIds,
-    brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
-    addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
-    channelIds: filterChannelIds.length > 0 ? filterChannelIds : undefined,
-    dateRange,
-    datePreset,
-  });
-
-  // Real revenue and promos by month for the SalesProjection grid rows
+  // Real revenue, promos, and ads by month for the SalesProjection grid rows and scorecards
   const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth({
     companyIds: effectiveCompanyIds,
     brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
@@ -537,7 +525,6 @@ export function useStrategicPageState() {
 
     // Loading/error state
     isLoading,
-    isLoadingSales,
     error: fetchError,
 
     // Computed flags
@@ -559,7 +546,6 @@ export function useStrategicPageState() {
     sortedDates,
     taskStats,
     taskCountByObjectiveId,
-    realSalesData,
     realRevenueByMonth,
     realPromosByMonth,
     realAdsByMonth,
