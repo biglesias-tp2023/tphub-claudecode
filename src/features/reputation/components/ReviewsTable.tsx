@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/utils/cn';
 import { ThumbsUp, ThumbsDown, Star, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, X } from 'lucide-react';
 import { CHANNELS } from '@/constants/channels';
@@ -11,22 +11,11 @@ const PAGE_SIZE_OPTIONS = [15, 50, 75, 100] as const;
 type SentimentFilter = 'all' | 'positive' | 'negative';
 type CommentFilter = 'all' | 'with' | 'without';
 type RefundFilter = 'all' | 'with' | 'without';
+type DeliveryFilter = 'all' | '0-20' | '20-35' | '35-50' | '50+';
 
-const TAG_CATEGORIES: { id: TagCategory; label: string }[] = [
-  { id: 'producto', label: 'Producto' },
-  { id: 'servicio', label: 'Servicio' },
-  { id: 'packaging', label: 'Packaging' },
-  { id: 'precio', label: 'Precio' },
-  { id: 'cantidad', label: 'Cantidad' },
-];
-
-const TAG_CATEGORY_COLORS: Record<TagCategory, string> = {
-  producto: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  servicio: 'bg-primary-50 text-primary-700 border-primary-200',
-  packaging: 'bg-purple-50 text-purple-700 border-purple-200',
-  precio: 'bg-amber-50 text-amber-700 border-amber-200',
-  cantidad: 'bg-teal-50 text-teal-700 border-teal-200',
-};
+const FILTER_SELECT = 'text-xs h-7 rounded-md border px-2 pr-6 focus:outline-none focus:ring-1 focus:ring-primary-500';
+const FILTER_ACTIVE = 'border-primary-300 bg-primary-50 text-primary-700';
+const FILTER_DEFAULT = 'border-gray-200 bg-white text-gray-600';
 
 function isPositive(review: Review): boolean {
   if (review.channel === 'glovo') return review.rating >= 4;
@@ -80,41 +69,30 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
   const [pageSize, setPageSize] = useState<number>(50);
 
   // Filter state
-  const [tagCategories, setTagCategories] = useState<TagCategory[]>([]);
+  const [tagFilter, setTagFilter] = useState<TagCategory | 'all'>('all');
   const [sentiment, setSentiment] = useState<SentimentFilter>('all');
   const [commentFilter, setCommentFilter] = useState<CommentFilter>('all');
   const [refundFilter, setRefundFilter] = useState<RefundFilter>('all');
-  const [deliveryMin, setDeliveryMin] = useState('');
-  const [deliveryMax, setDeliveryMax] = useState('');
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>('all');
 
-  const hasActiveFilters = tagCategories.length > 0 || sentiment !== 'all' || commentFilter !== 'all' || refundFilter !== 'all' || deliveryMin !== '' || deliveryMax !== '';
+  const hasActiveFilters = tagFilter !== 'all' || sentiment !== 'all' || commentFilter !== 'all' || refundFilter !== 'all' || deliveryFilter !== 'all';
 
-  const clearAllFilters = useCallback(() => {
-    setTagCategories([]);
+  const clearAllFilters = () => {
+    setTagFilter('all');
     setSentiment('all');
     setCommentFilter('all');
     setRefundFilter('all');
-    setDeliveryMin('');
-    setDeliveryMax('');
-  }, []);
-
-  const toggleTagCategory = useCallback((cat: TagCategory) => {
-    setTagCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
-  }, []);
+    setDeliveryFilter('all');
+  };
 
   // Apply filters
   const filteredData = useMemo(() => {
     let result = data;
 
     // Tag category filter
-    if (tagCategories.length > 0) {
+    if (tagFilter !== 'all') {
       result = result.filter((r) =>
-        r.tags?.some((tag) => {
-          const cat = getTagCategory(tag);
-          return cat && tagCategories.includes(cat);
-        })
+        r.tags?.some((tag) => getTagCategory(tag) === tagFilter)
       );
     }
 
@@ -139,20 +117,22 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
       result = result.filter((r) => r.refundAmount == null || r.refundAmount === 0);
     }
 
-    // Delivery time range
-    const minTime = deliveryMin !== '' ? Number(deliveryMin) : null;
-    const maxTime = deliveryMax !== '' ? Number(deliveryMax) : null;
-    if (minTime !== null || maxTime !== null) {
+    // Delivery time filter
+    if (deliveryFilter !== 'all') {
       result = result.filter((r) => {
         if (r.deliveryTime == null) return false;
-        if (minTime !== null && r.deliveryTime < minTime) return false;
-        if (maxTime !== null && r.deliveryTime > maxTime) return false;
-        return true;
+        switch (deliveryFilter) {
+          case '0-20': return r.deliveryTime <= 20;
+          case '20-35': return r.deliveryTime > 20 && r.deliveryTime <= 35;
+          case '35-50': return r.deliveryTime > 35 && r.deliveryTime <= 50;
+          case '50+': return r.deliveryTime > 50;
+          default: return true;
+        }
       });
     }
 
     return result;
-  }, [data, tagCategories, sentiment, commentFilter, refundFilter, deliveryMin, deliveryMax]);
+  }, [data, tagFilter, sentiment, commentFilter, refundFilter, deliveryFilter]);
 
   // Reset to page 1 when filtered data or pageSize changes
   useEffect(() => { setPage(1); }, [filteredData, pageSize]);
@@ -165,119 +145,70 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
   return (
     <div className={cn('bg-white rounded-xl border border-gray-100 overflow-hidden', className)}>
       {/* Filter bar */}
-      <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center gap-3">
-        {/* Tag category chips */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-500 mr-0.5">Tags</span>
-          {TAG_CATEGORIES.map((cat) => {
-            const active = tagCategories.includes(cat.id);
-            return (
-              <button
-                key={cat.id}
-                onClick={() => toggleTagCategory(cat.id)}
-                className={cn(
-                  'text-xs px-2 py-1 rounded-md border transition-colors',
-                  active
-                    ? TAG_CATEGORY_COLORS[cat.id]
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                )}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+      <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2">
+        <select
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value as TagCategory | 'all')}
+          className={cn(FILTER_SELECT, tagFilter !== 'all' ? FILTER_ACTIVE : FILTER_DEFAULT)}
+        >
+          <option value="all">Tags: Todos</option>
+          <option value="producto">Producto</option>
+          <option value="servicio">Servicio</option>
+          <option value="packaging">Packaging</option>
+          <option value="precio">Precio</option>
+          <option value="cantidad">Cantidad</option>
+        </select>
 
-        <div className="w-px h-5 bg-gray-200" />
+        <select
+          value={sentiment}
+          onChange={(e) => setSentiment(e.target.value as SentimentFilter)}
+          className={cn(FILTER_SELECT, sentiment !== 'all' ? FILTER_ACTIVE : FILTER_DEFAULT)}
+        >
+          <option value="all">Valoración: Todas</option>
+          <option value="positive">Positiva</option>
+          <option value="negative">Negativa</option>
+        </select>
 
-        {/* Sentiment */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-500 mr-0.5">Valoración</span>
-          {([
-            { value: 'all', label: 'Todas' },
-            { value: 'positive', label: 'Positiva' },
-            { value: 'negative', label: 'Negativa' },
-          ] as const).map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setSentiment(opt.value)}
-              className={cn(
-                'text-xs px-2 py-1 rounded-md border transition-colors',
-                sentiment === opt.value
-                  ? opt.value === 'positive' ? 'bg-green-50 text-green-700 border-green-200'
-                    : opt.value === 'negative' ? 'bg-red-50 text-red-700 border-red-200'
-                    : 'bg-gray-100 text-gray-700 border-gray-300'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="w-px h-5 bg-gray-200" />
-
-        {/* Comment filter */}
         <select
           value={commentFilter}
           onChange={(e) => setCommentFilter(e.target.value as CommentFilter)}
-          className={cn(
-            'text-xs h-7 rounded-md border px-2 pr-6 focus:outline-none focus:ring-1 focus:ring-primary-500',
-            commentFilter !== 'all' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-600'
-          )}
+          className={cn(FILTER_SELECT, commentFilter !== 'all' ? FILTER_ACTIVE : FILTER_DEFAULT)}
         >
           <option value="all">Comentarios: Todos</option>
           <option value="with">Con comentario</option>
           <option value="without">Sin comentario</option>
         </select>
 
-        {/* Refund filter */}
+        <select
+          value={deliveryFilter}
+          onChange={(e) => setDeliveryFilter(e.target.value as DeliveryFilter)}
+          className={cn(FILTER_SELECT, deliveryFilter !== 'all' ? FILTER_ACTIVE : FILTER_DEFAULT)}
+        >
+          <option value="all">T. Entrega: Todos</option>
+          <option value="0-20">≤ 20 min</option>
+          <option value="20-35">20–35 min</option>
+          <option value="35-50">35–50 min</option>
+          <option value="50+">{'> 50 min'}</option>
+        </select>
+
         <select
           value={refundFilter}
           onChange={(e) => setRefundFilter(e.target.value as RefundFilter)}
-          className={cn(
-            'text-xs h-7 rounded-md border px-2 pr-6 focus:outline-none focus:ring-1 focus:ring-primary-500',
-            refundFilter !== 'all' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-gray-200 bg-white text-gray-600'
-          )}
+          className={cn(FILTER_SELECT, refundFilter !== 'all' ? FILTER_ACTIVE : FILTER_DEFAULT)}
         >
           <option value="all">Reembolso: Todos</option>
           <option value="with">Con reembolso</option>
           <option value="without">Sin reembolso</option>
         </select>
 
-        <div className="w-px h-5 bg-gray-200" />
-
-        {/* Delivery time range */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-500">T. Entrega</span>
-          <input
-            type="number"
-            placeholder="Min"
-            value={deliveryMin}
-            onChange={(e) => setDeliveryMin(e.target.value)}
-            className="w-14 h-7 text-xs rounded-md border border-gray-200 px-2 text-center focus:outline-none focus:ring-1 focus:ring-primary-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          <span className="text-xs text-gray-400">&ndash;</span>
-          <input
-            type="number"
-            placeholder="Max"
-            value={deliveryMax}
-            onChange={(e) => setDeliveryMax(e.target.value)}
-            className="w-14 h-7 text-xs rounded-md border border-gray-200 px-2 text-center focus:outline-none focus:ring-1 focus:ring-primary-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          <span className="text-xs text-gray-400">min</span>
-        </div>
-
-        {/* Clear filters */}
         {hasActiveFilters && (
           <>
-            <div className="w-px h-5 bg-gray-200" />
             <button
               onClick={clearAllFilters}
-              className="text-xs px-2 py-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-1"
+              className="text-xs h-7 px-2 rounded-md text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-1"
             >
               <X className="w-3 h-3" />
-              Limpiar filtros
+              Limpiar
             </button>
             <span className="text-xs text-gray-400">
               {filteredData.length} de {data.length}
