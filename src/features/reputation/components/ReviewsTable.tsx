@@ -79,7 +79,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                   </td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums">
                     {review.orderAmount != null && review.orderAmount > 0 ? (
-                      <span className="text-gray-700 font-medium">
+                      <span className="text-gray-900 font-semibold">
                         {review.orderAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
                       </span>
                     ) : (
