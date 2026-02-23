@@ -1,6 +1,6 @@
-import { HelpCircle, type LucideIcon } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { CheckCircle2, HelpCircle, Megaphone, Tag } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { resolveIcon } from '@/utils/iconResolver';
 import {
   getPromotionsForPlatform,
   getAdsForPlatform,
@@ -15,12 +15,6 @@ interface CampaignTypeSelectorProps {
   onSelect: (typeId: string) => void;
 }
 
-// Helper to get Lucide icon by name
-function getIcon(iconName: string): LucideIcon {
-  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
-  return icons[iconName] || HelpCircle;
-}
-
 function CampaignTypeCard({
   config,
   isSelected,
@@ -31,7 +25,7 @@ function CampaignTypeCard({
   onClick: () => void;
 }) {
   /* eslint-disable react-hooks/static-components */
-  const Icon = getIcon(config.icon);
+  const Icon = resolveIcon(config.icon, HelpCircle);
 
   return (
     <button
@@ -65,7 +59,7 @@ function CampaignTypeCard({
 
       {isSelected && (
         <div className="shrink-0">
-          <LucideIcons.CheckCircle2 className="w-5 h-5 text-primary-600" />
+          <CheckCircle2 className="w-5 h-5 text-primary-600" />
         </div>
       )}
     </button>
@@ -93,7 +87,7 @@ export function CampaignTypeSelector({ platform, selected, onSelect }: CampaignT
       {promotions.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            <LucideIcons.Tag className="w-4 h-4" />
+            <Tag className="w-4 h-4" />
             Promociones
           </h4>
           <div className="grid gap-3">
@@ -113,7 +107,7 @@ export function CampaignTypeSelector({ platform, selected, onSelect }: CampaignT
       {ads.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            <LucideIcons.Megaphone className="w-4 h-4" />
+            <Megaphone className="w-4 h-4" />
             Publicidad
           </h4>
           <div className="grid gap-3">

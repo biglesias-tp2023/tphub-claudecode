@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_LONG } from '@/constants/queryConfig';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import { fetchBrandActiveChannels } from '@/services/crp-portal/brand-channels';
 
@@ -24,5 +25,6 @@ export function useBrandChannels() {
       return fetchBrandActiveChannels(numericIds.length > 0 ? numericIds : undefined);
     },
     staleTime: 10 * 60 * 1000, // 10 min cache
+    gcTime: QUERY_GC_LONG,
   });
 }

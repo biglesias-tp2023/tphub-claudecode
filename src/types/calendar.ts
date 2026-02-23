@@ -179,32 +179,3 @@ export interface WeatherForecast {
   isHistorical?: boolean;
 }
 
-export interface WeatherCache {
-  id: string;
-  latitude: number;
-  longitude: number;
-  forecastDate: string;
-  temperatureMax: number | null;
-  temperatureMin: number | null;
-  weatherCode: number | null;
-  precipitationProbability: number | null;
-  description: string | null;
-  icon: string | null;
-  fetchedAt: string;
-  expiresAt: string | null;
-  /** true = dato real histórico (permanente), false = pronóstico (temporal) */
-  isHistorical: boolean;
-}
-
-export interface DbWeatherCache {
-  id: string;
-  latitude: number;
-  longitude: number;
-  forecast_date: string;
-  temperature_max: number | null;
-  temperature_min: number | null;
-  weather_code: number | null;
-  precipitation_probability: number | null;
-  fetched_at: string;
-  expires_at: string;
-}

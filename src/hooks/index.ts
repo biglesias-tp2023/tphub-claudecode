@@ -1,3 +1,3 @@
 export { useScrollLock } from './useScrollLock';
-export { useSidebarCollapse } from './useSidebarCollapse';
 export { useScheduledRefresh } from './useScheduledRefresh';
+export { useToast } from './useToast';

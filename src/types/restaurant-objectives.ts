@@ -63,37 +63,3 @@ export interface DbRestaurantObjective {
   updated_at: string;
 }
 
-/**
- * Historical data point for objectives table
- */
-export interface HistoricalPeriod {
-  periodMonth: string;
-  revenue: number;
-  revenueChange: number;        // % change vs previous month
-}
-
-/**
- * Objective data point for objectives table
- */
-export interface ObjectivePeriod {
-  periodMonth: string;
-  revenueTarget: number;
-  adsInvestmentMode: InvestmentMode;
-  adsInvestmentValue: number;
-  promosInvestmentMode: InvestmentMode;
-  promosInvestmentValue: number;
-  foodcostTarget: number;
-  marginTarget: number;
-  hasObjective: boolean;        // Whether objective exists in DB
-}
-
-/**
- * Combined view for objectives table row
- */
-export interface ObjectiveRowData {
-  restaurantId: string;
-  restaurantName: string;
-  channel: ChannelId | 'total';
-  historical: HistoricalPeriod[];
-  objectives: ObjectivePeriod[];
-}

@@ -3,7 +3,6 @@ import { Suspense } from 'react';
 import { MainLayout, AuthLayout } from '@/components/layout';
 import { ProtectedRoute } from '@/components/common';
 import { LoginPage } from '@/pages/auth';
-import { AdminPage } from '@/pages/admin/AdminPage';
 import { lazyWithRetry } from '@/utils/lazyWithRetry';
 
 // Lazy load heavy pages with retry logic for chunk load errors after deploys
@@ -28,6 +27,8 @@ const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ def
 const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
 // Marketing: advertising analytics
 const MarketingPage = lazyWithRetry(() => import('@/pages/marketing').then(m => ({ default: m.MarketingPage })));
+// Admin: user management (admin-only)
+const AdminPage = lazyWithRetry(() => import('@/pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 // Public shared pages
 const SharedObjectivePage = lazyWithRetry(() => import('@/pages/shared/SharedObjectivePage').then(m => ({ default: m.SharedObjectivePage })));
 
@@ -138,8 +139,8 @@ export const router = createBrowserRouter([
       { path: 'audits/:id', element: <LazyPage><AuditDetailPage /></LazyPage> },
       { path: 'marketing', element: <LazyPage><MarketingPage /></LazyPage> },
       { path: 'maps', element: <LazyPage><MapsPage /></LazyPage> },
-      { path: 'admin', element: <AdminPage /> },
-      { path: 'admin/users', element: <AdminPage /> },
+      { path: 'admin', element: <LazyPage><AdminPage /></LazyPage> },
+      { path: 'admin/users', element: <LazyPage><AdminPage /></LazyPage> },
       // Consultant portal - unified page
       { path: 'my-clients', element: <PlaceholderPage title="Mis Clientes" /> },
     ],

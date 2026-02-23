@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { fetchCrpAreas, fetchCrpAreaById } from '@/services/crp-portal';
 
 /**
@@ -15,6 +16,7 @@ export function useAreas() {
     queryKey: ['areas', 'list'],
     queryFn: fetchCrpAreas,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 

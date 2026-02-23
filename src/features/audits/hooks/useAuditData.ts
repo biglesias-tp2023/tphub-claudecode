@@ -6,6 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import {
   fetchAuditTypes,
   fetchAuditTypeById,
@@ -33,6 +34,7 @@ export function useAuditTypes() {
     queryKey: queryKeys.auditTypes.all,
     queryFn: fetchAuditTypes,
     staleTime: 5 * 60 * 1000, // 5 minutes - audit types rarely change
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 

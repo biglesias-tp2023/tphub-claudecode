@@ -6,6 +6,7 @@
  * all months×channels in ONE call (instead of 6 separate heavy RPCs).
  */
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { fetchMonthlyRevenueByChannel } from '@/services/crp-portal';
 import type { GridChannelMonthData } from '@/types';
 import type { ChannelId } from '@/types';
@@ -137,6 +138,7 @@ export function useActualRevenueByMonth({
       return { revenueByMonth, promosByMonth, adsByMonth, lastMonthRevenue };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 
   return {

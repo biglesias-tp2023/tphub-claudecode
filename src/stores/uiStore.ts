@@ -1,5 +1,11 @@
+/**
+ * UI state store — sidebar, theme, modals, notifications, command palette.
+ * @module stores/uiStore
+ */
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { NOTIFICATION_DURATION_MS } from '@/constants/timeouts';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -21,7 +27,7 @@ interface UIState {
 
   // Modals
   activeModal: string | null;
-  modalData: unknown;
+  modalData: Record<string, unknown> | null;
 
   // Notifications
   notifications: Notification[];
@@ -36,7 +42,7 @@ interface UIState {
 
   setTheme: (theme: Theme) => void;
 
-  openModal: (modalId: string, data?: unknown) => void;
+  openModal: (modalId: string, data?: Record<string, unknown>) => void;
   closeModal: () => void;
 
   addNotification: (notification: Omit<Notification, 'id'>) => void;
@@ -104,7 +110,7 @@ export const useUIStore = create<UIState>()(
         const newNotification: Notification = {
           ...notification,
           id,
-          duration: notification.duration ?? 5000,
+          duration: notification.duration ?? NOTIFICATION_DURATION_MS,
         };
 
         set((state) => ({

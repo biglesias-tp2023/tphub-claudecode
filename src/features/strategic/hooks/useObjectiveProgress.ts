@@ -16,6 +16,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useObjectiveKpiValue } from './useObjectiveKpiValue';
 import { supabase } from '@/services/supabase';
 import type {
@@ -315,6 +316,7 @@ export function useObjectiveProgress({
     queryFn: () => fetchObjectiveSnapshots(objective.id),
     enabled: includeSnapshots && !!objective.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 
   // Calculate all progress metrics

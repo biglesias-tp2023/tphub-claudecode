@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Cloud, Flag, Trophy, Tv, ShoppingBag, type LucideIcon } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { resolveIcon } from '@/utils/iconResolver';
 import { CampaignEvent, CampaignEventCompact } from './CampaignEvent';
 import type { PromotionalCampaign, CalendarEvent, WeatherForecast, EventCategory } from '@/types';
 
@@ -14,12 +14,6 @@ interface CalendarDayProps {
   weather?: WeatherForecast;
   onCampaignClick?: (campaign: PromotionalCampaign) => void;
   onDayClick?: (date: Date, campaigns: PromotionalCampaign[], events: CalendarEvent[]) => void;
-}
-
-// Helper to get Lucide icon by name
-function getIcon(iconName: string): LucideIcon {
-  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
-  return icons[iconName] || Cloud;
 }
 
 // Event category icons and colors
@@ -132,7 +126,7 @@ export function CalendarDay({
 
         {/* Weather icon in top-right corner */}
         {weather && (() => {
-          const WeatherIcon = getIcon(weather.icon);
+          const WeatherIcon = resolveIcon(weather.icon, Cloud);
           const isHistorical = weather.isHistorical === true;
           return (
             <div

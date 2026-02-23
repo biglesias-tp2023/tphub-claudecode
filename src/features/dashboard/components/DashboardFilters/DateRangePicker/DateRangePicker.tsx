@@ -56,17 +56,9 @@ export function DateRangePicker({
 
   // Handle preset selection
   const handlePresetChange = (newPresetId: DatePresetId) => {
-    if (import.meta.env.DEV) {
-      console.log('[DateRangePicker] Preset selected:', newPresetId);
-    }
-
     setTempPresetId(newPresetId);
 
     if (newPresetId === 'custom') {
-      // Show calendar for custom selection
-      if (import.meta.env.DEV) {
-        console.log('[DateRangePicker] Showing calendar for custom range');
-      }
       setShowCalendar(true);
       setTempCustomRange(value);
     } else {

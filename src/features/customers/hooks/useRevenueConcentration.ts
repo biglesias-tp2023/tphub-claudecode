@@ -2,23 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchRevenueConcentration } from '@/services/crp-portal';
 import type { RevenueConcentration } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-
-function ensureDate(date: Date | string): Date {
-  if (date instanceof Date) return date;
-  return new Date(date);
-}
-
-function formatDate(date: Date | string): string {
-  const d = ensureDate(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function parseNumericIds(ids: string[]): number[] {
-  return ids.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id) && id > 0);
-}
+import { formatDate, parseNumericIds } from '@/utils/dateUtils';
 
 export interface UseRevenueConcentrationResult {
   data: RevenueConcentration | undefined;

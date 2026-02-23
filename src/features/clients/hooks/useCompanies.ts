@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { fetchCrpCompanies, fetchCrpCompanyById } from '@/services/crp-portal';
 import type { Company } from '@/types';
 
@@ -18,6 +19,7 @@ export function useCompanies(userId?: string) {
     queryKey: queryKeys.companies.list(userId || 'current'),
     queryFn: fetchCrpCompanies,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 

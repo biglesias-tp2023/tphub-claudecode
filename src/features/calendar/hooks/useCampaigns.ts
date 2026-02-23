@@ -9,6 +9,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_STALE_SHORT, QUERY_GC_SHORT } from '@/constants/queryConfig';
 import { supabase } from '@/services/supabase';
 import type {
   PromotionalCampaign,
@@ -413,6 +414,8 @@ export function useCampaigns(params: FetchCampaignsParams = {}) {
     queryFn: () => USE_LOCAL_STORAGE
       ? fetchCampaignsLocal(params)
       : fetchCampaignsSupabase(params),
+    staleTime: QUERY_STALE_SHORT,
+    gcTime: QUERY_GC_SHORT,
   });
 }
 
@@ -430,6 +433,8 @@ export function useCampaignsByMonth(
       ? fetchCampaignsByMonthLocal(restaurantIds, year, month)
       : fetchCampaignsByMonthSupabase(restaurantIds, year, month),
     enabled: restaurantIds.length > 0,
+    staleTime: QUERY_STALE_SHORT,
+    gcTime: QUERY_GC_SHORT,
   });
 }
 
@@ -443,6 +448,8 @@ export function useCampaignsByRestaurant(restaurantId: string | undefined) {
       ? fetchCampaignsLocal({ restaurantIds: [restaurantId!] })
       : fetchCampaignsSupabase({ restaurantIds: [restaurantId!] }),
     enabled: !!restaurantId,
+    staleTime: QUERY_STALE_SHORT,
+    gcTime: QUERY_GC_SHORT,
   });
 }
 
@@ -456,6 +463,8 @@ export function useCampaign(id: string | undefined) {
       ? fetchCampaignByIdLocal(id!)
       : fetchCampaignByIdSupabase(id!),
     enabled: !!id,
+    staleTime: QUERY_STALE_SHORT,
+    gcTime: QUERY_GC_SHORT,
   });
 }
 

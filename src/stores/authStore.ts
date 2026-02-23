@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '@/services/supabase';
 import { fetchCurrentProfile } from '@/services/supabase-data';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { SESSION_CHECK_TIMEOUT_MS } from '@/constants/timeouts';
 import type { User, Profile } from '@/types';
 
 /**
@@ -180,7 +181,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const sessionPromise = supabase.auth.getSession();
           const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout verificando sesión')), 5000)
+            setTimeout(() => reject(new Error('Timeout verificando sesión')), SESSION_CHECK_TIMEOUT_MS)
           );
           const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
 

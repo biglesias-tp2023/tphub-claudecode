@@ -8,6 +8,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_MEDIUM, QUERY_GC_LONG } from '@/constants/queryConfig';
 import { fetchCrpProducts, fetchCrpProductsByIds, type CrpProduct } from '@/services/crp-portal';
 import type { CampaignPlatform } from '@/types';
 
@@ -65,6 +66,7 @@ export function useProducts({
     },
     enabled: enabled && !!companyId && !!platform,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 
@@ -89,5 +91,6 @@ export function useProductsByIds({
     },
     enabled: enabled && !!companyId && !!platform && productIds.length > 0,
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: QUERY_GC_LONG,
   });
 }

@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_GC_LONG } from '@/constants/queryConfig';
 import { supabase } from '@/services/supabase';
 import type { CalendarEvent, DbCalendarEvent, EventCategory } from '@/types';
 
@@ -189,6 +190,7 @@ export function useCalendarEventsByMonth(
     queryKey: queryKeys.calendarEvents.byMonth(year, month, countryCode),
     queryFn: () => fetchEventsByMonth(year, month, countryCode),
     staleTime: 24 * 60 * 60 * 1000, // 24 hours - events don't change often
+    gcTime: QUERY_GC_LONG,
   });
 }
 
@@ -205,6 +207,7 @@ export function useCalendarEventsByDateRange(
     queryFn: () => fetchEventsByDateRange(startDate, endDate, countryCode),
     enabled: !!startDate && !!endDate,
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
+    gcTime: QUERY_GC_LONG,
   });
 }
 
@@ -218,6 +221,7 @@ export function useUpcomingEvents(countryCode: string = 'ES', limit: number = 5)
     queryKey: ['calendar-events', 'upcoming', countryCode, limit, today],
     queryFn: () => fetchUpcomingEvents(countryCode, limit),
     staleTime: 60 * 60 * 1000, // 1 hour
+    gcTime: QUERY_GC_LONG,
   });
 }
 
@@ -232,6 +236,7 @@ export function useCalendarEventsByCategory(
     queryKey: ['calendar-events', 'category', category, countryCode],
     queryFn: () => fetchEventsByCategory(category, countryCode),
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
+    gcTime: QUERY_GC_LONG,
   });
 }
 

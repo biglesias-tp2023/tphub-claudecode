@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QUERY_GC_SHORT } from '@/constants/queryConfig';
 import { fetchAllProfiles, updateProfile, deleteProfile } from '@/services/supabase-data';
 import type { UserRole } from '@/types';
 
@@ -15,6 +16,7 @@ export function useUsers() {
     queryKey: ['profiles', 'all'],
     queryFn: fetchAllProfiles,
     staleTime: 1 * 60 * 1000, // 1 minute
+    gcTime: QUERY_GC_SHORT,
   });
 }
 

@@ -1,5 +1,5 @@
 import { Calendar, User, Trash2 } from 'lucide-react';
-import * as Icons from 'lucide-react';
+import { resolveIcon } from '@/utils/iconResolver';
 import { cn } from '@/utils/cn';
 import { getAuditStatusConfig, getAuditScopeLabel, AUDIT_TYPE_ICONS } from '../config';
 import type { AuditWithDetails } from '@/types';
@@ -23,10 +23,9 @@ export function AuditCard({
   const typeSlug = audit.auditType?.slug || '';
   const typeIcon = AUDIT_TYPE_ICONS[typeSlug] || 'ClipboardList';
 
-  // Get icon component by name
   const getIconComponent = (iconName: string) => {
-    const IconComponent = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[iconName];
-    return IconComponent ? <IconComponent className="w-5 h-5" /> : null;
+    const IconComponent = resolveIcon(iconName);
+    return <IconComponent className="w-5 h-5" />;
   };
 
   // Format date

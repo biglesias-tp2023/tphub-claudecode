@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_SHORT } from '@/constants/queryConfig';
 import { subDays, format } from 'date-fns';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
 import type { ChannelId } from '@/types';
@@ -232,5 +233,6 @@ export function useDashboardData() {
     queryKey: ['dashboard', companyIds, brandIds, channelIds, datePreset],
     queryFn: () => fetchDashboardData(companyIds, brandIds, channelIds, days),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: QUERY_GC_SHORT,
   });
 }

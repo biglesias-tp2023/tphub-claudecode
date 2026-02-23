@@ -1,6 +1,6 @@
-import { Cloud, type LucideIcon } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { Cloud, CloudOff, Sun } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { resolveIcon } from '@/utils/iconResolver';
 import type { WeatherForecast } from '@/types';
 
 interface WeatherWidgetProps {
@@ -9,15 +9,9 @@ interface WeatherWidgetProps {
   error?: string;
 }
 
-// Helper to get Lucide icon by name
-function getIcon(iconName: string): LucideIcon {
-  const icons = LucideIcons as unknown as Record<string, LucideIcon>;
-  return icons[iconName] || Cloud;
-}
-
 function WeatherDay({ forecast, isToday }: { forecast: WeatherForecast; isToday: boolean }) {
   /* eslint-disable react-hooks/static-components */
-  const Icon = getIcon(forecast.icon);
+  const Icon = resolveIcon(forecast.icon, Cloud);
   const date = new Date(forecast.date);
   const dayName = isToday
     ? 'Hoy'
@@ -71,7 +65,7 @@ export function WeatherWidget({ forecasts, isLoading, error }: WeatherWidgetProp
     return (
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
-          <LucideIcons.Cloud className="w-4 h-4 text-gray-400" />
+          <Cloud className="w-4 h-4 text-gray-400" />
           <h3 className="text-sm font-medium text-gray-700">Tiempo</h3>
         </div>
         <div className="space-y-2">
@@ -87,7 +81,7 @@ export function WeatherWidget({ forecasts, isLoading, error }: WeatherWidgetProp
     return (
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
-          <LucideIcons.CloudOff className="w-4 h-4 text-gray-400" />
+          <CloudOff className="w-4 h-4 text-gray-400" />
           <h3 className="text-sm font-medium text-gray-700">Tiempo</h3>
         </div>
         <p className="text-sm text-gray-500">{error}</p>
@@ -99,7 +93,7 @@ export function WeatherWidget({ forecasts, isLoading, error }: WeatherWidgetProp
     return (
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
-          <LucideIcons.Cloud className="w-4 h-4 text-gray-400" />
+          <Cloud className="w-4 h-4 text-gray-400" />
           <h3 className="text-sm font-medium text-gray-700">Tiempo</h3>
         </div>
         <p className="text-sm text-gray-500">
@@ -114,7 +108,7 @@ export function WeatherWidget({ forecasts, isLoading, error }: WeatherWidgetProp
   return (
     <div className="p-4">
       <div className="flex items-center gap-2 mb-3">
-        <LucideIcons.Sun className="w-4 h-4 text-amber-500" />
+        <Sun className="w-4 h-4 text-amber-500" />
         <h3 className="text-sm font-medium text-gray-700">Pronostico</h3>
       </div>
 

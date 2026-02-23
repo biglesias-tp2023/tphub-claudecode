@@ -1,0 +1,116 @@
+import type { LucideIcon } from 'lucide-react';
+import {
+  // Weather
+  Sun,
+  Cloud,
+  CloudSun,
+  CloudDrizzle,
+  CloudFog,
+  CloudLightning,
+  CloudOff,
+  CloudRain,
+  CloudRainWind,
+  CloudSnow,
+  // Calendar events
+  Flag,
+  Trophy,
+  Tv,
+  ShoppingBag,
+  // Campaign types
+  CheckCircle2,
+  Copy,
+  Euro,
+  Gift,
+  HelpCircle,
+  Image,
+  Megaphone,
+  MousePointerClick,
+  Percent,
+  Rocket,
+  Search,
+  Stamp,
+  Tag,
+  TrendingUp,
+  Truck,
+  Zap,
+  // Audits
+  BarChart3,
+  Beef,
+  CheckCircle,
+  ClipboardList,
+  Clock,
+  DollarSign,
+  Eye,
+  FileEdit,
+  Globe,
+  Package,
+  Phone,
+  Receipt,
+  Send,
+  Star,
+  Store,
+  Swords,
+  UserSearch,
+} from 'lucide-react';
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  // Weather
+  Sun,
+  Cloud,
+  CloudSun,
+  CloudDrizzle,
+  CloudFog,
+  CloudLightning,
+  CloudOff,
+  CloudRain,
+  CloudRainWind,
+  CloudSnow,
+  // Calendar events
+  Flag,
+  Trophy,
+  Tv,
+  ShoppingBag,
+  // Campaign types
+  CheckCircle2,
+  Copy,
+  Euro,
+  Gift,
+  HelpCircle,
+  Image,
+  Megaphone,
+  MousePointerClick,
+  Percent,
+  Rocket,
+  Search,
+  Stamp,
+  Tag,
+  TrendingUp,
+  Truck,
+  Zap,
+  // Audits
+  BarChart3,
+  Beef,
+  CheckCircle,
+  ClipboardList,
+  Clock,
+  DollarSign,
+  Eye,
+  FileEdit,
+  Globe,
+  Package,
+  Phone,
+  Receipt,
+  Send,
+  Star,
+  Store,
+  Swords,
+  UserSearch,
+};
+
+/**
+ * Resolve a Lucide icon by name from a curated map.
+ * Avoids `import * as LucideIcons` which prevents tree-shaking (~564KB).
+ */
+export function resolveIcon(name: string, fallback: LucideIcon = HelpCircle): LucideIcon {
+  return ICON_MAP[name] ?? fallback;
+}

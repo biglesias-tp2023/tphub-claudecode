@@ -6,6 +6,7 @@ import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { fetchCrpOrdersRaw } from '@/services/crp-portal';
 import type { Brand, Restaurant } from '@/types';
 import type { HeatmapMatrix } from '../types';
+import { formatDate } from '@/utils/dateUtils';
 
 // ============================================
 // HELPERS
@@ -37,18 +38,6 @@ function expandRestaurantIds(selectedIds: string[], restaurants: Restaurant[]): 
     }
   }
   return Array.from(expanded);
-}
-
-function ensureDate(date: Date | string): Date {
-  return date instanceof Date ? date : new Date(date);
-}
-
-function formatDate(date: Date | string): string {
-  const d = ensureDate(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 /**

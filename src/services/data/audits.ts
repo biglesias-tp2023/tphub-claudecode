@@ -349,10 +349,10 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
   };
 
   const [auditType, company, brand, portal, creator] = await Promise.all([
-    fetchAuditTypeById(audit.pfkIdAuditType).catch(() => null),
-    audit.pfkIdCompany ? fetchCrpCompanyById(audit.pfkIdCompany).catch(() => null) : null,
-    audit.pfkIdStore ? fetchBrandById(audit.pfkIdStore).catch(() => null) : null,
-    audit.pfkIdPortal ? fetchPortalById(audit.pfkIdPortal).catch(() => null) : null,
+    fetchAuditTypeById(audit.pfkIdAuditType).catch((error) => { console.warn('[audits] fetchAuditTypeById failed:', error); return null; }),
+    audit.pfkIdCompany ? fetchCrpCompanyById(audit.pfkIdCompany).catch((error) => { console.warn('[audits] fetchCrpCompanyById failed:', error); return null; }) : null,
+    audit.pfkIdStore ? fetchBrandById(audit.pfkIdStore).catch((error) => { console.warn('[audits] fetchBrandById failed:', error); return null; }) : null,
+    audit.pfkIdPortal ? fetchPortalById(audit.pfkIdPortal).catch((error) => { console.warn('[audits] fetchPortalById failed:', error); return null; }) : null,
     fetchCreatorProfile(),
   ]);
 

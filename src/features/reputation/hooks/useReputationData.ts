@@ -9,7 +9,7 @@
  */
 
 import { useMemo } from 'react';
-import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
@@ -151,8 +151,11 @@ function buildChannelRating(
 // ============================================
 
 export function useReputationData() {
-  const { companyIds } = useGlobalFiltersStore();
-  const { brandIds, restaurantIds, channelIds, dateRange, datePreset } = useDashboardFiltersStore();
+  const companyIds = useCompanyIds();
+  const brandIds = useBrandIds();
+  const channelIds = useChannelIds();
+  const { dateRange, datePreset } = useDateFilters();
+  const { restaurantIds } = useDashboardFiltersStore();
 
   // Expand multi-portal IDs
   const { data: brands = [] } = useBrands();

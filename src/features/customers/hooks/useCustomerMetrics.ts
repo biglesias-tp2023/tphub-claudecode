@@ -10,43 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCustomerMetrics, fetchCustomerMetricsByChannel } from '@/services/crp-portal';
 import type { CustomerMetricsWithChanges, ChannelCustomerMetrics } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import type { DateRange } from '@/types';
-
-// ============================================
-// HELPERS
-// ============================================
-
-function ensureDate(date: Date | string): Date {
-  if (date instanceof Date) return date;
-  return new Date(date);
-}
-
-function formatDate(date: Date | string): string {
-  const d = ensureDate(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getPreviousPeriodRange(dateRange: DateRange): { start: Date; end: Date } {
-  const start = ensureDate(dateRange.start);
-  const end = ensureDate(dateRange.end);
-  const durationMs = end.getTime() - start.getTime();
-
-  return {
-    start: new Date(start.getTime() - durationMs - 86400000),
-    end: new Date(start.getTime() - 86400000),
-  };
-}
-
-function parseNumericIds(ids: string[]): number[] {
-  return ids.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id) && id > 0);
-}
-
-// ============================================
-// HOOKS
-// ============================================
+import { formatDate, parseNumericIds, getPreviousPeriodRange } from '@/utils/dateUtils';
 
 export interface UseCustomerMetricsResult {
   data: CustomerMetricsWithChanges | undefined;

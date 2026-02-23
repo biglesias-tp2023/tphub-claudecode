@@ -41,7 +41,7 @@ async function importWithReload<T>(
   }
 }
 
-function isChunkLoadError(error: unknown): boolean {
+export function isChunkLoadError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const message = error.message || '';
   return (

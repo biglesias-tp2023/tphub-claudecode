@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
 import {
   fetchCrpRestaurants,
@@ -57,7 +58,8 @@ export function useRestaurants() {
         companyIds: effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined,
         areaIds: areaIds.length > 0 ? areaIds : undefined,
       }),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 
@@ -168,6 +170,7 @@ export function useRestaurantsForMap() {
         brandIds: brandIds.length > 0 ? brandIds : undefined,
         areaIds: areaIds.length > 0 ? areaIds : undefined,
       }),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
   });
 }

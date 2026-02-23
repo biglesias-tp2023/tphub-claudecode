@@ -7,6 +7,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QUERY_GC_SHORT } from '@/constants/queryConfig';
 import {
   fetchInvitationsWithDetails,
   fetchInvitationById,
@@ -44,6 +45,7 @@ export function useInvitations(params: FetchInvitationsParams = {}) {
     queryKey: invitationKeys.list(params),
     queryFn: () => fetchInvitationsWithDetails(params),
     staleTime: 30 * 1000, // 30 seconds
+    gcTime: QUERY_GC_SHORT,
   });
 }
 
@@ -73,6 +75,7 @@ export function useInvitationStats() {
     queryKey: invitationKeys.stats(),
     queryFn: getInvitationStats,
     staleTime: 60 * 1000, // 1 minute
+    gcTime: QUERY_GC_SHORT,
   });
 }
 

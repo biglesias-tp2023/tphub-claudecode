@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import { fetchCrpBrands, fetchCrpBrandById } from '@/services/crp-portal';
 
@@ -17,7 +18,8 @@ export function useBrands() {
   return useQuery({
     queryKey: queryKeys.brands.list(companyIds),
     queryFn: () => fetchCrpBrands(companyIds.length > 0 ? companyIds : undefined),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 

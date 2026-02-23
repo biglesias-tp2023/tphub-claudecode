@@ -11,6 +11,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import {
   fetchShareLinkByObjectiveId,
   fetchShareLinkByToken,
@@ -48,6 +49,7 @@ export function useShareLink(objectiveId: string | undefined) {
     queryFn: () => fetchShareLinkByObjectiveId(objectiveId!),
     enabled: !!objectiveId,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 
@@ -60,6 +62,7 @@ export function useShareLinkByToken(token: string | undefined) {
     queryFn: () => fetchShareLinkByToken(token!),
     enabled: !!token,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 

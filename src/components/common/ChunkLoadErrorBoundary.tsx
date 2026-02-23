@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
+import { isChunkLoadError } from '@/utils/lazyWithRetry';
 
 interface Props {
   children: ReactNode;
@@ -70,14 +71,4 @@ export class ChunkLoadErrorBoundary extends Component<Props, State> {
 
     return this.props.children;
   }
-}
-
-function isChunkLoadError(error: Error): boolean {
-  const message = error.message || '';
-  return (
-    message.includes('Failed to fetch dynamically imported module') ||
-    message.includes('Importing a module script failed') ||
-    message.includes('error loading dynamically imported module') ||
-    (error.name === 'TypeError' && message.includes('Failed to fetch'))
-  );
 }

@@ -258,42 +258,12 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
       clearChannels: () => set({ channelIds: [] }),
 
       // Fechas
-      setDateRange: (range) => {
-        if (import.meta.env.DEV) {
-          console.log('[FiltersStore] setDateRange:', {
-            start: range.start.toISOString(),
-            end: range.end.toISOString(),
-          });
-        }
-        set({ dateRange: range, datePreset: 'custom' });
-      },
+      setDateRange: (range) => set({ dateRange: range, datePreset: 'custom' }),
       setDatePreset: (preset) => {
         const newRange = getDateRangeFromPreset(preset);
-        if (import.meta.env.DEV) {
-          console.log('[FiltersStore] setDatePreset:', {
-            preset,
-            start: newRange.start.toISOString(),
-            end: newRange.end.toISOString(),
-          });
-        }
-        set({
-          datePreset: preset,
-          dateRange: newRange,
-        });
+        set({ datePreset: preset, dateRange: newRange });
       },
-      setDateRangeWithPreset: (range, preset) => {
-        if (import.meta.env.DEV) {
-          console.log('[FiltersStore] setDateRangeWithPreset:', {
-            preset,
-            start: range.start.toISOString(),
-            end: range.end.toISOString(),
-          });
-        }
-        set({
-          datePreset: preset,
-          dateRange: range,
-        });
-      },
+      setDateRangeWithPreset: (range, preset) => set({ datePreset: preset, dateRange: range }),
 
       // Reset jerárquico (cuando cambia Compañía)
       resetDashboardFilters: () => set({
@@ -355,7 +325,7 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
             if (parsed.state?.datePreset) {
               const migratedPreset = migrateLegacyPreset(parsed.state.datePreset);
               if (migratedPreset !== parsed.state.datePreset) {
-                console.log('[FiltersStore] Migrated legacy preset:', parsed.state.datePreset, '→', migratedPreset);
+                console.debug('[FiltersStore] Migrated legacy preset:', parsed.state.datePreset, '→', migratedPreset);
                 parsed.state.datePreset = migratedPreset;
                 // Recalculate date range for migrated preset
                 parsed.state.dateRange = getDateRangeFromPreset(migratedPreset);
@@ -396,3 +366,22 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
   )
 );
 
+// ============================================
+// SELECTOR HOOKS (prevent unnecessary re-renders)
+// ============================================
+
+/** Select only companyIds from global filters. */
+export const useCompanyIds = () => useGlobalFiltersStore((s) => s.companyIds);
+
+/** Select only brandIds from dashboard filters. */
+export const useBrandIds = () => useDashboardFiltersStore((s) => s.brandIds);
+
+/** Select only areaIds from dashboard filters. */
+export const useAreaIds = () => useDashboardFiltersStore((s) => s.areaIds);
+
+/** Select only channelIds from dashboard filters. */
+export const useChannelIds = () => useDashboardFiltersStore((s) => s.channelIds);
+
+/** Select date range and preset from dashboard filters. */
+export const useDateFilters = () =>
+  useDashboardFiltersStore((s) => ({ dateRange: s.dateRange, datePreset: s.datePreset }));

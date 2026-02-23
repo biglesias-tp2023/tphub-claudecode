@@ -16,17 +16,7 @@ export function DashboardFilters({ className, excludeChannels }: DashboardFilter
   const { dateRange, datePreset, setDateRangeWithPreset } = useDashboardFiltersStore();
 
   const handleDateChange = (range: DateRange, presetId: DatePreset) => {
-    // Use the preset directly - no mapping needed since types are now unified
     setDateRangeWithPreset(range, presetId);
-
-    // Debug logging
-    if (import.meta.env.DEV) {
-      console.log('[DashboardFilters] Date changed:', {
-        presetId,
-        rangeStart: range.start.toISOString(),
-        rangeEnd: range.end.toISOString(),
-      });
-    }
   };
 
   return (

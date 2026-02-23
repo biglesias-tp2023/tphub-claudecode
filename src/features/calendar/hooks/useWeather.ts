@@ -22,6 +22,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
+import { QUERY_GC_LONG } from '@/constants/queryConfig';
 import { fetchWeatherForecast, fetchWeatherForDateRange } from '../services/weatherApi';
 import type { WeatherForecast, Restaurant } from '@/types';
 
@@ -48,6 +49,7 @@ export function useWeatherByLocation(lat: number | undefined, lng: number | unde
     queryFn: () => fetchWeatherForecast(lat!, lng!, days),
     enabled: lat !== undefined && lng !== undefined,
     staleTime: 4 * 60 * 60 * 1000, // 4 hours - weather cache
+    gcTime: QUERY_GC_LONG,
     retry: 2,
   });
 }
@@ -64,6 +66,7 @@ export function useWeatherByRestaurant(restaurant: Restaurant | undefined) {
     queryFn: () => fetchWeatherForecast(lat!, lng!, 7),
     enabled: !!restaurant && lat !== undefined && lat !== null && lng !== undefined && lng !== null,
     staleTime: 4 * 60 * 60 * 1000, // 4 hours
+    gcTime: QUERY_GC_LONG,
     retry: 2,
   });
 }
@@ -89,6 +92,7 @@ export function useWeatherByMonth(
     queryFn: () => fetchWeatherForDateRange(lat!, lng!, startDate, endDate),
     enabled: !!restaurant && lat !== undefined && lat !== null && lng !== undefined && lng !== null,
     staleTime: 30 * 60 * 1000, // 30 minutes - shorter for combined data
+    gcTime: QUERY_GC_LONG,
     retry: 2,
   });
 }
@@ -114,6 +118,7 @@ export function useWeatherByDateRange(
     queryFn: () => fetchWeatherForDateRange(lat!, lng!, startDate, endDate),
     enabled: !!restaurant && lat !== undefined && lat !== null && lng !== undefined && lng !== null,
     staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: QUERY_GC_LONG,
     retry: 2,
   });
 }

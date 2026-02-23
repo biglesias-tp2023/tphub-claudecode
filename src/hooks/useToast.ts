@@ -1,3 +1,9 @@
+/**
+ * Toast notification hook.
+ * Manages a stack of toast messages with auto-incrementing IDs.
+ * @module hooks/useToast
+ */
+
 import { useState, useCallback } from 'react';
 import type { ToastType } from '@/components/ui';
 
@@ -9,6 +15,7 @@ interface ToastItem {
 
 let toastId = 0;
 
+/** Manages toast notifications. Returns toasts array and helper methods. */
 export function useToast() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 

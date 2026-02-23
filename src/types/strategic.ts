@@ -401,25 +401,6 @@ export interface DbObjectiveShareLink {
   last_accessed_at: string | null;
 }
 
-/**
- * Record of share link views
- */
-export interface ShareLinkView {
-  id: string;
-  shareLinkId: string;
-  viewedAt: string;
-  ipAddress: string | null;
-  userAgent: string | null;
-}
-
-export interface DbShareLinkView {
-  id: string;
-  share_link_id: string;
-  viewed_at: string;
-  ip_address: string | null;
-  user_agent: string | null;
-}
-
 // ============================================
 // OBJECTIVE PROGRESS (Calculated, not stored)
 // ============================================

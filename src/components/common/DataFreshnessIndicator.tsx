@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
+import { FRESHNESS_UPDATE_INTERVAL_MS } from '@/constants/timeouts';
 
 const STORAGE_KEY = 'tphub_last_data_refresh';
 
@@ -62,7 +63,7 @@ export function DataFreshnessIndicator() {
     };
 
     update();
-    const interval = setInterval(update, 30_000);
+    const interval = setInterval(update, FRESHNESS_UPDATE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
 

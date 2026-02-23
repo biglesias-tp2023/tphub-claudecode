@@ -1,12 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import { fetchRestaurantKpis, fetchAggregatedKpis } from '@/services/supabase-data';
 import { useRestaurants } from './useRestaurants';
 import type { PeriodType, DateRange } from '@/types';
-
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
+import { formatDate } from '@/utils/dateUtils';
 
 interface UseRestaurantKpisOptions {
   periodType?: PeriodType;
@@ -52,6 +50,7 @@ export function useRestaurantKpis(options: UseRestaurantKpisOptions = {}) {
       }),
     enabled: enabled && targetRestaurantIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 
@@ -93,6 +92,7 @@ export function useAggregatedKpis(options: UseRestaurantKpisOptions = {}) {
       }),
     enabled: enabled && targetRestaurantIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 }
 
@@ -126,5 +126,6 @@ export function useRestaurantKpisById(
       }),
     enabled: !!restaurantId,
     staleTime: 5 * 60 * 1000,
+    gcTime: QUERY_GC_MEDIUM,
   });
 }

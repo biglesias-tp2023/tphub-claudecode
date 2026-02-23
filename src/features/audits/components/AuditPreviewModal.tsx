@@ -336,7 +336,7 @@ ThinkPaladar`;
       setContactsLoading(true);
       fetchContactsByCompanyId(companyId)
         .then(setContacts)
-        .catch(() => setContacts([]))
+        .catch((error) => { console.warn('[AuditPreviewModal] fetchContacts failed:', error); setContacts([]); })
         .finally(() => setContactsLoading(false));
     }
   }, [open, companyId]);
@@ -405,8 +405,8 @@ ThinkPaladar`;
 
       onToast?.('Email enviado correctamente', 'success');
       onClose();
-    } catch (err) {
-      console.error('Error sending email:', err);
+    } catch (error) {
+      console.error('Error sending email:', error);
       onToast?.('Error al enviar el email. Inténtalo de nuevo.', 'error');
     } finally {
       setIsSending(false);

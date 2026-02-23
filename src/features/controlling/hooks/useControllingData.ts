@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters } from '@/stores/filtersStore';
+import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import type { ChannelId } from '@/types';
 import { useOrdersData } from './useOrdersData';
 import { useHierarchyData } from './useHierarchyData';
@@ -104,6 +105,12 @@ export interface HierarchyRow {
   // Reembolsos (phase 2 - optional)
   reembolsos?: number;
   reembolsosPercentage?: number;
+
+  // Operaciones - Reviews
+  ratingGlovo?: number;
+  reviewsGlovo?: number;
+  ratingUber?: number;
+  reviewsUber?: number;
 }
 
 export interface ControllingData {
@@ -159,6 +166,11 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     // Organico = % of orders without promotion
     organicOrders: row.metrics.pedidos > 0
       ? ((row.metrics.pedidos - row.metrics.promotedOrders) / row.metrics.pedidos) * 100 : 0,
+    // Reviews
+    ratingGlovo: row.metrics.ratingGlovo,
+    reviewsGlovo: row.metrics.reviewsGlovo,
+    ratingUber: row.metrics.ratingUber,
+    reviewsUber: row.metrics.reviewsUber,
   };
 }
 
@@ -240,8 +252,11 @@ function createDefaultChannels(): ChannelMetrics[] {
  * - Hierarchy data comes from useHierarchyData (aggregated by company/brand/address/channel)
  */
 export function useControllingData() {
-  const { companyIds } = useGlobalFiltersStore();
-  const { datePreset, dateRange, brandIds, channelIds, restaurantIds } = useDashboardFiltersStore();
+  const companyIds = useCompanyIds();
+  const brandIds = useBrandIds();
+  const channelIds = useChannelIds();
+  const { datePreset, dateRange } = useDateFilters();
+  const { restaurantIds } = useDashboardFiltersStore();
 
   // Fetch brands and restaurants for ID expansion (multi-portal grouping)
   const { data: brands = [] } = useBrands();

@@ -54,6 +54,10 @@ export interface HierarchyMetrics {
   impressions: number;
   clicks: number;
   adOrders: number;
+  ratingGlovo: number;
+  reviewsGlovo: number;
+  ratingUber: number;
+  reviewsUber: number;
 }
 
 /**
@@ -277,6 +281,10 @@ function buildHierarchyFromDimensions(
     impressions: 0,
     clicks: 0,
     adOrders: 0,
+    ratingGlovo: 0,
+    reviewsGlovo: 0,
+    ratingUber: 0,
+    reviewsUber: 0,
   };
 
   // =====================================================
@@ -456,7 +464,7 @@ function buildHierarchyFromDimensions(
       ticketMedio: base.pedidos > 0 ? base.ventas / base.pedidos : 0,
       nuevosClientes: base.nuevos,
       porcentajeNuevos: base.pedidos > 0 ? (base.nuevos / base.pedidos) * 100 : 0,
-      descuentos: 0,  // Raw orders path doesn't have promo/ads data
+      descuentos: 0,  // Raw orders path doesn't have promo/ads/review data
       promotedOrders: 0,
       adSpent: 0,
       adRevenue: 0,
@@ -464,6 +472,10 @@ function buildHierarchyFromDimensions(
       impressions: 0,
       clicks: 0,
       adOrders: 0,
+      ratingGlovo: 0,
+      reviewsGlovo: 0,
+      ratingUber: 0,
+      reviewsUber: 0,
     };
   };
 
@@ -728,6 +740,10 @@ interface RPCBaseMetrics {
   impressions: number;
   clicks: number;
   adOrders: number;
+  glovoRatingSum: number;
+  glovoReviews: number;
+  uberRatingSum: number;
+  uberReviews: number;
 }
 
 /**
@@ -746,6 +762,10 @@ function createEmptyRPCBase(): RPCBaseMetrics {
     impressions: 0,
     clicks: 0,
     adOrders: 0,
+    glovoRatingSum: 0,
+    glovoReviews: 0,
+    uberRatingSum: 0,
+    uberReviews: 0,
   };
 }
 
@@ -790,6 +810,20 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.impressions += row.impressions || 0;
     agg.clicks += row.clicks || 0;
     agg.adOrders += row.ad_orders || 0;
+
+    // Review metrics: weighted sum for proper bubble-up averaging
+    const isGlovo = row.pfk_id_portal === 'E22BC362' || row.pfk_id_portal === 'E22BC362-2';
+    const isUber = row.pfk_id_portal === '3CCD6861';
+    const avgRating = row.avg_rating || 0;
+    const totalReviews = row.total_reviews || 0;
+
+    if (isGlovo) {
+      agg.glovoRatingSum += avgRating * totalReviews;
+      agg.glovoReviews += totalReviews;
+    } else if (isUber) {
+      agg.uberRatingSum += avgRating * totalReviews;
+      agg.uberReviews += totalReviews;
+    }
   }
 
   // Step 2: Aggregate ADDRESS level from portals
@@ -814,6 +848,10 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.impressions += metrics.impressions;
     agg.clicks += metrics.clicks;
     agg.adOrders += metrics.adOrders;
+    agg.glovoRatingSum += metrics.glovoRatingSum;
+    agg.glovoReviews += metrics.glovoReviews;
+    agg.uberRatingSum += metrics.uberRatingSum;
+    agg.uberReviews += metrics.uberReviews;
   }
 
   // Step 3: Aggregate STORE level from addresses
@@ -838,6 +876,10 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.impressions += metrics.impressions;
     agg.clicks += metrics.clicks;
     agg.adOrders += metrics.adOrders;
+    agg.glovoRatingSum += metrics.glovoRatingSum;
+    agg.glovoReviews += metrics.glovoReviews;
+    agg.uberRatingSum += metrics.uberRatingSum;
+    agg.uberReviews += metrics.uberReviews;
   }
 
   // Step 4: Aggregate COMPANY level from stores
@@ -861,6 +903,10 @@ function aggregateRPCMetrics(rows: ControllingMetricsRow[]): {
     agg.impressions += metrics.impressions;
     agg.clicks += metrics.clicks;
     agg.adOrders += metrics.adOrders;
+    agg.glovoRatingSum += metrics.glovoRatingSum;
+    agg.glovoReviews += metrics.glovoReviews;
+    agg.uberRatingSum += metrics.uberRatingSum;
+    agg.uberReviews += metrics.uberReviews;
   }
 
   return { byPortal, byAddress, byStore, byCompany };
@@ -903,6 +949,10 @@ function buildHierarchyFromRPCMetrics(
       impressions: 0,
       clicks: 0,
       adOrders: 0,
+      ratingGlovo: 0,
+      reviewsGlovo: 0,
+      ratingUber: 0,
+      reviewsUber: 0,
     };
 
     if (!base) return emptyMetrics;
@@ -924,6 +974,10 @@ function buildHierarchyFromRPCMetrics(
       impressions: base.impressions,
       clicks: base.clicks,
       adOrders: base.adOrders,
+      ratingGlovo: base.glovoReviews > 0 ? base.glovoRatingSum / base.glovoReviews : 0,
+      reviewsGlovo: base.glovoReviews,
+      ratingUber: base.uberReviews > 0 ? base.uberRatingSum / base.uberReviews : 0,
+      reviewsUber: base.uberReviews,
     };
   };
 
@@ -945,11 +999,7 @@ function buildHierarchyFromRPCMetrics(
   }
 
   if (import.meta.env.DEV) {
-    console.log('[buildHierarchyFromRPCMetrics] Address-to-store mapping size:', addressToStoreMap.size);
-    console.log('[buildHierarchyFromRPCMetrics] Addresses in dimensions:', addresses.length);
-    // Show addresses with storeId from dimension table
-    const addressesWithStoreId = addresses.filter(a => a.storeId);
-    console.log('[buildHierarchyFromRPCMetrics] Addresses with storeId in dimension:', addressesWithStoreId.length);
+    console.debug('[buildHierarchyFromRPCMetrics] addressToStoreMap:', addressToStoreMap.size, '/ addresses:', addresses.length);
   }
 
   const rows: HierarchyDataRow[] = [];
@@ -1150,51 +1200,15 @@ export async function fetchHierarchyDataRPC(
   // Step 1: Fetch ALL dimensions for selected companies (for names)
   const dimensions = await fetchAllDimensions(companyIds);
 
-  if (import.meta.env.DEV) {
-    console.log('[fetchHierarchyDataRPC] Dimensions loaded:', {
-      companies: dimensions.companies.length,
-      stores: dimensions.stores.length,
-      addresses: dimensions.addresses.length,
-      portals: dimensions.portals.length,
-    });
-    if (dimensions.addresses.length > 0) {
-      console.log('[fetchHierarchyDataRPC] Sample addresses:', dimensions.addresses.slice(0, 3));
-    }
-  }
-
   // Step 2: Fetch metrics from RPC for both periods in parallel
   const [currentMetrics, previousMetrics] = await Promise.all([
     fetchControllingMetricsRPC(companyIds, startDate, endDate),
     fetchControllingMetricsRPC(companyIds, previousStartDate, previousEndDate),
   ]);
 
-  if (import.meta.env.DEV) {
-    console.log('[fetchHierarchyDataRPC] Metrics loaded:', {
-      currentMetrics: currentMetrics.length,
-      previousMetrics: previousMetrics.length,
-    });
-    if (currentMetrics.length > 0) {
-      console.log('[fetchHierarchyDataRPC] Sample metrics:', currentMetrics.slice(0, 3));
-    }
-  }
-
   // Step 3: Aggregate metrics bottom-up
   const currentAgg = aggregateRPCMetrics(currentMetrics);
   const previousAgg = aggregateRPCMetrics(previousMetrics);
-
-  if (import.meta.env.DEV) {
-    console.log('[fetchHierarchyDataRPC] Aggregation results:', {
-      byPortal: currentAgg.byPortal.size,
-      byAddress: currentAgg.byAddress.size,
-      byStore: currentAgg.byStore.size,
-      byCompany: currentAgg.byCompany.size,
-    });
-    // Log sample keys to understand the format
-    if (currentAgg.byAddress.size > 0) {
-      const sampleAddressKeys = Array.from(currentAgg.byAddress.keys()).slice(0, 3);
-      console.log('[fetchHierarchyDataRPC] Sample address keys:', sampleAddressKeys);
-    }
-  }
 
   // Step 4: Build complete hierarchy from dimensions and aggregated metrics
   const result = buildHierarchyFromRPCMetrics(dimensions, currentAgg, previousAgg);
@@ -1204,7 +1218,11 @@ export async function fetchHierarchyDataRPC(
       acc[row.level] = (acc[row.level] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    console.log('[fetchHierarchyDataRPC] Hierarchy rows by level:', levelCounts);
+    console.debug('[fetchHierarchyDataRPC]', {
+      dimensions: { companies: dimensions.companies.length, stores: dimensions.stores.length, addresses: dimensions.addresses.length },
+      metrics: { current: currentMetrics.length, previous: previousMetrics.length },
+      rows: levelCounts,
+    });
   }
 
   return result;

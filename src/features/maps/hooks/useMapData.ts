@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { DEMO_MAP_RESTAURANTS, generateDeliveryPoints } from '../utils/coordinates';
 import type { MapRestaurant, MapData, DeliveryPoint } from '../types/maps.types';
@@ -36,6 +37,7 @@ export function useMapData() {
     queryKey: ['map-data', companyIds],
     queryFn: fetchMapData,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: QUERY_GC_MEDIUM,
   });
 
   // Filter restaurants based on all active filters

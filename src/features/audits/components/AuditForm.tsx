@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import * as Icons from 'lucide-react';
+import { resolveIcon } from '@/utils/iconResolver';
 import { cn } from '@/utils/cn';
 import { FieldRenderer } from './fields';
 import { calculateAuditCompletion } from '../config';
@@ -54,11 +54,10 @@ export function AuditForm({
 
   const completion = calculateAuditCompletion(auditType, fieldData);
 
-  // Get icon component by name
   const getIconComponent = (iconName: string | undefined) => {
     if (!iconName) return null;
-    const IconComponent = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[iconName];
-    return IconComponent ? <IconComponent className="w-5 h-5" /> : null;
+    const IconComponent = resolveIcon(iconName);
+    return <IconComponent className="w-5 h-5" />;
   };
 
   return (

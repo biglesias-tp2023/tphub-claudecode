@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { QUERY_GC_SHORT, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { queryKeys } from '@/constants/queryKeys';
 import {
@@ -33,6 +34,7 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
     queryKey: queryKeys.restaurants.list({ companyIds }),
     queryFn: () => fetchCrpRestaurants({ companyIds: companyIds.length > 0 ? companyIds : undefined }),
     staleTime: 5 * 60 * 1000,
+    gcTime: QUERY_GC_MEDIUM,
   });
 
   // Fetch objectives directly by companyIds (no longer filtered through restaurants)
@@ -49,6 +51,7 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
     }),
     // Always enabled - show all objectives if no company filter is set
     staleTime: 2 * 60 * 1000,
+    gcTime: QUERY_GC_SHORT,
   });
 
   // Group objectives by horizon

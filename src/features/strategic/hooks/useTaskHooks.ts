@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { QUERY_GC_SHORT, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { queryKeys } from '@/constants/queryKeys';
 import {
@@ -28,6 +29,7 @@ export function useTasks(isCompleted?: boolean) {
     queryKey: queryKeys.restaurants.list({ companyIds }),
     queryFn: () => fetchCrpRestaurants({ companyIds: companyIds.length > 0 ? companyIds : undefined }),
     staleTime: 5 * 60 * 1000,
+    gcTime: QUERY_GC_MEDIUM,
   });
 
   // Filter restaurant IDs
@@ -47,6 +49,7 @@ export function useTasks(isCompleted?: boolean) {
     queryFn: () => fetchTasks({ restaurantIds, isCompleted }),
     enabled: restaurantIds.length > 0,
     staleTime: 2 * 60 * 1000,
+    gcTime: QUERY_GC_SHORT,
   });
 
   // Separate pending and completed tasks
