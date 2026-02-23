@@ -183,15 +183,18 @@ export function ReputationPage() {
               <ChannelRatingCard key={rating.channel} data={rating} className="flex-1 min-w-0" />
             ))}
             <SummaryCard
-              type="totalReviews"
-              value={data.summary.totalReviews}
-              change={data.summary.totalReviewsChange}
-              className="flex-1 min-w-0"
-            />
-            <SummaryCard
               type="negativeReviews"
               value={data.summary.negativeReviews}
               change={data.summary.negativeReviewsChange}
+              subtitle={data.summary.totalReviews > 0
+                ? `${((data.summary.negativeReviews / data.summary.totalReviews) * 100).toFixed(1)}% del total`
+                : undefined
+              }
+              className="flex-1 min-w-0"
+            />
+            <SummaryCard
+              type="avgDeliveryTime"
+              value={data.summary.avgDeliveryTime ?? 0}
               className="flex-1 min-w-0"
             />
             <SummaryCard

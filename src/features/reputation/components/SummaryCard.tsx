@@ -1,8 +1,8 @@
 import { cn } from '@/utils/cn';
-import { MessageSquare, ThumbsDown, RotateCcw, TrendingUp, TrendingDown } from 'lucide-react';
+import { Clock, ThumbsDown, RotateCcw, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface SummaryCardProps {
-  type: 'totalReviews' | 'negativeReviews' | 'refunds';
+  type: 'avgDeliveryTime' | 'negativeReviews' | 'refunds';
   value: number;
   change?: number;
   subtitle?: string;
@@ -16,19 +16,24 @@ function formatNumber(n: number): string {
   return n.toLocaleString('es-ES');
 }
 
+function formatMinutes(n: number): string {
+  if (n === 0) return '—';
+  return n.toFixed(1) + ' min';
+}
+
 function formatCurrency(n: number): string {
   return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20AC';
 }
 
 const CARD_CONFIG = {
-  totalReviews: {
-    label: 'Total Reseñas',
+  avgDeliveryTime: {
+    label: 'Tiempo Medio Entrega',
     valueColor: 'text-primary-600',
     iconBg: 'bg-primary-50',
-    Icon: MessageSquare,
+    Icon: Clock,
     iconColor: 'text-primary-600',
-    invertChange: false, // up = green
-    formatValue: formatNumber,
+    invertChange: true, // up = red (slower is bad)
+    formatValue: formatMinutes,
   },
   negativeReviews: {
     label: 'Reseñas Negativas',

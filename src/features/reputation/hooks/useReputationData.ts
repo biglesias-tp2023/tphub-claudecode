@@ -41,6 +41,7 @@ export interface ReputationSummary {
   totalRefunds: number;
   totalRefundsChange: number;
   refundRate: number;
+  avgDeliveryTime?: number;
 }
 
 export interface HeatmapCell {
