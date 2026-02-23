@@ -83,6 +83,7 @@ export interface RawReview {
   pfk_id_portal: string;
   ts_creation_time: string;
   val_rating: number;
+  txt_comment: string | null;
 }
 
 export interface ReviewsChanges {
@@ -418,8 +419,8 @@ export async function fetchReviewTags(
   for (let i = 0; i < reviewIds.length; i += CHUNK_SIZE) {
     const chunk = reviewIds.slice(i, i + CHUNK_SIZE);
     const { data, error } = await supabase
-      .from('crp_portal_ftreview_tag')
-      .select('pk_id_review, val_tag')
+      .from('crp_portal__ft_review_tag')
+      .select('pk_id_review, pk_des_tag')
       .in('pk_id_review', chunk);
 
     if (error) {
@@ -429,7 +430,7 @@ export async function fetchReviewTags(
 
     for (const row of data || []) {
       const reviewId = row.pk_id_review as string;
-      const tag = normalizeTagLabel(row.val_tag as string);
+      const tag = normalizeTagLabel(row.pk_des_tag as string);
       const existing = tagMap.get(reviewId);
       if (existing) {
         existing.push(tag);
@@ -455,7 +456,7 @@ export async function fetchCrpReviewsRaw(
 
   let query = supabase
     .from('crp_portal__ft_review')
-    .select('pk_id_review, fk_id_order, pfk_id_company, pfk_id_store, pfk_id_store_address, pfk_id_portal, ts_creation_time, val_rating')
+    .select('pk_id_review, fk_id_order, pfk_id_company, pfk_id_store, pfk_id_store_address, pfk_id_portal, ts_creation_time, val_rating, txt_comment')
     .gte('ts_creation_time', `${startDate}T00:00:00`)
     .lte('ts_creation_time', `${endDate}T23:59:59`)
     .order('ts_creation_time', { ascending: false })

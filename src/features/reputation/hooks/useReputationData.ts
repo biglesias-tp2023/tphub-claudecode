@@ -259,6 +259,7 @@ export function useReputationData() {
       const orderAmount = orderDetails?.amounts.get(raw.fk_id_order) ?? null;
       const deliveryTime = orderDetails?.deliveryTimes.get(raw.fk_id_order) ?? null;
       const tags = tagMap?.get(raw.pk_id_review) ?? null;
+      const comment = raw.txt_comment && raw.txt_comment.trim() !== '' ? raw.txt_comment.trim() : null;
       return {
         id: raw.pk_id_review,
         orderId: raw.fk_id_order,
@@ -266,6 +267,7 @@ export function useReputationData() {
         date: ts.toISOString().slice(0, 10),
         time: ts.toTimeString().slice(0, 5),
         rating: raw.val_rating,
+        comment,
         refundAmount,
         orderAmount,
         deliveryTime,
