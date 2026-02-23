@@ -16,7 +16,7 @@ import type { HierarchyRow } from '@/features/controlling';
 import { useSessionState, useSessionSet } from '@/features/controlling/hooks/useSessionState';
 import type { ChannelId } from '@/types';
 
-type ViewTab = 'rendimiento' | 'publicidad' | 'promociones';
+type ViewTab = 'rendimiento' | 'publicidad' | 'promociones' | 'operaciones';
 
 // Sortable columns
 type SortColumn =
@@ -38,7 +38,11 @@ type SortColumn =
   | 'inversionPromos'
   | 'promosPercentage'
   | 'promosRoas'
-  | 'organicOrders';
+  | 'organicOrders'
+  | 'ratingGlovo'
+  | 'reviewsGlovo'
+  | 'ratingUber'
+  | 'reviewsUber';
 type SortDirection = 'asc' | 'desc' | null;
 
 interface HierarchyTableProps {
@@ -315,6 +319,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
     { id: 'rendimiento', label: 'Rendimiento' },
     { id: 'publicidad', label: 'Publicidad' },
     { id: 'promociones', label: 'Promociones' },
+    { id: 'operaciones', label: 'Operaciones' },
   ];
 
   return (
@@ -510,6 +515,41 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                   </th>
                 </>
               )}
+              {activeTabs.has('operaciones') && (
+                <>
+                  <th className="py-2.5 px-2 font-medium text-gray-500 text-xs text-right" title="Tiempo de entrega">
+                    ETA
+                  </th>
+                  <SortableHeader
+                    column="ratingGlovo"
+                    label="Rating G"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="reviewsGlovo"
+                    label="Reviews G"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="ratingUber"
+                    label="Rating Uber"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="reviewsUber"
+                    label="Reviews Uber"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -607,6 +647,15 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
                       <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? `${row.organicOrders.toFixed(1)}%` : '-'}</td>
+                    </>
+                  )}
+                  {activeTabs.has('operaciones') && (
+                    <>
+                      <td className="text-right py-2.5 px-2 text-gray-400 text-sm">-</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${row.ratingGlovo.toFixed(1)}%` : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsGlovo ? formatNumber(row.reviewsGlovo) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingUber ? row.ratingUber.toFixed(1) : '-'}</td>
+                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsUber ? formatNumber(row.reviewsUber) : '-'}</td>
                     </>
                   )}
                 </tr>

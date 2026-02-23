@@ -136,7 +136,7 @@ AS $$
       cid, sid, aid, ch,
       AVG(daily_orders) AS avg_orders,
       AVG(daily_revenue) AS avg_revenue,
-      COALESCE(STDDEV(daily_orders), 0) AS sd_orders,
+      COALESCE(STDDEV(daily_orders)::numeric, 0) AS sd_orders,
       COUNT(*)::bigint AS wks
     FROM baseline_daily
     GROUP BY cid, sid, aid, ch
@@ -180,11 +180,11 @@ AS $$
     a.ch AS channel,
     a.yesterday_orders,
     a.yesterday_revenue,
-    ROUND(a.avg_orders_baseline, 1) AS avg_orders_baseline,
-    ROUND(a.avg_revenue_baseline, 2) AS avg_revenue_baseline,
-    ROUND(a.stddev_orders, 1) AS stddev_orders,
-    ROUND(a.orders_dev, 1) AS orders_deviation_pct,
-    ROUND(a.revenue_dev, 1) AS revenue_deviation_pct,
+    ROUND(a.avg_orders_baseline::numeric, 1) AS avg_orders_baseline,
+    ROUND(a.avg_revenue_baseline::numeric, 2) AS avg_revenue_baseline,
+    ROUND(a.stddev_orders::numeric, 1) AS stddev_orders,
+    ROUND(a.orders_dev::numeric, 1) AS orders_deviation_pct,
+    ROUND(a.revenue_dev::numeric, 1) AS revenue_deviation_pct,
     a.weeks_with_data
   FROM anomalies a
   LEFT JOIN active_companies ac ON ac.pk_id_company = a.cid
@@ -266,9 +266,9 @@ AS $$
   -- Reviews from yesterday (ft_review FKs are TEXT, cast to integer for joins)
   reviews_yesterday AS (
     SELECT
-      r.pfk_id_company::integer AS cid,
-      r.pfk_id_store::integer AS sid,
-      r.pfk_id_store_address::integer AS aid,
+      r.pfk_id_company AS cid,
+      r.pfk_id_store AS sid,
+      r.pfk_id_store_address AS aid,
       CASE
         WHEN r.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN r.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -279,10 +279,10 @@ AS $$
       COUNT(*) FILTER (WHERE r.val_rating <= 2)::bigint AS negative_count,
       COUNT(*) FILTER (WHERE r.val_rating >= 4)::bigint AS positive_count
     FROM crp_portal__ft_review r
-    INNER JOIN active_companies ac ON ac.pk_id_company = r.pfk_id_company::integer
+    INNER JOIN active_companies ac ON ac.pk_id_company::text = r.pfk_id_company
     CROSS JOIN yesterday_date yd
     WHERE (r.ts_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date = yd.d
-    GROUP BY r.pfk_id_company::integer, r.pfk_id_store::integer, r.pfk_id_store_address::integer,
+    GROUP BY r.pfk_id_company, r.pfk_id_store, r.pfk_id_store_address,
       CASE
         WHEN r.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN r.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -292,9 +292,9 @@ AS $$
   -- Baseline: same day-of-week over previous 6 weeks
   reviews_baseline_daily AS (
     SELECT
-      r.pfk_id_company::integer AS cid,
-      r.pfk_id_store::integer AS sid,
-      r.pfk_id_store_address::integer AS aid,
+      r.pfk_id_company AS cid,
+      r.pfk_id_store AS sid,
+      r.pfk_id_store_address AS aid,
       CASE
         WHEN r.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN r.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -305,14 +305,14 @@ AS $$
       COALESCE(AVG(r.val_rating), 0) AS daily_avg_rating,
       COUNT(*) FILTER (WHERE r.val_rating <= 2)::numeric AS daily_negative_count
     FROM crp_portal__ft_review r
-    INNER JOIN active_companies ac ON ac.pk_id_company = r.pfk_id_company::integer
+    INNER JOIN active_companies ac ON ac.pk_id_company::text = r.pfk_id_company
     CROSS JOIN yesterday_date yd
     WHERE
       (r.ts_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date
         BETWEEN (yd.d - 42) AND (yd.d - 1)
       AND EXTRACT(ISODOW FROM (r.ts_creation_time AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Madrid')::date)
         = EXTRACT(ISODOW FROM yd.d)
-    GROUP BY r.pfk_id_company::integer, r.pfk_id_store::integer, r.pfk_id_store_address::integer,
+    GROUP BY r.pfk_id_company, r.pfk_id_store, r.pfk_id_store_address,
       CASE
         WHEN r.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN r.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -358,12 +358,12 @@ AS $$
       -- Deviation metrics
       CASE
         WHEN b.avg_rating > 0 THEN
-          ROUND(((y.avg_rating - b.avg_rating) / b.avg_rating) * 100, 1)
+          ROUND((((y.avg_rating - b.avg_rating) / b.avg_rating) * 100)::numeric, 1)
         ELSE NULL
       END AS rating_dev,
       CASE
         WHEN b.avg_negative_count > 0 THEN
-          ROUND(((y.negative_count::numeric - b.avg_negative_count) / b.avg_negative_count) * 100, 1)
+          ROUND((((y.negative_count::numeric - b.avg_negative_count) / b.avg_negative_count) * 100)::numeric, 1)
         ELSE NULL
       END AS neg_spike
     FROM reviews_yesterday y
@@ -384,17 +384,17 @@ AS $$
     a.ch AS channel,
     a.atype AS anomaly_type,
     a.total_reviews AS yesterday_reviews,
-    ROUND(a.y_avg_rating, 2) AS yesterday_avg_rating,
+    ROUND(a.y_avg_rating::numeric, 2) AS yesterday_avg_rating,
     a.y_negative_count AS yesterday_negative_count,
-    ROUND(a.b_avg_rating, 2) AS baseline_avg_rating,
-    ROUND(a.b_avg_negative_count, 1) AS baseline_avg_negative_count,
+    ROUND(a.b_avg_rating::numeric, 2) AS baseline_avg_rating,
+    ROUND(a.b_avg_negative_count::numeric, 1) AS baseline_avg_negative_count,
     a.rating_dev AS rating_deviation_pct,
     a.neg_spike AS negative_spike_pct,
     a.wks AS weeks_with_data
   FROM review_anomalies a
-  LEFT JOIN active_companies ac ON ac.pk_id_company = a.cid
-  LEFT JOIN active_stores s ON s.pk_id_store = a.sid
-  LEFT JOIN active_addresses addr ON addr.pk_id_address = a.aid
+  LEFT JOIN active_companies ac ON ac.pk_id_company::text = a.cid
+  LEFT JOIN active_stores s ON s.pk_id_store::text = a.sid
+  LEFT JOIN active_addresses addr ON addr.pk_id_address::text = a.aid
   WHERE a.atype IS NOT NULL
   ORDER BY
     CASE a.atype
@@ -483,9 +483,9 @@ AS $$
   -- Ads from yesterday (ft_advertising_hp FKs are TEXT, cast to integer for joins)
   ads_yesterday AS (
     SELECT
-      a.pfk_id_company::integer AS cid,
-      a.pfk_id_store::integer AS sid,
-      a.pfk_id_store_address::integer AS aid,
+      a.pfk_id_company AS cid,
+      a.pfk_id_store AS sid,
+      a.pfk_id_store_address AS aid,
       CASE
         WHEN a.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN a.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -497,10 +497,10 @@ AS $$
       COALESCE(SUM(a.val_clicks), 0)::bigint AS total_clicks,
       COALESCE(SUM(a.val_orders), 0)::bigint AS total_ad_orders
     FROM crp_portal__ft_advertising_hp a
-    INNER JOIN active_companies ac ON ac.pk_id_company = a.pfk_id_company::integer
+    INNER JOIN active_companies ac ON ac.pk_id_company::text = a.pfk_id_company
     CROSS JOIN yesterday_date yd
     WHERE (a.pk_ts_hour AT TIME ZONE 'Europe/Madrid')::date = yd.d
-    GROUP BY a.pfk_id_company::integer, a.pfk_id_store::integer, a.pfk_id_store_address::integer,
+    GROUP BY a.pfk_id_company, a.pfk_id_store, a.pfk_id_store_address,
       CASE
         WHEN a.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN a.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -510,9 +510,9 @@ AS $$
   -- Baseline: same day-of-week over previous 6 weeks
   ads_baseline_daily AS (
     SELECT
-      a.pfk_id_company::integer AS cid,
-      a.pfk_id_store::integer AS sid,
-      a.pfk_id_store_address::integer AS aid,
+      a.pfk_id_company AS cid,
+      a.pfk_id_store AS sid,
+      a.pfk_id_store_address AS aid,
       CASE
         WHEN a.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN a.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -525,14 +525,14 @@ AS $$
       COALESCE(SUM(a.val_clicks), 0)::numeric AS daily_clicks,
       COALESCE(SUM(a.val_orders), 0)::numeric AS daily_ad_orders
     FROM crp_portal__ft_advertising_hp a
-    INNER JOIN active_companies ac ON ac.pk_id_company = a.pfk_id_company::integer
+    INNER JOIN active_companies ac ON ac.pk_id_company::text = a.pfk_id_company
     CROSS JOIN yesterday_date yd
     WHERE
       (a.pk_ts_hour AT TIME ZONE 'Europe/Madrid')::date
         BETWEEN (yd.d - 42) AND (yd.d - 1)
       AND EXTRACT(ISODOW FROM (a.pk_ts_hour AT TIME ZONE 'Europe/Madrid')::date)
         = EXTRACT(ISODOW FROM yd.d)
-    GROUP BY a.pfk_id_company::integer, a.pfk_id_store::integer, a.pfk_id_store_address::integer,
+    GROUP BY a.pfk_id_company, a.pfk_id_store, a.pfk_id_store_address,
       CASE
         WHEN a.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
         WHEN a.pfk_id_portal = '3CCD6861' THEN 'ubereats'
@@ -588,17 +588,17 @@ AS $$
       -- Deviation metrics
       CASE
         WHEN b.avg_roas IS NOT NULL AND b.avg_roas > 0 THEN
-          ROUND(((CASE WHEN y.total_ad_spent > 0 THEN y.total_ad_revenue / y.total_ad_spent ELSE 0 END - b.avg_roas) / b.avg_roas) * 100, 1)
+          ROUND((((CASE WHEN y.total_ad_spent > 0 THEN y.total_ad_revenue / y.total_ad_spent ELSE 0 END - b.avg_roas) / b.avg_roas) * 100)::numeric, 1)
         ELSE NULL
       END AS roas_dev,
       CASE
         WHEN b.avg_ad_spent > 0 THEN
-          ROUND(((y.total_ad_spent - b.avg_ad_spent) / b.avg_ad_spent) * 100, 1)
+          ROUND((((y.total_ad_spent - b.avg_ad_spent) / b.avg_ad_spent) * 100)::numeric, 1)
         ELSE NULL
       END AS spend_dev,
       CASE
         WHEN b.avg_impressions > 0 THEN
-          ROUND(((y.total_impressions::numeric - b.avg_impressions) / b.avg_impressions) * 100, 1)
+          ROUND((((y.total_impressions::numeric - b.avg_impressions) / b.avg_impressions) * 100)::numeric, 1)
         ELSE NULL
       END AS impressions_dev
     FROM ads_yesterday y
@@ -618,23 +618,23 @@ AS $$
     COALESCE(addr.des_address, 'Desconocida') AS address_name,
     a.ch AS channel,
     a.atype AS anomaly_type,
-    ROUND(a.total_ad_spent, 2) AS yesterday_ad_spent,
-    ROUND(a.total_ad_revenue, 2) AS yesterday_ad_revenue,
-    ROUND(a.y_roas, 2) AS yesterday_roas,
+    ROUND(a.total_ad_spent::numeric, 2) AS yesterday_ad_spent,
+    ROUND(a.total_ad_revenue::numeric, 2) AS yesterday_ad_revenue,
+    ROUND(a.y_roas::numeric, 2) AS yesterday_roas,
     a.total_impressions AS yesterday_impressions,
     a.total_clicks AS yesterday_clicks,
     a.total_ad_orders AS yesterday_ad_orders,
-    ROUND(a.avg_ad_spent, 2) AS baseline_avg_ad_spent,
-    ROUND(a.avg_roas, 2) AS baseline_avg_roas,
-    ROUND(a.avg_impressions, 0) AS baseline_avg_impressions,
+    ROUND(a.avg_ad_spent::numeric, 2) AS baseline_avg_ad_spent,
+    ROUND(a.avg_roas::numeric, 2) AS baseline_avg_roas,
+    ROUND(a.avg_impressions::numeric, 0) AS baseline_avg_impressions,
     a.roas_dev AS roas_deviation_pct,
     a.spend_dev AS spend_deviation_pct,
     a.impressions_dev AS impressions_deviation_pct,
     a.wks AS weeks_with_data
   FROM ads_anomalies a
-  LEFT JOIN active_companies ac ON ac.pk_id_company = a.cid
-  LEFT JOIN active_stores s ON s.pk_id_store = a.sid
-  LEFT JOIN active_addresses addr ON addr.pk_id_address = a.aid
+  LEFT JOIN active_companies ac ON ac.pk_id_company::text = a.cid
+  LEFT JOIN active_stores s ON s.pk_id_store::text = a.sid
+  LEFT JOIN active_addresses addr ON addr.pk_id_address::text = a.aid
   WHERE a.atype IS NOT NULL
   ORDER BY
     CASE a.atype
@@ -820,12 +820,12 @@ AS $$
       -- Deviation metrics
       CASE
         WHEN b.avg_promo_rate > 0 THEN
-          ROUND(((y.promo_rate - b.avg_promo_rate) / b.avg_promo_rate) * 100, 1)
+          ROUND((((y.promo_rate - b.avg_promo_rate) / b.avg_promo_rate) * 100)::numeric, 1)
         ELSE NULL
       END AS promo_rate_dev,
       CASE
         WHEN b.avg_promos > 0 THEN
-          ROUND(((y.total_promos - b.avg_promos) / b.avg_promos) * 100, 1)
+          ROUND((((y.total_promos - b.avg_promos) / b.avg_promos) * 100)::numeric, 1)
         ELSE NULL
       END AS promo_spend_dev
     FROM promos_yesterday y
@@ -846,11 +846,11 @@ AS $$
     a.ch AS channel,
     a.atype AS anomaly_type,
     a.total_orders AS yesterday_orders,
-    ROUND(a.total_revenue, 2) AS yesterday_revenue,
-    ROUND(a.total_promos, 2) AS yesterday_promos,
-    ROUND(a.y_promo_rate, 1) AS yesterday_promo_rate,
-    ROUND(a.avg_promos, 2) AS baseline_avg_promos,
-    ROUND(a.avg_promo_rate, 1) AS baseline_avg_promo_rate,
+    ROUND(a.total_revenue::numeric, 2) AS yesterday_revenue,
+    ROUND(a.total_promos::numeric, 2) AS yesterday_promos,
+    ROUND(a.y_promo_rate::numeric, 1) AS yesterday_promo_rate,
+    ROUND(a.avg_promos::numeric, 2) AS baseline_avg_promos,
+    ROUND(a.avg_promo_rate::numeric, 1) AS baseline_avg_promo_rate,
     a.promo_rate_dev AS promo_rate_deviation_pct,
     a.promo_spend_dev AS promo_spend_deviation_pct,
     a.wks AS weeks_with_data
