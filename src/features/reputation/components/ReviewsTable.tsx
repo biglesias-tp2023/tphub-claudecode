@@ -8,6 +8,7 @@ interface ReviewsTableProps {
   data: Review[];
   totalInPeriod?: number;
   className?: string;
+  onRowClick?: (review: Review) => void;
 }
 
 function RatingDisplay({ rating, channel }: { rating: number; channel: ChannelId }) {
@@ -40,7 +41,7 @@ function truncateId(id: string, maxLen = 12): string {
   return id.slice(0, maxLen) + '...';
 }
 
-export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTableProps) {
+export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: ReviewsTableProps) {
   return (
     <div className={cn('bg-white rounded-xl border border-gray-100 overflow-hidden', className)}>
       <div className="overflow-x-auto">
@@ -67,7 +68,11 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
               return (
                 <tr
                   key={review.id}
-                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  onClick={() => onRowClick?.(review)}
+                  className={cn(
+                    'border-b border-gray-100 hover:bg-gray-50 transition-colors',
+                    onRowClick && 'cursor-pointer'
+                  )}
                 >
                   <td className="px-4 py-3">
                     <img

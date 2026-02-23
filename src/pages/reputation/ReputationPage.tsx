@@ -9,8 +9,10 @@ import {
   ErrorHeatmap,
   RatingDistributionChart,
   ReviewsTable,
+  ReviewDetailDrawer,
   useReputationData,
 } from '@/features/reputation';
+import type { Review } from '@/features/reputation';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import { getPeriodLabels } from '@/utils/formatters';
 import {
@@ -35,6 +37,7 @@ const TABS: Tab[] = [
 
 export function ReputationPage() {
   const [activeTab, setActiveTab] = useState<TabId>('general');
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const { datePreset } = useDashboardFiltersStore();
   const { data, isLoading, error } = useReputationData();
 
@@ -238,10 +241,18 @@ export function ReputationPage() {
             <ReviewsTable
               data={data.reviews}
               totalInPeriod={data.totalReviewsInPeriod}
+              onRowClick={setSelectedReview}
             />
           )}
         </>
       )}
+
+      {/* Review detail drawer */}
+      <ReviewDetailDrawer
+        review={selectedReview}
+        isOpen={!!selectedReview}
+        onClose={() => setSelectedReview(null)}
+      />
     </div>
   );
 }
