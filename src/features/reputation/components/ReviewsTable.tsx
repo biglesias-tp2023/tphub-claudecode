@@ -11,8 +11,6 @@ const PAGE_SIZE_OPTIONS = [15, 50, 75, 100] as const;
 type SentimentFilter = 'all' | 'positive' | 'negative';
 type CommentFilter = 'all' | 'with' | 'without';
 type RefundFilter = 'all' | 'with' | 'without';
-type DeliveryFilter = 'all' | '0-20' | '20-35' | '35-50' | '50+';
-
 const FILTER_SELECT = 'text-xs h-7 rounded-md border px-2 pr-6 focus:outline-none focus:ring-1 focus:ring-primary-500';
 const FILTER_ACTIVE = 'border-primary-300 bg-primary-50 text-primary-700';
 const FILTER_DEFAULT = 'border-gray-200 bg-white text-gray-600';
@@ -73,16 +71,18 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
   const [sentiment, setSentiment] = useState<SentimentFilter>('all');
   const [commentFilter, setCommentFilter] = useState<CommentFilter>('all');
   const [refundFilter, setRefundFilter] = useState<RefundFilter>('all');
-  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>('all');
+  const [deliveryMin, setDeliveryMin] = useState('');
+  const [deliveryMax, setDeliveryMax] = useState('');
 
-  const hasActiveFilters = tagFilter !== 'all' || sentiment !== 'all' || commentFilter !== 'all' || refundFilter !== 'all' || deliveryFilter !== 'all';
+  const hasActiveFilters = tagFilter !== 'all' || sentiment !== 'all' || commentFilter !== 'all' || refundFilter !== 'all' || deliveryMin !== '' || deliveryMax !== '';
 
   const clearAllFilters = () => {
     setTagFilter('all');
     setSentiment('all');
     setCommentFilter('all');
     setRefundFilter('all');
-    setDeliveryFilter('all');
+    setDeliveryMin('');
+    setDeliveryMax('');
   };
 
   // Apply filters
@@ -117,22 +117,20 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
       result = result.filter((r) => r.refundAmount == null || r.refundAmount === 0);
     }
 
-    // Delivery time filter
-    if (deliveryFilter !== 'all') {
+    // Delivery time range
+    const minTime = deliveryMin !== '' ? Number(deliveryMin) : null;
+    const maxTime = deliveryMax !== '' ? Number(deliveryMax) : null;
+    if (minTime !== null || maxTime !== null) {
       result = result.filter((r) => {
         if (r.deliveryTime == null) return false;
-        switch (deliveryFilter) {
-          case '0-20': return r.deliveryTime <= 20;
-          case '20-35': return r.deliveryTime > 20 && r.deliveryTime <= 35;
-          case '35-50': return r.deliveryTime > 35 && r.deliveryTime <= 50;
-          case '50+': return r.deliveryTime > 50;
-          default: return true;
-        }
+        if (minTime !== null && r.deliveryTime < minTime) return false;
+        if (maxTime !== null && r.deliveryTime > maxTime) return false;
+        return true;
       });
     }
 
     return result;
-  }, [data, tagFilter, sentiment, commentFilter, refundFilter, deliveryFilter]);
+  }, [data, tagFilter, sentiment, commentFilter, refundFilter, deliveryMin, deliveryMax]);
 
   // Reset to page 1 when filtered data or pageSize changes
   useEffect(() => { setPage(1); }, [filteredData, pageSize]);
@@ -179,17 +177,25 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
           <option value="without">Sin comentario</option>
         </select>
 
-        <select
-          value={deliveryFilter}
-          onChange={(e) => setDeliveryFilter(e.target.value as DeliveryFilter)}
-          className={cn(FILTER_SELECT, deliveryFilter !== 'all' ? FILTER_ACTIVE : FILTER_DEFAULT)}
-        >
-          <option value="all">T. Entrega: Todos</option>
-          <option value="0-20">≤ 20 min</option>
-          <option value="20-35">20–35 min</option>
-          <option value="35-50">35–50 min</option>
-          <option value="50+">{'> 50 min'}</option>
-        </select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">T. Entrega</span>
+          <input
+            type="number"
+            placeholder="Min"
+            value={deliveryMin}
+            onChange={(e) => setDeliveryMin(e.target.value)}
+            className="w-14 h-7 text-xs rounded-md border border-gray-200 px-2 text-center focus:outline-none focus:ring-1 focus:ring-primary-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <span className="text-xs text-gray-400">&ndash;</span>
+          <input
+            type="number"
+            placeholder="Max"
+            value={deliveryMax}
+            onChange={(e) => setDeliveryMax(e.target.value)}
+            className="w-14 h-7 text-xs rounded-md border border-gray-200 px-2 text-center focus:outline-none focus:ring-1 focus:ring-primary-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <span className="text-xs text-gray-400">min</span>
+        </div>
 
         <select
           value={refundFilter}
