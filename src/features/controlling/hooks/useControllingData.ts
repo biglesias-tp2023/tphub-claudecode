@@ -287,15 +287,6 @@ export function useControllingData() {
 
   // Compute final data
   const data = useMemo<ControllingData | undefined>(() => {
-    // Need at least companies selected to show data
-    if (companyIds.length === 0) {
-      return {
-        portfolio: createDefaultPortfolio(),
-        channels: createDefaultChannels(),
-        hierarchy: [],
-      };
-    }
-
     // Transform hierarchy data
     const hierarchyRows: HierarchyRow[] = (hierarchyQuery.data || []).map(transformHierarchyDataRow);
 

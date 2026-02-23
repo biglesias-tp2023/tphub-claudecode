@@ -332,12 +332,15 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
               }
             }
 
-            // Convert date strings back to Date objects
-            if (parsed.state?.dateRange?.start && parsed.state?.dateRange?.end) {
+            // Always recalculate dateRange from preset on hydration
+            // (prevents stale dates when user returns on a different day)
+            if (parsed.state?.datePreset && parsed.state.datePreset !== 'custom') {
+              parsed.state.dateRange = getDateRangeFromPreset(parsed.state.datePreset);
+            } else if (parsed.state?.dateRange?.start && parsed.state?.dateRange?.end) {
+              // Custom range: convert date strings back to Date objects
               const start = new Date(parsed.state.dateRange.start);
               const end = new Date(parsed.state.dateRange.end);
 
-              // Validate dates are valid
               if (isNaN(start.getTime()) || isNaN(end.getTime())) {
                 console.warn('[FiltersStore] Invalid date range, using defaults');
                 delete parsed.state.dateRange;
@@ -345,7 +348,6 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
                 parsed.state.dateRange = { start, end };
               }
             } else {
-              // If dateRange is missing or invalid, use default
               delete parsed.state?.dateRange;
             }
             return parsed;
