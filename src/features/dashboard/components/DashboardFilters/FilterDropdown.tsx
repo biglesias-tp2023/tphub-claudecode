@@ -19,7 +19,7 @@ interface FilterDropdownProps {
   disabled?: boolean;
   className?: string;
   searchable?: boolean;
-  /** When true, empty selectedIds means "all selected" (default: true) */
+  /** @deprecated No longer used — kept for backward compatibility */
   treatEmptyAsAll?: boolean;
   /** Show header with title and count display */
   showHeader?: boolean;
@@ -39,13 +39,10 @@ export function FilterDropdown({
   disabled = false,
   className,
   searchable = true,
-  treatEmptyAsAll = true,
+  treatEmptyAsAll: _treatEmptyAsAll = true,
   showHeader = false,
   headerTitle,
 }: FilterDropdownProps) {
-  // When treatEmptyAsAll is true and selectedIds is empty, treat as "all selected"
-  const isAllSelected = treatEmptyAsAll && selectedIds.length === 0;
-  const effectiveSelectedIds = isAllSelected ? options.map((o) => o.id) : selectedIds;
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,15 +84,8 @@ export function FilterDropdown({
         : `${selectedIds.length} seleccionados`;
 
   const handleToggle = useCallback((id: string) => {
-    // If all are selected (empty array) and user unchecks one,
-    // we need to select all EXCEPT that one
-    if (isAllSelected && onSelectAll) {
-      const allExceptThis = options.filter((o) => o.id !== id).map((o) => o.id);
-      onSelectAll(allExceptThis);
-    } else {
-      onToggle(id);
-    }
-  }, [onToggle, onSelectAll, isAllSelected, options]);
+    onToggle(id);
+  }, [onToggle]);
 
   const handleClear = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -160,7 +150,7 @@ export function FilterDropdown({
               </h3>
               {options.length > 0 && (
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {isAllSelected ? options.length : selectedIds.length} de {options.length} seleccionados
+                  {selectedIds.length} de {options.length} seleccionados
                 </p>
               )}
             </div>
@@ -190,7 +180,7 @@ export function FilterDropdown({
               </div>
             ) : (
               filteredOptions.map((option) => {
-                const isSelected = effectiveSelectedIds.includes(option.id);
+                const isSelected = selectedIds.includes(option.id);
                 return (
                   <button
                     key={option.id}
@@ -229,10 +219,7 @@ export function FilterDropdown({
               <button
                 type="button"
                 onClick={() => {
-                  // Select all = clear selection (empty means all when treatEmptyAsAll)
-                  if (treatEmptyAsAll) {
-                    onClear();
-                  } else if (onSelectAll) {
+                  if (onSelectAll) {
                     onSelectAll(options.map((o) => o.id));
                   } else {
                     filteredOptions.forEach((opt) => {
@@ -254,10 +241,10 @@ export function FilterDropdown({
                     setIsOpen(false);
                     setSearchQuery('');
                   }}
-                  disabled={selectedIds.length === 0 && !isAllSelected}
+                  disabled={selectedIds.length === 0}
                   className={cn(
                     'px-2 py-1 text-xs font-medium rounded-lg transition-colors',
-                    (selectedIds.length > 0 || isAllSelected)
+                    selectedIds.length > 0
                       ? 'text-error-600 hover:bg-error-50'
                       : 'text-gray-400 cursor-not-allowed'
                   )}

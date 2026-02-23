@@ -84,9 +84,6 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
     [sortedCompanies]
   );
 
-  // Treat empty selection as "all selected"
-  const isEmptyAsAll = companyIds.length === 0;
-
   // Filter companies based on search, tab, status, and KAM
   const filteredCompanies = useMemo(() => {
     let result = sortedCompanies;
@@ -110,13 +107,13 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
       result = result.filter((c) => c.keyAccountManager && kamFilters.includes(c.keyAccountManager));
     }
 
-    // Apply tab filter — when empty = all, "selected" tab shows all companies
-    if (activeTab === 'selected' && !isEmptyAsAll) {
+    // Apply tab filter
+    if (activeTab === 'selected') {
       result = result.filter((c) => companyIds.includes(c.id));
     }
 
     return result;
-  }, [searchQuery, sortedCompanies, fuse, activeTab, companyIds, isEmptyAsAll, statusFilters, kamFilters]);
+  }, [searchQuery, sortedCompanies, fuse, activeTab, companyIds, statusFilters, kamFilters]);
 
   // Get selected companies for display
   const selectedCompanies = useMemo(() => {
@@ -137,18 +134,13 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
     }
   }, [sortedCompanies, companyIds, setCompanyIds]);
 
-  // Handle company selection — when empty (all selected), select all EXCEPT the toggled one
+  // Handle company selection
   const handleToggleCompany = useCallback(
     (company: Company) => {
-      if (isEmptyAsAll) {
-        const allExceptThis = sortedCompanies.filter((c) => c.id !== company.id).map((c) => c.id);
-        setCompanyIds(allExceptThis);
-      } else {
-        toggleCompanyId(company.id);
-      }
+      toggleCompanyId(company.id);
       resetDashboardFilters();
     },
-    [isEmptyAsAll, sortedCompanies, setCompanyIds, toggleCompanyId, resetDashboardFilters]
+    [toggleCompanyId, resetDashboardFilters]
   );
 
   // Handle select all visible
@@ -386,7 +378,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                       : 'text-gray-600 hover:bg-gray-100'
                   )}
                 >
-                  Seleccionados ({isEmptyAsAll ? sortedCompanies.length : selectedCompanies.length})
+                  Seleccionados ({selectedCompanies.length})
                 </button>
 
                 <div className="flex-1" />
@@ -420,7 +412,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                   </div>
                 ) : filteredCompanies.length === 0 ? (
                   <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                    {activeTab === 'selected' && !isEmptyAsAll
+                    {activeTab === 'selected'
                       ? 'No hay compañías seleccionadas'
                       : `No se encontraron compañías para "${searchQuery}"`}
                   </div>
@@ -430,7 +422,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                       <CompanyItem
                         key={company.id}
                         company={company}
-                        isSelected={isEmptyAsAll || companyIds.includes(company.id)}
+                        isSelected={companyIds.includes(company.id)}
                         isHighlighted={index === boundedHighlightedIndex}
                         onSelect={() => handleToggleCompany(company)}
                       />

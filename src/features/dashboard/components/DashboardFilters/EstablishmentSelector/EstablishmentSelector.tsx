@@ -52,16 +52,13 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
     return [...filteredRestaurants].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   }, [filteredRestaurants]);
 
-  // Treat empty selection as "all selected" (same as data layer behavior)
-  const isEmptyAsAll = restaurantIds.length === 0;
-
-  // Check if all are selected (either explicitly or via empty = all)
+  // Check if all are explicitly selected
   const allSelected = sortedRestaurants.length > 0 &&
-    (isEmptyAsAll || sortedRestaurants.every(r => restaurantIds.includes(r.id)));
+    restaurantIds.length > 0 &&
+    sortedRestaurants.every(r => restaurantIds.includes(r.id));
 
   // Check if some (but not all) are selected
-  const someSelected = !isEmptyAsAll &&
-    restaurantIds.length > 0 &&
+  const someSelected = restaurantIds.length > 0 &&
     restaurantIds.length < sortedRestaurants.length;
 
   // Close on click outside
@@ -85,14 +82,9 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
     }
   };
 
-  // Handle individual toggle — when empty (all selected), select all EXCEPT the toggled one
+  // Handle individual toggle
   const handleToggle = (id: string) => {
-    if (isEmptyAsAll) {
-      const allExceptThis = sortedRestaurants.filter(r => r.id !== id).map(r => r.id);
-      setRestaurantIds(allExceptThis);
-    } else {
-      toggleRestaurantId(id);
-    }
+    toggleRestaurantId(id);
   };
 
   // Always allow opening — the dropdown panel shows empty/loading state
@@ -120,7 +112,7 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
         )}>
           Establecimientos
         </span>
-        {!isEmptyAsAll && restaurantIds.length > 0 && !allSelected && (
+        {restaurantIds.length > 0 && !allSelected && (
           <span className="px-1.5 py-0.5 text-xs font-semibold bg-primary-100 text-primary-700 rounded-full">
             {restaurantIds.length}
           </span>
@@ -148,7 +140,7 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
             </h3>
             {sortedRestaurants.length > 0 && (
               <p className="text-xs text-gray-500 mt-0.5">
-                {isEmptyAsAll ? sortedRestaurants.length : restaurantIds.length} de {sortedRestaurants.length} seleccionados
+                {restaurantIds.length} de {sortedRestaurants.length} seleccionados
               </p>
             )}
           </div>
@@ -183,7 +175,7 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
                     <CheckboxItem
                       key={restaurant.id}
                       label={restaurant.name}
-                      checked={isEmptyAsAll || restaurantIds.includes(restaurant.id)}
+                      checked={restaurantIds.includes(restaurant.id)}
                       onChange={() => handleToggle(restaurant.id)}
                     />
                   ))}
@@ -206,10 +198,10 @@ export function EstablishmentSelector({ className }: EstablishmentSelectorProps)
                 <button
                   type="button"
                   onClick={clearRestaurants}
-                  disabled={restaurantIds.length === 0 && !isEmptyAsAll}
+                  disabled={restaurantIds.length === 0}
                   className={cn(
                     'px-2 py-1 text-xs font-medium rounded-lg transition-colors',
-                    (restaurantIds.length > 0 || isEmptyAsAll)
+                    restaurantIds.length > 0
                       ? 'text-error-600 hover:bg-error-50'
                       : 'text-gray-400 cursor-not-allowed'
                   )}
