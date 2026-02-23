@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import { getDateRangeFromPreset } from '@/utils/formatters';
 import type { ChannelId, DateRange, DatePreset, UserRole } from '@/types';
 
@@ -386,4 +387,4 @@ export const useChannelIds = () => useDashboardFiltersStore((s) => s.channelIds)
 
 /** Select date range and preset from dashboard filters. */
 export const useDateFilters = () =>
-  useDashboardFiltersStore((s) => ({ dateRange: s.dateRange, datePreset: s.datePreset }));
+  useDashboardFiltersStore(useShallow((s) => ({ dateRange: s.dateRange, datePreset: s.datePreset })));
