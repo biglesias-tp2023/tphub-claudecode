@@ -139,7 +139,7 @@ export async function exportReputationToExcel(data: ReputationExportData): Promi
   const wb = XLSX.utils.book_new();
 
   const summaryData: (string | number)[][] = [
-    ['REPUTACION', data.dateRange], [''], ['RATINGS POR CANAL'],
+    ['REPUTACIÓN', data.dateRange], [''], ['RATINGS POR CANAL'],
     ['Canal', 'Rating', 'Reviews', '% Positivo', '% Negativo'],
     ...data.channelRatings.map((r) => [r.channel, r.rating, r.totalReviews, r.positivePercent, r.negativePercent]), [''],
     ['RESUMEN'], ['Total Reseñas', data.summary.totalReviews], ['Reseñas Negativas', data.summary.negativeReviews],

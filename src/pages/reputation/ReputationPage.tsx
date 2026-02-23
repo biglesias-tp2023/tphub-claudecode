@@ -147,7 +147,7 @@ export function ReputationPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Reputacion</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Reputación</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Valoraciones y reseñas de clientes
             <span className="mx-2">·</span>
@@ -160,7 +160,7 @@ export function ReputationPage() {
             onExport={handleExport}
             getPreviewData={getPreviewData}
             generatePdfBlob={generatePdfBlob}
-            previewTitle="Reputacion"
+            previewTitle="Reputación"
             previewSubtitle={`${periodLabels.current} vs. ${periodLabels.comparison}`}
           />
         )}

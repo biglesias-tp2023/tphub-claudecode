@@ -174,7 +174,7 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
   const { jsPDF, autoTable } = await loadPdfLibraries();
   const doc = new jsPDF();
 
-  const startY = addBrandedHeader(doc, 'Reputacion', data.dateRange);
+  const startY = addBrandedHeader(doc, 'Reputación', data.dateRange);
 
   doc.setFontSize(11);
   doc.setTextColor(...BRAND.colors.dark);
@@ -453,7 +453,7 @@ export async function generateReputationPdfBlob(data: ReputationExportData): Pro
   const { jsPDF, autoTable } = await loadPdfLibraries();
   const doc = new jsPDF();
 
-  const startY = addBrandedHeader(doc, 'Reputacion', data.dateRange);
+  const startY = addBrandedHeader(doc, 'Reputación', data.dateRange);
 
   autoTable(doc, {
     startY: startY + 4,

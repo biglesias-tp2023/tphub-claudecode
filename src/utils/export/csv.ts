@@ -159,7 +159,7 @@ export function exportControllingToCSV(data: ControllingExportData) {
 
 export function exportReputationToCSV(data: ReputationExportData) {
   const csvContent = [
-    `REPUTACION - ${data.dateRange}`, '',
+    `REPUTACIÓN - ${data.dateRange}`, '',
     'RATINGS POR CANAL', 'Canal;Rating;Reviews;% Positivo;% Negativo',
     ...data.channelRatings.map((r) => `${r.channel};${r.rating.toFixed(1)};${r.totalReviews};${r.positivePercent.toFixed(1)}%;${r.negativePercent.toFixed(1)}%`), '',
     'RESUMEN', `Total Reseñas;${data.summary.totalReviews}`, `Reseñas Negativas;${data.summary.negativeReviews}`,
