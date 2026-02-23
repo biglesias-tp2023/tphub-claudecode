@@ -77,7 +77,7 @@ export function ErrorHeatmap({ data, className }: ErrorHeatmapProps) {
     <div className={cn('bg-white rounded-xl border border-gray-100 p-6', className)}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-gray-700">
-          Mapa de Calor - Resenas Negativas
+          Mapa de Calor - Reseñas Negativas
         </h3>
         <div className="flex items-center gap-2 text-[11px] text-gray-400">
           <span>Menos</span>
@@ -155,8 +155,8 @@ export function ErrorHeatmap({ data, className }: ErrorHeatmapProps) {
           <span className="mx-1.5 text-gray-400">·</span>
           <span>
             {tooltip.count > 0
-              ? `${tooltip.count} resena${tooltip.count > 1 ? 's' : ''} negativa${tooltip.count > 1 ? 's' : ''}`
-              : 'Sin resenas negativas'}
+              ? `${tooltip.count} reseña${tooltip.count > 1 ? 's' : ''} negativa${tooltip.count > 1 ? 's' : ''}`
+              : 'Sin reseñas negativas'}
           </span>
         </div>
       )}

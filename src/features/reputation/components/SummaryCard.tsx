@@ -22,7 +22,7 @@ function formatCurrency(n: number): string {
 
 const CARD_CONFIG = {
   totalReviews: {
-    label: 'Total Resenas',
+    label: 'Total Reseñas',
     valueColor: 'text-primary-600',
     iconBg: 'bg-primary-50',
     Icon: MessageSquare,
@@ -31,7 +31,7 @@ const CARD_CONFIG = {
     formatValue: formatNumber,
   },
   negativeReviews: {
-    label: 'Resenas Negativas',
+    label: 'Reseñas Negativas',
     valueColor: 'text-red-500',
     iconBg: 'bg-red-50',
     Icon: ThumbsDown,

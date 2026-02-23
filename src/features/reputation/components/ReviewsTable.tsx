@@ -161,7 +161,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
 
       {/* Footer */}
       <div className="bg-gray-50/50 px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-100">
-        Mostrando {data.length} de {(totalInPeriod || data.length).toLocaleString('es-ES')} resenas mas recientes
+        Mostrando {data.length} de {(totalInPeriod || data.length).toLocaleString('es-ES')} reseñas más recientes
         &bull; Datos de Glovo & Uber Eats Partner Portal
       </div>
     </div>

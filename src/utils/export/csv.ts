@@ -162,12 +162,12 @@ export function exportReputationToCSV(data: ReputationExportData) {
     `REPUTACION - ${data.dateRange}`, '',
     'RATINGS POR CANAL', 'Canal;Rating;Reviews;% Positivo;% Negativo',
     ...data.channelRatings.map((r) => `${r.channel};${r.rating.toFixed(1)};${r.totalReviews};${r.positivePercent.toFixed(1)}%;${r.negativePercent.toFixed(1)}%`), '',
-    'RESUMEN', `Total Resenas;${data.summary.totalReviews}`, `Resenas Negativas;${data.summary.negativeReviews}`,
+    'RESUMEN', `Total Reseñas;${data.summary.totalReviews}`, `Reseñas Negativas;${data.summary.negativeReviews}`,
     ...(data.summary.totalRefunds != null ? [`Reembolsos;${data.summary.totalRefunds.toFixed(2)} EUR`, `Tasa Reembolso;${(data.summary.refundRate ?? 0).toFixed(1)}%`] : []),
     '',
     'DISTRIBUCION DE VALORACIONES', 'Rating;Cantidad;Porcentaje',
     ...data.ratingDistribution.map((r) => `${r.rating} estrellas;${r.count};${r.percentage.toFixed(1)}%`), '',
-    'RESENAS', 'Fecha;Hora;Canal;Review ID;Order ID;Rating;Comentario;Tags;T. Entrega (min);Reembolso (EUR)',
+    'RESEÑAS', 'Fecha;Hora;Canal;Review ID;Order ID;Rating;Comentario;Tags;T. Entrega (min);Reembolso (EUR)',
     ...data.reviews.map((r) => `${r.date};${r.time};${r.channel};${r.id};${r.orderId};${r.rating};${r.comment ?? ''};${r.tags?.join(', ') ?? ''};${r.deliveryTime ?? ''};${r.refundAmount != null ? r.refundAmount.toFixed(2) : ''}`),
   ].join('\n');
 

@@ -149,7 +149,7 @@ export function ReputationPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Reputacion</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Valoraciones y resenas de clientes
+            Valoraciones y reseñas de clientes
             <span className="mx-2">·</span>
             <span className="font-medium text-gray-700">{periodLabels.current}</span>
             <span className="italic text-gray-400 ml-1.5">vs. {periodLabels.comparison}</span>
@@ -176,25 +176,28 @@ export function ReputationPage() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex gap-4 overflow-x-auto">
             {data.channelRatings.map((rating) => (
-              <ChannelRatingCard key={rating.channel} data={rating} />
+              <ChannelRatingCard key={rating.channel} data={rating} className="flex-1 min-w-0" />
             ))}
             <SummaryCard
               type="totalReviews"
               value={data.summary.totalReviews}
               change={data.summary.totalReviewsChange}
+              className="flex-1 min-w-0"
             />
             <SummaryCard
               type="negativeReviews"
               value={data.summary.negativeReviews}
               change={data.summary.negativeReviewsChange}
+              className="flex-1 min-w-0"
             />
             <SummaryCard
               type="refunds"
               value={data.summary.totalRefunds}
               change={data.summary.totalRefundsChange}
               subtitle={`${data.summary.refundRate.toFixed(1)}% de ventas`}
+              className="flex-1 min-w-0"
             />
           </div>
 

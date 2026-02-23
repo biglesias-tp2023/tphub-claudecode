@@ -197,8 +197,8 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...BRAND.colors.gray);
-  doc.text(`Total Resenas: ${formatNumber(data.summary.totalReviews)}`, 14, summaryY + 8);
-  doc.text(`Resenas Negativas: ${formatNumber(data.summary.negativeReviews)}`, 14, summaryY + 14);
+  doc.text(`Total Reseñas: ${formatNumber(data.summary.totalReviews)}`, 14, summaryY + 8);
+  doc.text(`Reseñas Negativas: ${formatNumber(data.summary.negativeReviews)}`, 14, summaryY + 14);
   if (data.summary.totalRefunds != null) {
     doc.text(`Reembolsos: ${data.summary.totalRefunds.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR (${(data.summary.refundRate ?? 0).toFixed(1)}%)`, 14, summaryY + 20);
   }
@@ -217,7 +217,7 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
   });
 
   doc.addPage();
-  const reviewsStartY = addBrandedHeader(doc, 'Resenas', `${data.reviews.length} registros`);
+  const reviewsStartY = addBrandedHeader(doc, 'Reseñas', `${data.reviews.length} registros`);
 
   autoTable(doc, {
     startY: reviewsStartY,
