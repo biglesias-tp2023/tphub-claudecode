@@ -199,23 +199,21 @@ export function ReputationPage() {
           </div>
 
           {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <div className="flex gap-1">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    'px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 transition-colors',
-                    activeTab === tab.id
-                      ? 'bg-white text-gray-900 border-gray-200'
-                      : 'bg-transparent text-gray-500 border-transparent hover:text-gray-700'
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          <div className="inline-flex bg-gray-100 rounded-lg p-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'px-4 py-2 rounded-md text-sm font-medium transition-all',
+                  activeTab === tab.id
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           {/* Tab content */}

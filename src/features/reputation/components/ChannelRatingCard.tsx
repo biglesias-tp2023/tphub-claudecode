@@ -14,7 +14,7 @@ export function ChannelRatingCard({ data, className }: ChannelRatingCardProps) {
   return (
     <div
       className={cn(
-        'bg-white rounded-xl border border-gray-200 p-5',
+        'bg-white rounded-xl border border-gray-100 p-6',
         className
       )}
     >

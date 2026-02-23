@@ -44,11 +44,11 @@ function truncateId(id: string, maxLen = 12): string {
 
 export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTableProps) {
   return (
-    <div className={cn('bg-white rounded-xl border border-gray-200 overflow-hidden', className)}>
+    <div className={cn('bg-white rounded-xl border border-gray-100 overflow-hidden', className)}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr className="bg-gray-50/50 border-b border-gray-100">
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
                 App
               </th>
@@ -160,7 +160,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-50 px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-200">
+      <div className="bg-gray-50/50 px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-100">
         Mostrando {data.length} de {(totalInPeriod || data.length).toLocaleString('es-ES')} resenas mas recientes
         &bull; Datos de Glovo & Uber Eats Partner Portal
       </div>

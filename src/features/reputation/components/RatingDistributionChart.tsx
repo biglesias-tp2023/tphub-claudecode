@@ -11,7 +11,7 @@ export function RatingDistributionChart({ data, className }: RatingDistributionC
   const maxCount = Math.max(...data.map((item) => item.count), 1);
 
   return (
-    <div className={cn('bg-white rounded-xl border border-gray-200 p-5', className)}>
+    <div className={cn('bg-white rounded-xl border border-gray-100 p-6', className)}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Distribucion de Valoraciones</h3>
         <p className="text-sm text-gray-500">{totalReviews.toLocaleString('es-ES')} valoraciones en total</p>
@@ -21,13 +21,13 @@ export function RatingDistributionChart({ data, className }: RatingDistributionC
         {data.map((item) => {
           const percent = totalReviews > 0 ? (item.count / totalReviews) * 100 : 0;
           return (
-            <div key={item.rating} className="flex items-center gap-3">
+            <div key={item.rating} className="flex items-center gap-3 rounded-lg px-2 py-1 -mx-2 hover:bg-gray-50 transition-colors">
               <div className="w-20 text-right text-sm text-gray-600 shrink-0">
                 {item.label}
               </div>
-              <div className="flex-1 h-6 bg-gray-100 rounded overflow-hidden">
+              <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full rounded transition-all duration-500"
+                  className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${(item.count / maxCount) * 100}%`,
                     backgroundColor: item.color,
