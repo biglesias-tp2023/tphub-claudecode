@@ -17,6 +17,7 @@ import {
   fetchCrpReviewsRaw,
   fetchOrderDetails,
   fetchCrpOrdersComparison,
+  fetchReviewTags,
 } from '@/services/crp-portal';
 import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams, OrderDetails } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
@@ -144,6 +145,16 @@ export function useReviewsRaw(params: UseReviewsParams, limit = 200) {
         limit
       );
     },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useReviewTags(reviewIds: string[]) {
+  return useQuery<Map<string, string[]>>({
+    queryKey: ['review-tags', [...reviewIds].sort().join(',')],
+    queryFn: () => fetchReviewTags(reviewIds),
+    enabled: reviewIds.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

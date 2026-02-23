@@ -329,6 +329,7 @@ export async function fetchCrpReviewsComparison(
 export interface OrderDetails {
   refunds: Map<string, number>;
   amounts: Map<string, number>;
+  deliveryTimes: Map<string, number>; // orderId → minutes
 }
 
 export async function fetchOrderRefunds(
@@ -343,7 +344,8 @@ export async function fetchOrderDetails(
 ): Promise<OrderDetails> {
   const refunds = new Map<string, number>();
   const amounts = new Map<string, number>();
-  if (orderIds.length === 0) return { refunds, amounts };
+  const deliveryTimes = new Map<string, number>();
+  if (orderIds.length === 0) return { refunds, amounts, deliveryTimes };
 
   // Supabase IN filter has a practical limit; batch in chunks of 200
   const CHUNK_SIZE = 200;
@@ -351,7 +353,7 @@ export async function fetchOrderDetails(
     const chunk = orderIds.slice(i, i + CHUNK_SIZE);
     const { data, error } = await supabase
       .from('crp_portal__ft_order_head')
-      .select('pk_uuid_order, amt_refunds, amt_total_price')
+      .select('pk_uuid_order, amt_refunds, amt_total_price, ts_accepted, ts_delivered')
       .in('pk_uuid_order', chunk);
 
     if (error) {
@@ -368,10 +370,76 @@ export async function fetchOrderDetails(
       if (totalPrice > 0) {
         amounts.set(row.pk_uuid_order, totalPrice);
       }
+      if (row.ts_accepted && row.ts_delivered) {
+        const diffMinutes = Math.round(
+          (new Date(row.ts_delivered).getTime() - new Date(row.ts_accepted).getTime()) / 60000
+        );
+        if (diffMinutes > 0 && diffMinutes < 180) {
+          deliveryTimes.set(row.pk_uuid_order, diffMinutes);
+        }
+      }
     }
   }
 
-  return { refunds, amounts };
+  return { refunds, amounts, deliveryTimes };
+}
+
+// ============================================
+// REVIEW TAGS
+// ============================================
+
+/**
+ * Normalizes tag labels from different platforms:
+ * - Glovo: SCREAMING_SNAKE_CASE → "Missing or mistaken items"
+ * - UberEats: Already Title Case → passes through
+ */
+function normalizeTagLabel(tag: string): string {
+  if (tag === tag.toUpperCase() && tag.includes('_')) {
+    // SCREAMING_SNAKE_CASE → sentence case
+    return tag
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/^\w/, (c) => c.toUpperCase());
+  }
+  return tag;
+}
+
+/**
+ * Fetches review tags from crp_portal_ftreview_tag for a batch of review IDs.
+ * Returns a Map of reviewId → normalized tag labels.
+ */
+export async function fetchReviewTags(
+  reviewIds: string[]
+): Promise<Map<string, string[]>> {
+  const tagMap = new Map<string, string[]>();
+  if (reviewIds.length === 0) return tagMap;
+
+  const CHUNK_SIZE = 200;
+  for (let i = 0; i < reviewIds.length; i += CHUNK_SIZE) {
+    const chunk = reviewIds.slice(i, i + CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from('crp_portal_ftreview_tag')
+      .select('pk_id_review, val_tag')
+      .in('pk_id_review', chunk);
+
+    if (error) {
+      console.error('Error fetching review tags:', error);
+      throw error;
+    }
+
+    for (const row of data || []) {
+      const reviewId = row.pk_id_review as string;
+      const tag = normalizeTagLabel(row.val_tag as string);
+      const existing = tagMap.get(reviewId);
+      if (existing) {
+        existing.push(tag);
+      } else {
+        tagMap.set(reviewId, [tag]);
+      }
+    }
+  }
+
+  return tagMap;
 }
 
 export async function fetchCrpReviewsRaw(

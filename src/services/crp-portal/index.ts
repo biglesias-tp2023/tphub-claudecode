@@ -141,6 +141,7 @@ export {
   fetchCrpReviewsRaw,
   fetchOrderRefunds,
   fetchOrderDetails,
+  fetchReviewTags,
 } from './reviews';
 
 export type {

@@ -13,7 +13,7 @@ import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters, useDashboard
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
-import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw, useOrderRefunds, useRefundsSummary } from './useReviewsData';
+import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw, useOrderRefunds, useReviewTags, useRefundsSummary } from './useReviewsData';
 import { portalIdToChannelId } from '@/services/crp-portal/reviews';
 import type { ChannelId } from '@/types';
 import type { ChannelReviewAggregation } from '@/services/crp-portal';
@@ -194,6 +194,13 @@ export function useReputationData() {
   );
   const refundsQuery = useOrderRefunds(orderIds);
 
+  // Extract review IDs for tags lookup
+  const reviewIds = useMemo(
+    () => (rawQuery.data || []).map((r) => r.pk_id_review),
+    [rawQuery.data]
+  );
+  const tagsQuery = useReviewTags(reviewIds);
+
   const isLoading = aggQuery.isLoading || heatmapQuery.isLoading || rawQuery.isLoading;
   const error = aggQuery.error || heatmapQuery.error || rawQuery.error;
 
@@ -242,13 +249,16 @@ export function useReputationData() {
       };
     });
 
-    // Build reviews from raw data, merging per-order refund amounts and order amounts
+    // Build reviews from raw data, merging per-order refund amounts, order amounts, delivery times and tags
     const orderDetails = refundsQuery.data;
+    const tagMap = tagsQuery.data;
     const reviews: Review[] = (rawQuery.data || []).map((raw) => {
       const channel = portalIdToChannelId(raw.pfk_id_portal) || 'glovo';
       const ts = new Date(raw.ts_creation_time);
       const refundAmount = orderDetails?.refunds.get(raw.fk_id_order) ?? null;
       const orderAmount = orderDetails?.amounts.get(raw.fk_id_order) ?? null;
+      const deliveryTime = orderDetails?.deliveryTimes.get(raw.fk_id_order) ?? null;
+      const tags = tagMap?.get(raw.pk_id_review) ?? null;
       return {
         id: raw.pk_id_review,
         orderId: raw.fk_id_order,
@@ -258,8 +268,19 @@ export function useReputationData() {
         rating: raw.val_rating,
         refundAmount,
         orderAmount,
+        deliveryTime,
+        tags,
       };
     });
+
+    // Calculate average delivery time for the scorecard
+    const deliveryTimes = reviews.map((r) => r.deliveryTime).filter((t): t is number => t != null);
+    const avgDeliveryTime = deliveryTimes.length > 0
+      ? deliveryTimes.reduce((sum, t) => sum + t, 0) / deliveryTimes.length
+      : undefined;
+
+    // Add avgDeliveryTime to summary
+    summary.avgDeliveryTime = avgDeliveryTime;
 
     return {
       channelRatings,
@@ -269,7 +290,7 @@ export function useReputationData() {
       reviews,
       totalReviewsInPeriod: current.totalReviews,
     };
-  }, [aggQuery.data, heatmapQuery.data, rawQuery.data, refundsQuery.data, refundsSummaryQuery.data]);
+  }, [aggQuery.data, heatmapQuery.data, rawQuery.data, refundsQuery.data, refundsSummaryQuery.data, tagsQuery.data]);
 
   return {
     data,
