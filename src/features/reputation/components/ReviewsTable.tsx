@@ -83,10 +83,10 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
                       title={channel.name}
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm text-right tabular-nums">
+                  <td className="px-4 py-3 text-sm text-right tabular-nums whitespace-nowrap">
                     {review.orderAmount != null && review.orderAmount > 0 ? (
                       <span className="text-gray-900 font-semibold">
-                        {review.orderAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
+                        {review.orderAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;&euro;
                       </span>
                     ) : (
                       <span className="italic text-gray-300">&mdash;</span>
@@ -136,13 +136,13 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
                       : <span className="italic text-gray-300">&mdash;</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-sm text-right tabular-nums">
+                  <td className="px-4 py-3 text-sm text-right tabular-nums whitespace-nowrap">
                     {review.refundAmount != null && review.refundAmount > 0 ? (
                       <span className="text-amber-600 font-medium">
-                        -{review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
+                        -{review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;&euro;
                       </span>
                     ) : (
-                      <span className="italic text-gray-300">0,00 &euro;</span>
+                      <span className="italic text-gray-300">0,00&nbsp;&euro;</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-400">
