@@ -129,8 +129,10 @@ export function useOrdersData(params: UseOrdersDataParams) {
 
       return result;
     },
-    // Always enabled: empty companyIds means "all companies" (no filter)
-    enabled: true,
+    // Only fetch when companies are selected (consistent with useHierarchyData/useWeeklyRevenue)
+    enabled: companyIds.length > 0,
+    // Limit retries to prevent amplifying RPC timeouts (default=3 → 1)
+    retry: 1,
     // Keep data fresh but avoid excessive refetching
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
