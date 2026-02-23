@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, type ReactNode } from 'react';
-import { select, scalePoint, scaleLinear, max, axisBottom, axisLeft, curveMonotoneX, curveLinear, area, line, pointer } from 'd3';
+import { select, scalePoint, scaleLinear, max, axisBottom, axisLeft, axisRight, curveMonotoneX, curveLinear, area, line, pointer } from 'd3';
 import type { ChartMargin, AreaSeriesConfig, ReferenceLineConfig } from './types';
 
 interface AreaChartProps {
@@ -13,6 +13,7 @@ interface AreaChartProps {
   tickFontSize?: number;
   tickColor?: string;
   yTickFormatter?: (value: number) => string;
+  rightYTickFormatter?: (value: number) => string;
   referenceLines?: ReferenceLineConfig[];
   renderTooltip?: (dataPoint: Record<string, unknown>, xLabel: string) => ReactNode;
   curveType?: 'monotone' | 'linear';
@@ -29,6 +30,7 @@ export function AreaChart({
   tickFontSize = 12,
   tickColor = '#6B7280',
   yTickFormatter,
+  rightYTickFormatter,
   referenceLines,
   renderTooltip,
   curveType = 'monotone',
@@ -125,14 +127,31 @@ export function AreaChart({
       return stackedValues.get(prevSeries.dataKey)?.get(i) || 0;
     };
 
-    const yMax = max(data.flatMap((_, i) =>
-      series.map((s) => getValue(s, i))
+    // Dual Y-axis: split series into left and right groups
+    const leftSeries = series.filter((s) => s.yAxisId !== 'right');
+    const rightSeries = series.filter((s) => s.yAxisId === 'right');
+    const hasRightAxis = rightSeries.length > 0;
+
+    const yMaxLeft = max(data.flatMap((_, i) =>
+      leftSeries.map((s) => getValue(s, i))
     )) || 0;
 
     const y = scaleLinear()
-      .domain([0, yMax])
+      .domain([0, yMaxLeft])
       .nice()
       .range([innerHeight, 0]);
+
+    const yMaxRight = hasRightAxis
+      ? (max(data.flatMap((_, i) => rightSeries.map((s) => getValue(s, i)))) || 0)
+      : 0;
+
+    const yRight = scaleLinear()
+      .domain([0, yMaxRight])
+      .nice()
+      .range([innerHeight, 0]);
+
+    // Helper to pick the correct y scale for a series
+    const getYScale = (s: AreaSeriesConfig) => s.yAxisId === 'right' ? yRight : y;
 
     // Grid
     const yTicks = y.ticks(5);
@@ -181,19 +200,38 @@ export function AreaChart({
       .attr('font-size', tickFontSize)
       .attr('fill', tickColor);
 
+    // Right Y Axis (if any series uses yAxisId: 'right')
+    if (hasRightAxis) {
+      const yRightAxisG = g.append('g')
+        .attr('transform', `translate(${innerWidth},0)`)
+        .call(
+          axisRight(yRight)
+            .ticks(5)
+            .tickSize(0)
+            .tickFormat((d) => rightYTickFormatter ? rightYTickFormatter(d as number) : String(d))
+        );
+
+      yRightAxisG.select('.domain').remove();
+      yRightAxisG.selectAll('text')
+        .attr('font-size', tickFontSize)
+        .attr('fill', tickColor);
+    }
+
     const curve = curveType === 'monotone' ? curveMonotoneX : curveLinear;
 
     // Draw areas and lines (in order so later series draw on top)
     series.forEach((s) => {
+      const yScale = getYScale(s);
+
       const areaGen = area<Record<string, unknown>>()
         .x((d) => x(String(d[xKey])) || 0)
-        .y0((_, i) => y(getBaseline(s, i)))
-        .y1((_, i) => y(getValue(s, i)))
+        .y0((_, i) => yScale(getBaseline(s, i)))
+        .y1((_, i) => yScale(getValue(s, i)))
         .curve(curve);
 
       const lineGen = line<Record<string, unknown>>()
         .x((d) => x(String(d[xKey])) || 0)
-        .y((_, i) => y(getValue(s, i)))
+        .y((_, i) => yScale(getValue(s, i)))
         .curve(curve);
 
       // Area fill
@@ -204,12 +242,16 @@ export function AreaChart({
         .attr('stroke', 'none');
 
       // Line
-      g.append('path')
+      const linePath = g.append('path')
         .datum(data)
         .attr('d', lineGen)
         .attr('fill', 'none')
         .attr('stroke', s.color)
         .attr('stroke-width', s.strokeWidth || 2);
+
+      if (s.strokeDasharray) {
+        linePath.attr('stroke-dasharray', s.strokeDasharray);
+      }
 
       // Dots
       if (s.showDots !== false) {
@@ -218,7 +260,7 @@ export function AreaChart({
           .enter()
           .append('circle')
           .attr('cx', (d) => x(String(d[xKey])) || 0)
-          .attr('cy', (_, i) => y(getValue(s, i)))
+          .attr('cy', (_, i) => yScale(getValue(s, i)))
           .attr('r', 3)
           .attr('fill', s.color);
       }
@@ -282,7 +324,7 @@ export function AreaChart({
 
       overlay.on('mouseleave', () => setTooltip(null));
     }
-  }, [data, series, dimensions, margin, xKey, gridDash, gridColor, gridVertical, tickFontSize, tickColor, yTickFormatter, referenceLines, renderTooltip, curveType]);
+  }, [data, series, dimensions, margin, xKey, gridDash, gridColor, gridVertical, tickFontSize, tickColor, yTickFormatter, rightYTickFormatter, referenceLines, renderTooltip, curveType]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">

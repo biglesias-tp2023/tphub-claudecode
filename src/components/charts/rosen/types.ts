@@ -25,8 +25,10 @@ export interface AreaSeriesConfig {
   color: string;
   gradientOpacity?: [number, number];
   strokeWidth?: number;
+  strokeDasharray?: string;
   stackId?: string;
   showDots?: boolean;
+  yAxisId?: 'left' | 'right';
 }
 
 export interface ReferenceLineConfig {
