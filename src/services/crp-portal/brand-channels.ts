@@ -41,20 +41,24 @@ export async function fetchBrandActiveChannels(
   companyIds?: number[]
 ): Promise<Map<string, ChannelId[]>> {
   // Only last 90 days for efficiency
+  const now = new Date();
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 90);
 
   // Use pagination to fetch all data (bypasses Supabase's server-side max_rows limit)
   const PAGE_SIZE = 1000;
+  const MAX_PAGES = 100; // Safety limit to prevent runaway pagination
   const allData: { pfk_id_store: string; pfk_id_portal: string }[] = [];
   let offset = 0;
   let hasMore = true;
+  let pageCount = 0;
 
-  while (hasMore) {
+  while (hasMore && pageCount < MAX_PAGES) {
     let query = supabase
       .from('crp_portal__ft_order_head')
       .select('pfk_id_store, pfk_id_portal')
-      .gte('td_creation_time', cutoffDate.toISOString());
+      .gte('td_creation_time', cutoffDate.toISOString())
+      .lte('td_creation_time', now.toISOString());
 
     if (companyIds?.length) {
       query = query.in('pfk_id_company', companyIds);
@@ -68,6 +72,7 @@ export async function fetchBrandActiveChannels(
     if (data && data.length > 0) {
       allData.push(...(data as { pfk_id_store: string; pfk_id_portal: string }[]));
       offset += PAGE_SIZE;
+      pageCount++;
       hasMore = data.length === PAGE_SIZE;
     } else {
       hasMore = false;
@@ -110,20 +115,24 @@ export async function fetchRestaurantActiveChannels(
   companyIds?: number[]
 ): Promise<Map<string, ChannelId[]>> {
   // Only last 90 days for efficiency
+  const now = new Date();
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - 90);
 
   // Use pagination to fetch all data (bypasses Supabase's server-side max_rows limit)
   const PAGE_SIZE = 1000;
+  const MAX_PAGES = 100; // Safety limit to prevent runaway pagination
   const allData: { pfk_id_store_address: string; pfk_id_portal: string }[] = [];
   let offset = 0;
   let hasMore = true;
+  let pageCount = 0;
 
-  while (hasMore) {
+  while (hasMore && pageCount < MAX_PAGES) {
     let query = supabase
       .from('crp_portal__ft_order_head')
       .select('pfk_id_store_address, pfk_id_portal')
-      .gte('td_creation_time', cutoffDate.toISOString());
+      .gte('td_creation_time', cutoffDate.toISOString())
+      .lte('td_creation_time', now.toISOString());
 
     if (companyIds?.length) {
       query = query.in('pfk_id_company', companyIds);
@@ -137,6 +146,7 @@ export async function fetchRestaurantActiveChannels(
     if (data && data.length > 0) {
       allData.push(...(data as { pfk_id_store_address: string; pfk_id_portal: string }[]));
       offset += PAGE_SIZE;
+      pageCount++;
       hasMore = data.length === PAGE_SIZE;
     } else {
       hasMore = false;
