@@ -14,14 +14,12 @@ export function MainLayout() {
       {/* Main content area - offset by sidebar */}
       <main
         className={cn(
-          'min-h-screen transition-[padding-left] duration-300 ease-out',
+          'min-h-screen bg-white transition-[padding-left] duration-300 ease-out border-l border-gray-200',
           isSidebarCollapsed ? 'pl-[72px]' : 'pl-[260px]'
         )}
       >
-        <div className="p-3">
-          <div className="bg-white rounded-2xl shadow-sm min-h-[calc(100vh-24px)] p-6">
-            <Outlet />
-          </div>
+        <div className="p-6">
+          <Outlet />
         </div>
       </main>
     </div>
