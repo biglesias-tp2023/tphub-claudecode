@@ -11,7 +11,6 @@ interface ReviewsTableProps {
 }
 
 function RatingDisplay({ rating, channel }: { rating: number; channel: ChannelId }) {
-  // Glovo uses thumbs up/down (5 = positive, 1 = negative)
   if (channel === 'glovo') {
     if (rating >= 4) {
       return <ThumbsUp className="w-5 h-5 text-green-500" />;
@@ -19,7 +18,6 @@ function RatingDisplay({ rating, channel }: { rating: number; channel: ChannelId
     return <ThumbsDown className="w-5 h-5 text-red-500" />;
   }
 
-  // UberEats and others use star rating
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -49,39 +47,17 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50/50 border-b border-gray-100">
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                App
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Review ID
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Order ID
-              </th>
-              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">
-                AOV
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Fecha
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Hora
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Rating
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Comentario
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                Tags
-              </th>
-              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
-                T. Entrega
-              </th>
-              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">
-                Reembolso
-              </th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">App</th>
+              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">AOV</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Fecha</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Hora</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Rating</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Comentario</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Tags</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">T. Entrega</th>
+              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">Reembolso</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Order ID</th>
+              <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Review ID</th>
             </tr>
           </thead>
           <tbody>
@@ -94,20 +70,12 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                   className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={channel.logoUrl}
-                        alt={channel.name}
-                        className="w-5 h-5 rounded-full object-cover shrink-0"
-                      />
-                      <span className="text-sm text-gray-900">{channel.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-600">
-                    {truncateId(review.id)}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-600">
-                    {truncateId(review.orderId)}
+                    <img
+                      src={channel.logoUrl}
+                      alt={channel.name}
+                      className="w-6 h-6 rounded-full object-cover"
+                      title={channel.name}
+                    />
                   </td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums">
                     {review.orderAmount != null && review.orderAmount > 0 ? (
@@ -115,7 +83,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                         {review.orderAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
                       </span>
                     ) : (
-                      <span className="italic text-gray-300">—</span>
+                      <span className="italic text-gray-300">&mdash;</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
@@ -159,17 +127,23 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                           {review.deliveryTime} min
                         </span>
                       )
-                      : <span className="italic text-gray-300">—</span>
+                      : <span className="italic text-gray-300">&mdash;</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-sm text-right">
+                  <td className="px-4 py-3 text-sm text-right tabular-nums">
                     {review.refundAmount != null && review.refundAmount > 0 ? (
                       <span className="text-amber-600 font-medium">
                         {review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
                       </span>
                     ) : (
-                      <span className="italic text-gray-300">—</span>
+                      <span className="italic text-gray-300">0,00 &euro;</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-mono text-gray-400">
+                    {truncateId(review.orderId)}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-mono text-gray-400">
+                    {truncateId(review.id)}
                   </td>
                 </tr>
               );
