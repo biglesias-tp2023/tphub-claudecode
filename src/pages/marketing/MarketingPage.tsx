@@ -283,6 +283,11 @@ export function MarketingPage() {
       {/* Filters */}
       <DashboardFilters excludeChannels={['justeat']} />
 
+      {/* Disclaimer */}
+      <p className="text-xs text-gray-400 -mb-3">
+        Clica sobre una métrica para verla representada en la gráfica
+      </p>
+
       {/* Scorecards Row 1 - Volume */}
       <section>
         <h2 className="text-sm font-semibold text-gray-900 mb-3">
