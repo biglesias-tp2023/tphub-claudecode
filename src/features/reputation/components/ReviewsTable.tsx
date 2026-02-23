@@ -133,7 +133,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                   <td className="px-4 py-3 text-sm text-right tabular-nums">
                     {review.refundAmount != null && review.refundAmount > 0 ? (
                       <span className="text-amber-600 font-medium">
-                        {review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
+                        -{review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
                       </span>
                     ) : (
                       <span className="italic text-gray-300">0,00 &euro;</span>
