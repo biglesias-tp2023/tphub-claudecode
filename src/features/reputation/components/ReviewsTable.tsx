@@ -1,9 +1,12 @@
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/utils/cn';
-import { ThumbsUp, ThumbsDown, Star } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Star, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast } from 'lucide-react';
 import { CHANNELS } from '@/constants/channels';
 import { getTagClasses } from '../utils/tagCategories';
 import type { Review } from '../hooks/useReputationData';
 import type { ChannelId } from '@/types';
+
+const PAGE_SIZE_OPTIONS = [15, 50, 75, 100] as const;
 
 interface ReviewsTableProps {
   data: Review[];
@@ -43,6 +46,17 @@ function truncateId(id: string, maxLen = 12): string {
 }
 
 export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: ReviewsTableProps) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(50);
+
+  // Reset to page 1 when data or pageSize changes
+  useEffect(() => { setPage(1); }, [data, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+  const startIdx = (page - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, data.length);
+  const pageData = useMemo(() => data.slice(startIdx, endIdx), [data, startIdx, endIdx]);
+
   return (
     <div className={cn('bg-white rounded-xl border border-gray-100 overflow-hidden', className)}>
       <div className="overflow-x-auto">
@@ -63,7 +77,7 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
             </tr>
           </thead>
           <tbody>
-            {data.map((review) => {
+            {pageData.map((review) => {
               const channel = CHANNELS[review.channel];
 
               return (
@@ -158,10 +172,69 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
         </table>
       </div>
 
-      {/* Footer */}
-      <div className="bg-gray-50/50 px-4 py-3 text-center text-sm text-gray-500 border-t border-gray-100">
-        Mostrando {data.length} de {(totalInPeriod || data.length).toLocaleString('es-ES')} reseñas más recientes
-        &bull; Datos de Glovo & Uber Eats Partner Portal
+      {/* Pagination Footer */}
+      <div className="bg-gray-50/50 px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+        {/* Left: Page navigation */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setPage(1)}
+            disabled={page === 1}
+            className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Primera página"
+          >
+            <ChevronFirst className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Página anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <span className="inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 tabular-nums">
+            {page}
+          </span>
+
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Página siguiente"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setPage(totalPages)}
+            disabled={page === totalPages}
+            className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            aria-label="Última página"
+          >
+            <ChevronLast className="w-4 h-4" />
+          </button>
+
+          <span className="ml-2 text-sm text-gray-500">
+            Mostrando {startIdx + 1}&ndash;{endIdx} de {(totalInPeriod || data.length).toLocaleString('es-ES')} reseñas
+          </span>
+        </div>
+
+        {/* Right: Page size selector */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="page-size" className="text-sm text-gray-500 whitespace-nowrap">
+            Filas por página
+          </label>
+          <select
+            id="page-size"
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            className="h-8 rounded-md border border-gray-300 bg-white px-2 pr-7 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
