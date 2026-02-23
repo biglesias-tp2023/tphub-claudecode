@@ -283,16 +283,16 @@ export function MarketingPage() {
       {/* Filters */}
       <DashboardFilters excludeChannels={['justeat']} />
 
-      {/* Disclaimer */}
-      <p className="text-xs text-gray-400 -mb-3">
-        Clica sobre una métrica para verla representada en la gráfica
-      </p>
-
       {/* Scorecards Row 1 - Volume */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">
-          Rendimiento Publicitario
-        </h2>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">
+            Rendimiento Publicitario
+          </h2>
+          <span className="text-xs text-gray-400">
+            Clica sobre una métrica para verla representada en la gráfica
+          </span>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {volumeKpis.map((kpi) => (
             <Scorecard

@@ -289,8 +289,28 @@ export function AreaChart({
       }
     });
 
-    // Tooltip overlay
+    // Tooltip overlay with hover dots and vertical guide line
     if (renderTooltip) {
+      // Hover group for guide line + dots (drawn above everything)
+      const hoverGroup = g.append('g').attr('class', 'hover-group').style('display', 'none');
+
+      // Vertical guide line
+      hoverGroup.append('line')
+        .attr('class', 'hover-guide')
+        .attr('y1', 0).attr('y2', innerHeight)
+        .attr('stroke', '#D1D5DB')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '4 3');
+
+      // Create a dot for each series
+      const hoverDots = series.map((s) => {
+        return hoverGroup.append('circle')
+          .attr('r', 5)
+          .attr('fill', s.color)
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 2);
+      });
+
       const overlay = g.append('rect')
         .attr('width', innerWidth)
         .attr('height', innerHeight)
@@ -312,8 +332,24 @@ export function AreaChart({
           }
         });
 
+        const hoverX = xPositions[closestIdx] || 0;
+
+        // Update guide line
+        hoverGroup.style('display', null);
+        hoverGroup.select('.hover-guide')
+          .attr('x1', hoverX).attr('x2', hoverX);
+
+        // Update dots
+        series.forEach((s, si) => {
+          const yScale = getYScale(s);
+          const yVal = getValue(s, closestIdx);
+          hoverDots[si]
+            .attr('cx', hoverX)
+            .attr('cy', yScale(yVal));
+        });
+
         const rect = containerRef.current!.getBoundingClientRect();
-        const xPos = (xPositions[closestIdx] || 0) + margin.left;
+        const xPos = hoverX + margin.left;
         setTooltip({
           dataPoint: data[closestIdx],
           xLabel: domain[closestIdx],
@@ -322,7 +358,10 @@ export function AreaChart({
         });
       });
 
-      overlay.on('mouseleave', () => setTooltip(null));
+      overlay.on('mouseleave', () => {
+        hoverGroup.style('display', 'none');
+        setTooltip(null);
+      });
     }
   }, [data, series, dimensions, margin, xKey, gridDash, gridColor, gridVertical, tickFontSize, tickColor, yTickFormatter, rightYTickFormatter, referenceLines, renderTooltip, curveType]);
 
