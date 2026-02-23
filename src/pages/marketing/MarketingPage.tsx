@@ -136,7 +136,7 @@ export function MarketingPage() {
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
 
   const [selectedKpis, setSelectedKpis] = useState<Set<KpiId>>(
-    () => new Set(['impressions'])
+    () => new Set(['clicks', 'adOrders', 'adSpent'])
   );
 
   const toggleKpi = useCallback((kpiId: KpiId) => {
@@ -265,9 +265,9 @@ export function MarketingPage() {
       {/* Page header */}
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-accent-400">
-            Beta
+          <h1 className="text-xl font-semibold text-gray-900">Publicidad</h1>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary-50 text-primary-600">
+            New!
           </span>
         </div>
         <p className="text-sm text-gray-500 mt-0.5">
