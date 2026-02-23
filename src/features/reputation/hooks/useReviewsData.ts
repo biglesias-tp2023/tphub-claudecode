@@ -15,10 +15,10 @@ import {
   fetchCrpReviewsComparison,
   fetchCrpReviewsHeatmap,
   fetchCrpReviewsRaw,
-  fetchOrderRefunds,
+  fetchOrderDetails,
   fetchCrpOrdersComparison,
 } from '@/services/crp-portal';
-import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams } from '@/services/crp-portal';
+import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams, OrderDetails } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
 import { formatDate, getPreviousPeriodRange } from '@/features/controlling/hooks/dateUtils';
 
@@ -150,9 +150,9 @@ export function useReviewsRaw(params: UseReviewsParams, limit = 200) {
 }
 
 export function useOrderRefunds(orderIds: string[]) {
-  return useQuery<Map<string, number>>({
-    queryKey: ['order-refunds', [...orderIds].sort().join(',')],
-    queryFn: () => fetchOrderRefunds(orderIds),
+  return useQuery<OrderDetails>({
+    queryKey: ['order-details', [...orderIds].sort().join(',')],
+    queryFn: () => fetchOrderDetails(orderIds),
     enabled: orderIds.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

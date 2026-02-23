@@ -58,6 +58,9 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
                 Order ID
               </th>
+              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">
+                AOV
+              </th>
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">
                 Fecha
               </th>
@@ -106,6 +109,15 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                   <td className="px-4 py-3 text-sm font-mono text-gray-600">
                     {truncateId(review.orderId)}
                   </td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums">
+                    {review.orderAmount != null && review.orderAmount > 0 ? (
+                      <span className="text-gray-700 font-medium">
+                        {review.orderAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
+                      </span>
+                    ) : (
+                      <span className="italic text-gray-300">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {new Date(review.date).toLocaleDateString('es-ES', {
                       day: '2-digit',
@@ -118,8 +130,11 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                   <td className="px-4 py-3">
                     <RatingDisplay rating={review.rating} channel={review.channel} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate">
-                    {review.comment ?? <span className="text-gray-300">&mdash;</span>}
+                  <td className="px-4 py-3 text-sm max-w-[200px] truncate">
+                    {review.comment
+                      ? <span className="text-gray-500">{review.comment}</span>
+                      : <span className="italic text-gray-300">Sin comentario</span>
+                    }
                   </td>
                   <td className="px-4 py-3">
                     {review.tags && review.tags.length > 0 ? (
@@ -134,13 +149,17 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                         ))}
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-300">&mdash;</span>
+                      <span className="text-sm italic text-gray-300">Sin tags</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
+                  <td className="px-4 py-3 text-sm">
                     {review.deliveryTime != null
-                      ? `${review.deliveryTime} min`
-                      : <span className="text-gray-300">&mdash;</span>
+                      ? (
+                        <span className={review.deliveryTime > 35 ? 'text-red-500 font-medium' : 'text-gray-500'}>
+                          {review.deliveryTime} min
+                        </span>
+                      )
+                      : <span className="italic text-gray-300">—</span>
                     }
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
@@ -149,7 +168,7 @@ export function ReviewsTable({ data, totalInPeriod, className }: ReviewsTablePro
                         {review.refundAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &euro;
                       </span>
                     ) : (
-                      <span className="text-gray-300">&mdash;</span>
+                      <span className="italic text-gray-300">—</span>
                     )}
                   </td>
                 </tr>

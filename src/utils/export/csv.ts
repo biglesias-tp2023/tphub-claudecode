@@ -167,8 +167,8 @@ export function exportReputationToCSV(data: ReputationExportData) {
     '',
     'DISTRIBUCION DE VALORACIONES', 'Rating;Cantidad;Porcentaje',
     ...data.ratingDistribution.map((r) => `${r.rating} estrellas;${r.count};${r.percentage.toFixed(1)}%`), '',
-    'RESEÑAS', 'Fecha;Hora;Canal;Review ID;Order ID;Rating;Comentario;Tags;T. Entrega (min);Reembolso (EUR)',
-    ...data.reviews.map((r) => `${r.date};${r.time};${r.channel};${r.id};${r.orderId};${r.rating};${r.comment ?? ''};${r.tags?.join(', ') ?? ''};${r.deliveryTime ?? ''};${r.refundAmount != null ? r.refundAmount.toFixed(2) : ''}`),
+    'RESEÑAS', 'Fecha;Hora;Canal;Review ID;Order ID;AOV (EUR);Rating;Comentario;Tags;T. Entrega (min);Reembolso (EUR)',
+    ...data.reviews.map((r) => `${r.date};${r.time};${r.channel};${r.id};${r.orderId};${r.orderAmount != null ? r.orderAmount.toFixed(2) : ''};${r.rating};${r.comment ?? ''};${r.tags?.join(', ') ?? ''};${r.deliveryTime ?? ''};${r.refundAmount != null ? r.refundAmount.toFixed(2) : ''}`),
   ].join('\n');
 
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });

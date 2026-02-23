@@ -326,11 +326,24 @@ export async function fetchCrpReviewsComparison(
  * Fetches refund amounts for a batch of order IDs from ft_order_head.
  * Returns a Map of orderId → refundAmount (EUR).
  */
+export interface OrderDetails {
+  refunds: Map<string, number>;
+  amounts: Map<string, number>;
+}
+
 export async function fetchOrderRefunds(
   orderIds: string[]
 ): Promise<Map<string, number>> {
-  const result = new Map<string, number>();
-  if (orderIds.length === 0) return result;
+  const details = await fetchOrderDetails(orderIds);
+  return details.refunds;
+}
+
+export async function fetchOrderDetails(
+  orderIds: string[]
+): Promise<OrderDetails> {
+  const refunds = new Map<string, number>();
+  const amounts = new Map<string, number>();
+  if (orderIds.length === 0) return { refunds, amounts };
 
   // Supabase IN filter has a practical limit; batch in chunks of 200
   const CHUNK_SIZE = 200;
@@ -338,23 +351,27 @@ export async function fetchOrderRefunds(
     const chunk = orderIds.slice(i, i + CHUNK_SIZE);
     const { data, error } = await supabase
       .from('crp_portal__ft_order_head')
-      .select('pk_uuid_order, amt_refunds')
+      .select('pk_uuid_order, amt_refunds, amt_total_price')
       .in('pk_uuid_order', chunk);
 
     if (error) {
-      console.error('Error fetching order refunds:', error);
+      console.error('Error fetching order details:', error);
       throw error;
     }
 
     for (const row of data || []) {
-      const amount = Number(row.amt_refunds) || 0;
-      if (amount > 0) {
-        result.set(row.pk_uuid_order, amount);
+      const refundAmount = Number(row.amt_refunds) || 0;
+      if (refundAmount > 0) {
+        refunds.set(row.pk_uuid_order, refundAmount);
+      }
+      const totalPrice = Number(row.amt_total_price) || 0;
+      if (totalPrice > 0) {
+        amounts.set(row.pk_uuid_order, totalPrice);
       }
     }
   }
 
-  return result;
+  return { refunds, amounts };
 }
 
 export async function fetchCrpReviewsRaw(

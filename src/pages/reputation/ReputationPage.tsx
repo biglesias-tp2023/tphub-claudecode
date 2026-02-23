@@ -70,6 +70,7 @@ export function ReputationPage() {
         id: r.id,
         channel: r.channel,
         orderId: r.orderId,
+        orderAmount: r.orderAmount ?? undefined,
         rating: r.rating,
         date: new Date(r.date).toLocaleDateString('es-ES'),
         time: r.time,
@@ -112,11 +113,12 @@ export function ReputationPage() {
     if (!data) return { headers: [], rows: [] };
 
     return {
-      headers: ['Canal', 'Review ID', 'Order ID', 'Fecha', 'Hora', 'Rating', 'Comentario', 'Tags', 'T. Entrega', 'Reembolso'],
+      headers: ['Canal', 'Review ID', 'Order ID', 'AOV', 'Fecha', 'Hora', 'Rating', 'Comentario', 'Tags', 'T. Entrega', 'Reembolso'],
       rows: data.reviews.slice(0, 15).map((r) => [
         r.channel === 'glovo' ? 'Glovo' : r.channel === 'ubereats' ? 'Uber Eats' : 'Just Eat',
         r.id.slice(0, 12),
         r.orderId.slice(0, 12),
+        r.orderAmount != null && r.orderAmount > 0 ? `${r.orderAmount.toFixed(2)} €` : '—',
         new Date(r.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
         r.time,
         `${r.rating}★`,

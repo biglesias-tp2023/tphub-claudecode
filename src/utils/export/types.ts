@@ -128,6 +128,7 @@ export interface ReputationExportData {
     id: string;
     channel: string;
     orderId: string;
+    orderAmount?: number;
     rating: number;
     date: string;
     time: string;

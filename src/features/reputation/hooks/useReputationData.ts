@@ -67,6 +67,7 @@ export interface Review {
   tags?: string[] | null;
   deliveryTime?: number | null; // minutes
   refundAmount?: number | null; // EUR from ft_order_head.amt_refunds
+  orderAmount?: number | null; // EUR from ft_order_head.amt_total_price
 }
 
 export interface ReputationData {
@@ -240,12 +241,13 @@ export function useReputationData() {
       };
     });
 
-    // Build reviews from raw data, merging per-order refund amounts
-    const refundsMap = refundsQuery.data;
+    // Build reviews from raw data, merging per-order refund amounts and order amounts
+    const orderDetails = refundsQuery.data;
     const reviews: Review[] = (rawQuery.data || []).map((raw) => {
       const channel = portalIdToChannelId(raw.pfk_id_portal) || 'glovo';
       const ts = new Date(raw.ts_creation_time);
-      const refundAmount = refundsMap?.get(raw.fk_id_order) ?? null;
+      const refundAmount = orderDetails?.refunds.get(raw.fk_id_order) ?? null;
+      const orderAmount = orderDetails?.amounts.get(raw.fk_id_order) ?? null;
       return {
         id: raw.pk_id_review,
         orderId: raw.fk_id_order,
@@ -254,6 +256,7 @@ export function useReputationData() {
         time: ts.toTimeString().slice(0, 5),
         rating: raw.val_rating,
         refundAmount,
+        orderAmount,
       };
     });
 

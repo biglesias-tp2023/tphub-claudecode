@@ -221,9 +221,11 @@ export async function exportReputationToPDF(data: ReputationExportData): Promise
 
   autoTable(doc, {
     startY: reviewsStartY,
-    head: [['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'Rating', 'Comentario', 'Tags', 'T. Entrega', 'Reembolso']],
+    head: [['Fecha', 'Hora', 'Canal', 'Review ID', 'Order ID', 'AOV', 'Rating', 'Comentario', 'Tags', 'T. Entrega', 'Reembolso']],
     body: data.reviews.slice(0, 50).map((r) => [
-      r.date, r.time, r.channel, r.id.substring(0, 12), r.orderId.substring(0, 12), `${r.rating}★`,
+      r.date, r.time, r.channel, r.id.substring(0, 12), r.orderId.substring(0, 12),
+      r.orderAmount != null ? `${r.orderAmount.toFixed(2)} €` : '',
+      `${r.rating}★`,
       r.comment?.substring(0, 30) ?? '', r.tags?.join(', ') ?? '', r.deliveryTime != null ? `${r.deliveryTime} min` : '',
       r.refundAmount != null ? `${r.refundAmount.toFixed(2)} €` : '',
     ]),
