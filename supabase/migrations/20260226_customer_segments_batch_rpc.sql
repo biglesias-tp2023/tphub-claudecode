@@ -38,6 +38,8 @@ AS $$
 DECLARE
   i int;
 BEGIN
+  -- Resolve ambiguity: prefer table columns over output parameter names
+  #variable_conflict use_column
   FOR i IN 1..array_length(p_week_starts, 1) LOOP
     RETURN QUERY
     WITH week_customers AS (
