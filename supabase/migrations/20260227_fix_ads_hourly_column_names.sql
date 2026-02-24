@@ -1,10 +1,11 @@
 -- ============================================
--- RPC: get_ads_hourly_distribution
+-- Fix: get_ads_hourly_distribution column names
 -- ============================================
--- Aggregates advertising data by hour of day (0-23)
--- from crp_portal__ft_advertising_hp.
--- Used by the "Inversión en ADS por horas" chart
--- in the Controlling detail panel.
+-- The original migration used wrong column names:
+--   qty_impressions  → val_impressions
+--   qty_clicks       → val_clicks
+--   qty_orders_ad    → val_orders
+--   amt_ad_revenue   → amt_revenue
 -- ============================================
 
 CREATE OR REPLACE FUNCTION get_ads_hourly_distribution(
