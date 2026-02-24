@@ -256,7 +256,7 @@ export function useControllingData() {
   const brandIds = useBrandIds();
   const channelIds = useChannelIds();
   const { datePreset, dateRange } = useDateFilters();
-  const { restaurantIds } = useDashboardFiltersStore();
+  const restaurantIds = useDashboardFiltersStore((s) => s.restaurantIds);
 
   // Fetch brands and restaurants for ID expansion (multi-portal grouping)
   const { data: brands = [] } = useBrands();

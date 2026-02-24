@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_GC_LONG } from '@/constants/queryConfig';
-import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useCompanyIds } from '@/stores/filtersStore';
 import { fetchRestaurantActiveChannels } from '@/services/crp-portal/brand-channels';
 
 /**
@@ -14,7 +14,7 @@ import { fetchRestaurantActiveChannels } from '@/services/crp-portal/brand-chann
  * // restaurantChannels.get("789") => ["glovo"]
  */
 export function useRestaurantChannels() {
-  const { companyIds } = useGlobalFiltersStore();
+  const companyIds = useCompanyIds();
 
   return useQuery({
     queryKey: ['restaurant-channels', companyIds],

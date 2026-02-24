@@ -12,7 +12,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { fetchHierarchyDataRPC } from '@/services/crp-portal';
 import type { HierarchyDataRow } from '@/services/crp-portal';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
@@ -36,8 +36,11 @@ import { expandBrandIds, expandRestaurantIds } from './idExpansion';
  * ```
  */
 export function useHierarchyData() {
-  const { companyIds } = useGlobalFiltersStore();
-  const { dateRange, datePreset, brandIds, channelIds, restaurantIds } = useDashboardFiltersStore();
+  const companyIds = useCompanyIds();
+  const brandIds = useBrandIds();
+  const channelIds = useChannelIds();
+  const { dateRange, datePreset } = useDateFilters();
+  const restaurantIds = useDashboardFiltersStore((s) => s.restaurantIds);
 
   // Fetch brands and restaurants for ID expansion
   const { data: brands = [] } = useBrands();

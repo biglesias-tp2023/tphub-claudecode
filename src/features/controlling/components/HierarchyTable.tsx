@@ -50,6 +50,7 @@ interface HierarchyTableProps {
   periodLabels: { current: string; comparison: string };
   weeklyRevenue: Map<string, number[]>;
   weeklyRevenueLoading: boolean;
+  onRowClick?: (row: HierarchyRow) => void;
 }
 
 const LEVEL_ICONS: Record<HierarchyRow['level'], React.ElementType> = {
@@ -108,7 +109,7 @@ function SortableHeader({ column, label, currentSort, currentDirection, onSort, 
   );
 }
 
-export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoading }: HierarchyTableProps) {
+export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoading, onRowClick }: HierarchyTableProps) {
   const [activeTabs, setActiveTabs] = useSessionSet<ViewTab>('tphub-ht-tabs', ['rendimiento']);
   const [expandedRows, setExpandedRows] = useSessionSet<string>('tphub-ht-expanded', []);
   const [sortColumn, setSortColumn] = useSessionState<SortColumn | null>('tphub-ht-sort-col', null);
@@ -565,8 +566,10 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                   className={cn(
                     'border-b border-gray-50 hover:bg-gray-50/50 transition-colors',
                     row.level === 'company' && 'bg-primary-50/60',
-                    row.level === 'channel' && 'bg-gray-50/30'
+                    row.level === 'channel' && 'bg-gray-50/30',
+                    onRowClick && 'cursor-pointer'
                   )}
+                  onClick={() => onRowClick?.(row)}
                 >
                   <td className="py-2.5 px-4">
                     <div
@@ -575,7 +578,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     >
                       {canExpand ? (
                         <button
-                          onClick={() => toggleRow(row.id)}
+                          onClick={(e) => { e.stopPropagation(); toggleRow(row.id); }}
                           className="p-0.5 hover:bg-gray-200 rounded"
                         >
                           {isExpanded ? (

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/constants/queryKeys';
 import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
-import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useCompanyIds } from '@/stores/filtersStore';
 import { fetchCrpBrands, fetchCrpBrandById } from '@/services/crp-portal';
 
 /**
@@ -13,7 +13,7 @@ import { fetchCrpBrands, fetchCrpBrandById } from '@/services/crp-portal';
  * const { data: brands, isLoading } = useBrands();
  */
 export function useBrands() {
-  const { companyIds } = useGlobalFiltersStore();
+  const companyIds = useCompanyIds();
 
   return useQuery({
     queryKey: queryKeys.brands.list(companyIds),

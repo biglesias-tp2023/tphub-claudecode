@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_GC_LONG } from '@/constants/queryConfig';
-import { useGlobalFiltersStore } from '@/stores/filtersStore';
+import { useCompanyIds } from '@/stores/filtersStore';
 import { fetchBrandActiveChannels } from '@/services/crp-portal/brand-channels';
 
 /**
@@ -14,7 +14,7 @@ import { fetchBrandActiveChannels } from '@/services/crp-portal/brand-channels';
  * // brandChannels.get("123") => ["glovo", "ubereats"]
  */
 export function useBrandChannels() {
-  const { companyIds } = useGlobalFiltersStore();
+  const companyIds = useCompanyIds();
 
   return useQuery({
     queryKey: ['brand-channels', companyIds],

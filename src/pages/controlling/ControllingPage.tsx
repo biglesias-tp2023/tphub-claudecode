@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Euro,
   ShoppingBag,
@@ -12,7 +12,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ExportButtons, DataFreshnessIndicator, type ExportFormat, type PreviewTableData } from '@/components/common';
 import { DashboardFilters } from '@/features/dashboard';
 import { useControllingData, useWeeklyRevenue } from '@/features/controlling';
-import { PortfolioCard, ChannelCard, HierarchyTable } from '@/features/controlling/components';
+import type { HierarchyRow } from '@/features/controlling';
+import { PortfolioCard, ChannelCard, HierarchyTable, DetailPanel } from '@/features/controlling/components';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
 import {
@@ -31,7 +32,10 @@ export function ControllingPage() {
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const dateRange = useDashboardFiltersStore((s) => s.dateRange);
   const { data, isLoading, error } = useControllingData();
-  const { weeklyRevenue, channelWeeklyRevenue, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
+  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
+
+  // Detail panel state
+  const [selectedRow, setSelectedRow] = useState<HierarchyRow | null>(null);
 
   // Period labels for comparison - use actual dateRange values
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
@@ -256,8 +260,16 @@ export function ControllingPage() {
           periodLabels={periodLabels}
           weeklyRevenue={weeklyRevenue}
           weeklyRevenueLoading={weeklyRevenueLoading}
+          onRowClick={setSelectedRow}
         />
       </section>
+
+      {/* Detail Panel (Drawer) */}
+      <DetailPanel
+        row={selectedRow}
+        weeklyMetrics={weeklyMetrics}
+        onClose={() => setSelectedRow(null)}
+      />
     </div>
   );
 }

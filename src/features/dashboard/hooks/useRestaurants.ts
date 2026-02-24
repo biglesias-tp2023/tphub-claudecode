@@ -29,8 +29,9 @@ function buildLookupMaps(brands: Brand[], areas: Area[]) {
  * const { data: restaurants, isLoading } = useRestaurants();
  */
 export function useRestaurants() {
-  const { brandIds, areaIds } = useDashboardFiltersStore();
-  const { companyIds: globalCompanyIds } = useGlobalFiltersStore();
+  const brandIds = useDashboardFiltersStore((s) => s.brandIds);
+  const areaIds = useDashboardFiltersStore((s) => s.areaIds);
+  const globalCompanyIds = useGlobalFiltersStore((s) => s.companyIds);
   const { data: brands = [] } = useBrands();
 
   // When brands are selected, get the company IDs of those brands
@@ -144,8 +145,9 @@ export function useRestaurantsWithDetails(): RestaurantWithDetails[] {
  * const { data: restaurants, isLoading } = useRestaurantsForMap();
  */
 export function useRestaurantsForMap() {
-  const { brandIds, areaIds } = useDashboardFiltersStore();
-  const { companyIds: globalCompanyIds } = useGlobalFiltersStore();
+  const brandIds = useDashboardFiltersStore((s) => s.brandIds);
+  const areaIds = useDashboardFiltersStore((s) => s.areaIds);
+  const globalCompanyIds = useGlobalFiltersStore((s) => s.companyIds);
   const { data: brands = [] } = useBrands();
 
   const effectiveCompanyIds = useMemo(() => {
