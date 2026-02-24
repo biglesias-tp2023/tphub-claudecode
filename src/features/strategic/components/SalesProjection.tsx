@@ -284,15 +284,15 @@ export function SalesProjection({
                 <div className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg rounded-xl border border-gray-100 text-xs">
                   <p className="font-semibold text-gray-900 mb-2">{xLabel}</p>
                   <div className="space-y-1.5">
-                    <Row label="Ventas objetivo" value={d.targetRevenue} color="text-primary-600" />
-                    {d.actualRevenue > 0 && <Row label="Ventas real" value={d.actualRevenue} color="text-emerald-600" />}
+                    <Row label="Objetivo de Ventas" value={d.targetRevenue} color="text-primary-600" />
+                    {d.actualRevenue > 0 && <Row label="Venta Actual" value={d.actualRevenue} color="text-emerald-600" />}
                     <div className="border-t border-gray-100 pt-1.5 mt-1.5">
-                      <Row label="ADS objetivo" value={d.targetAds} color="text-amber-600" />
-                      {d.actualAds > 0 && <Row label="ADS real" value={d.actualAds} color="text-amber-500" />}
+                      <Row label="Presupuesto ADS" value={d.targetAds} color="text-amber-600" />
+                      {d.actualAds > 0 && <Row label="Inv. Actual ADS" value={d.actualAds} color="text-amber-500" />}
                     </div>
                     <div className="border-t border-gray-100 pt-1.5 mt-1.5">
-                      <Row label="Promos objetivo" value={d.targetPromos} color="text-purple-600" />
-                      {d.actualPromos > 0 && <Row label="Promos real" value={d.actualPromos} color="text-purple-500" />}
+                      <Row label="Presupuesto Promo" value={d.targetPromos} color="text-purple-600" />
+                      {d.actualPromos > 0 && <Row label="Inv. Actual Promo" value={d.actualPromos} color="text-purple-500" />}
                     </div>
                   </div>
                 </div>
