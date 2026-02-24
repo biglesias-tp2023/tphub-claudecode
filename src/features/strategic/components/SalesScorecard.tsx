@@ -20,18 +20,18 @@ interface ScorecardProps {
   showActual: boolean;
   isLoading?: boolean;
   isRealData?: boolean;
+  isInvestment?: boolean;
 }
 
 /** Scorecard individual con objetivo y real */
 export function Scorecard({
-  label, value, actual, color, showActual, isLoading = false, isRealData = false
+  label, value, actual, color, showActual, isLoading = false, isRealData = false, isInvestment = false
 }: ScorecardProps) {
   const diff = actual > 0 && value > 0
     ? ((actual / value - 1) * 100).toFixed(0)
     : null;
 
   const isPositive = diff ? parseFloat(diff) >= 0 : false;
-  const isInvestment = label !== 'Ventas';
   const diffText = isInvestment
     ? (isPositive ? `+${diff}% sobre obj` : `${Math.abs(parseFloat(diff || '0'))}% bajo obj`)
     : (isPositive ? `+${diff}% vs obj` : `${diff}% vs obj`);

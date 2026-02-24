@@ -237,22 +237,25 @@ export function SalesProjection({
           color="text-primary-600"
           showActual={showActual}
           isRealData={hasRealRevenue}
+          isInvestment={false}
         />
         <Scorecard
-          label="ADS"
+          label="Presupuesto ADS"
           value={calculations.currentTargetAds}
           actual={calculations.currentActualAds}
           color="text-amber-600"
           showActual={showActual}
           isRealData={hasRealAds}
+          isInvestment
         />
         <Scorecard
-          label="Promos"
+          label="Presupuesto Promo"
           value={calculations.currentTargetPromos}
           actual={calculations.currentActualPromos}
           color="text-purple-600"
           showActual={showActual}
           isRealData={hasRealPromos}
+          isInvestment
         />
       </div>
 
