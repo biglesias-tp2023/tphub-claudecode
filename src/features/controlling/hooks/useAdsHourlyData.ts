@@ -1,8 +1,8 @@
 /**
  * useAdsHourlyData Hook
  *
- * Fetches hourly ADS distribution for the selected HierarchyRow
- * in the Controlling detail panel.
+ * Fetches weekly ADS heatmap data (day_of_week × hour_of_day)
+ * for the selected HierarchyRow in the Controlling detail panel.
  *
  * Uses the same 8-week range as the other detail panel charts.
  *
@@ -11,8 +11,8 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAdsHourlyDistribution } from '@/services/crp-portal';
-import type { AdsHourlyDistributionRow } from '@/services/crp-portal';
+import { fetchAdsWeeklyHeatmap } from '@/services/crp-portal';
+import type { AdsWeeklyHeatmapRow } from '@/services/crp-portal';
 import type { HierarchyRow } from './useControllingData';
 
 function formatDate(d: Date): string {
@@ -69,11 +69,11 @@ export function useAdsHourlyData(row: HierarchyRow | null) {
   const range = useMemo(() => get8WeekRange(), []);
   const filters = useMemo(() => (row ? parseRowFilters(row) : null), [row]);
 
-  return useQuery<AdsHourlyDistributionRow[]>({
-    queryKey: ['ads-hourly', row?.id, range.startDate, range.endDate],
+  return useQuery<AdsWeeklyHeatmapRow[]>({
+    queryKey: ['ads-weekly-heatmap', row?.id, range.startDate, range.endDate],
     queryFn: async () => {
       if (!filters) return [];
-      return fetchAdsHourlyDistribution({
+      return fetchAdsWeeklyHeatmap({
         ...filters,
         startDate: range.startDate,
         endDate: range.endDate,

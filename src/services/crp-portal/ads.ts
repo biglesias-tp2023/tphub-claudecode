@@ -51,6 +51,16 @@ export interface AdsHourlyDistributionRow {
   adRevenue: number;
 }
 
+export interface AdsWeeklyHeatmapRow {
+  dayOfWeek: number;  // 1=Mon, 7=Sun (ISODOW)
+  hourOfDay: number;  // 0-23
+  adSpent: number;
+  impressions: number;
+  clicks: number;
+  orders: number;
+  adRevenue: number;
+}
+
 // ============================================
 // HELPERS
 // ============================================
@@ -161,6 +171,54 @@ export async function fetchAdsHourlyDistribution(
     orders: number;
     ad_revenue: number;
   }>).map((row) => ({
+    hourOfDay: Number(row.hour_of_day),
+    adSpent: Number(row.ad_spent) || 0,
+    impressions: Number(row.impressions) || 0,
+    clicks: Number(row.clicks) || 0,
+    orders: Number(row.orders) || 0,
+    adRevenue: Number(row.ad_revenue) || 0,
+  }));
+}
+
+/**
+ * Fetches weekly ADS heatmap using the get_ads_weekly_heatmap RPC.
+ *
+ * Returns rows grouped by (day_of_week, hour_of_day) with aggregated metrics.
+ */
+export async function fetchAdsWeeklyHeatmap(
+  params: AdsHourlyDistributionParams
+): Promise<AdsWeeklyHeatmapRow[]> {
+  const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
+
+  let portalIdsToFilter: string[] | null = null;
+  if (channelIds && channelIds.length > 0 && shouldApplyChannelFilter(channelIds)) {
+    portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
+  }
+
+  const { data, error } = await supabase.rpc('get_ads_weekly_heatmap', {
+    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+    p_start_date: `${startDate}T00:00:00`,
+    p_end_date: `${endDate}T23:59:59`,
+  });
+
+  if (error) {
+    console.error('Error fetching ads weekly heatmap:', error);
+    throw error;
+  }
+
+  return ((data || []) as Array<{
+    day_of_week: number;
+    hour_of_day: number;
+    ad_spent: number;
+    impressions: number;
+    clicks: number;
+    orders: number;
+    ad_revenue: number;
+  }>).map((row) => ({
+    dayOfWeek: Number(row.day_of_week),
     hourOfDay: Number(row.hour_of_day),
     adSpent: Number(row.ad_spent) || 0,
     impressions: Number(row.impressions) || 0,

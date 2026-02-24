@@ -86,6 +86,18 @@ function getDescendantsSummary(row: HierarchyRow, hierarchy: HierarchyRow[]): st
   return parts.join(' · ');
 }
 
+/** Build the breadcrumb path by walking parentId up the hierarchy */
+function getBreadcrumbPath(row: HierarchyRow, hierarchy: HierarchyRow[]): string[] {
+  const path: string[] = [];
+  let current: HierarchyRow | undefined = row;
+  while (current) {
+    path.unshift(current.name);
+    if (!current.parentId) break;
+    current = hierarchy.find((r) => r.id === current!.parentId);
+  }
+  return path;
+}
+
 interface DetailPanelProps {
   row: HierarchyRow | null;
   hierarchy: HierarchyRow[];
@@ -108,6 +120,8 @@ export function DetailPanel({ row, hierarchy, weeklyMetrics, weeklySegments, onC
   const levelLabel = LEVEL_LABELS[row.level];
   const hasData = data && data.length > 0;
   const descendantsSummary = row.level !== 'channel' ? getDescendantsSummary(row, hierarchy) : '';
+  const breadcrumb = getBreadcrumbPath(row, hierarchy);
+  const parentPath = breadcrumb.slice(0, -1); // All except current
 
   const headerContent = (
     <div>
@@ -116,6 +130,11 @@ export function DetailPanel({ row, hierarchy, weeklyMetrics, weeklySegments, onC
           {levelLabel}
         </span>
       </div>
+      {parentPath.length > 0 && (
+        <p className="text-[10px] text-gray-400 mb-0.5 truncate">
+          {parentPath.join(' › ')}
+        </p>
+      )}
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-primary-600" />
