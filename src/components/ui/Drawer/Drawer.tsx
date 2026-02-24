@@ -147,7 +147,9 @@ export function Drawer({
         )}
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto" onScroll={() => {
+          window.dispatchEvent(new Event('drawer-scroll'));
+        }}>{children}</div>
 
         {/* Footer */}
         {footer && (

@@ -18,3 +18,5 @@ export { useDetailPanelData } from './useDetailPanelData';
 export type { DetailWeekData } from './useDetailPanelData';
 
 export { useSessionState, useSessionSet } from './useSessionState';
+
+export { useAdsHourlyData } from './useAdsHourlyData';

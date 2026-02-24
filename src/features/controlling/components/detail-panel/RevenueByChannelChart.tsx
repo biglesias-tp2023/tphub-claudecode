@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { AreaChart } from '@/components/charts/rosen/AreaChart';
+import { CHANNELS } from '@/constants/channels';
 import { formatCurrency } from '@/utils/formatters';
 import type { DetailWeekData } from '../../hooks/useDetailPanelData';
 
@@ -22,10 +23,10 @@ export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
     <div>
       <div className="flex items-center gap-4 mb-2">
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />Glovo
+          <img src={CHANNELS.glovo.logoUrl} alt="Glovo" className="w-4 h-4 object-contain" />Glovo
         </span>
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />UberEats
+          <img src={CHANNELS.ubereats.logoUrl} alt="Uber Eats" className="w-4 h-4 object-contain" />UberEats
         </span>
       </div>
       <div className="h-[170px]">

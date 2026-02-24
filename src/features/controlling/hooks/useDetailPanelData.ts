@@ -25,6 +25,8 @@ export interface DetailWeekData {
   // Chart 4: Promos rate + organic revenue
   promosRate: number;  // descuentos / ventas * 100
   organicRevenue: number; // ventas - ad_revenue (approximation)
+  // Chart 4: Promos return multiplier
+  promosRetorno: number; // promoRevenue / descuentos (multiplier, like ROAS for promos)
   // Chart 5: Promo vs organic revenue
   promoRevenue: number;  // ad_revenue (revenue from promoted orders)
   // Raw values for tooltips
@@ -54,6 +56,7 @@ export function useDetailPanelData({ rowId, weeklyMetrics, weeklySegments }: Use
       const promosRate = m.ventas > 0 ? (m.descuentos / m.ventas) * 100 : 0;
       const organicRevenue = Math.max(0, m.ventas - m.adRevenue);
       const promoRevenue = m.adRevenue;
+      const promosRetorno = m.descuentos > 0 ? promoRevenue / m.descuentos : 0;
 
       return {
         weekLabel: m.weekLabel,
@@ -63,6 +66,7 @@ export function useDetailPanelData({ rowId, weeklyMetrics, weeklySegments }: Use
         adsRate,
         roas,
         promosRate,
+        promosRetorno,
         organicRevenue,
         promoRevenue,
         ventas: m.ventas,

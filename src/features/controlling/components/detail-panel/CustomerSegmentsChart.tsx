@@ -12,18 +12,18 @@ export function CustomerSegmentsChart({ data }: CustomerSegmentsChartProps) {
     () =>
       data.map((d) => ({
         label: d.weekLabel,
-        new: d.newCustomers,
-        occasional: d.occasionalCustomers,
         frequent: d.frequentCustomers,
+        occasional: d.occasionalCustomers,
+        new: d.newCustomers,
       })),
     [data]
   );
 
   const series = useMemo(
     () => [
-      { key: 'new', name: 'Nuevo', color: '#3B82F6' },
-      { key: 'occasional', name: 'Ocasional', color: '#F59E0B' },
-      { key: 'frequent', name: 'Frecuente', color: '#10B981' },
+      { key: 'frequent', name: 'Frecuente', color: '#095789' },
+      { key: 'occasional', name: 'Ocasional', color: '#6bb8e0' },
+      { key: 'new', name: 'Nuevo', color: '#ffa166' },
     ],
     []
   );
@@ -44,13 +44,13 @@ export function CustomerSegmentsChart({ data }: CustomerSegmentsChartProps) {
     <div>
       <div className="flex items-center gap-4 mb-2">
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Nuevo (1 pedido)
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#095789' }} />Frecuente (4+)
         </span>
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />Ocasional (2-3)
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#6bb8e0' }} />Ocasional (2-3)
         </span>
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Frecuente (4+)
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#ffa166' }} />Nuevo (1 pedido)
         </span>
       </div>
       <div className="h-[170px]">
@@ -59,13 +59,13 @@ export function CustomerSegmentsChart({ data }: CustomerSegmentsChartProps) {
           series={series}
           yTickFormatter={(v) => formatNumber(v, { notation: 'compact' })}
           renderTooltip={(item) => {
-            const total = Number(item.new) + Number(item.occasional) + Number(item.frequent);
+            const total = Number(item.frequent) + Number(item.occasional) + Number(item.new);
             return (
               <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
                 <p className="font-medium mb-1">{item.label}</p>
-                <p className="text-blue-300">Nuevo: {formatNumber(Number(item.new))}</p>
-                <p className="text-amber-300">Ocasional: {formatNumber(Number(item.occasional))}</p>
-                <p className="text-emerald-300">Frecuente: {formatNumber(Number(item.frequent))}</p>
+                <p style={{ color: '#6bb8e0' }}>Frecuente: {formatNumber(Number(item.frequent))}</p>
+                <p style={{ color: '#9dd0eb' }}>Ocasional: {formatNumber(Number(item.occasional))}</p>
+                <p style={{ color: '#ffa166' }}>Nuevo: {formatNumber(Number(item.new))}</p>
                 <p className="text-gray-400 mt-1">Total: {formatNumber(total)}</p>
               </div>
             );

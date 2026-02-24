@@ -57,6 +57,12 @@ export function BarChartStacked({
   }, [updateDimensions]);
 
   useEffect(() => {
+    const clear = () => setTooltip(null);
+    window.addEventListener('drawer-scroll', clear);
+    return () => window.removeEventListener('drawer-scroll', clear);
+  }, []);
+
+  useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || data.length === 0 || series.length === 0) return;
 
     const svg = select(svgRef.current);

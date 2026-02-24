@@ -12,7 +12,7 @@ export function AdsRateRoasChart({ data }: AdsRateRoasChartProps) {
     () =>
       data.map((d) => ({
         label: d.weekLabel,
-        barValue: d.adsRate,
+        barValue: d.adSpent,
         lineValue: d.roas,
       })),
     [data]
@@ -22,7 +22,7 @@ export function AdsRateRoasChart({ data }: AdsRateRoasChartProps) {
     <div>
       <div className="flex items-center gap-4 mb-2">
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-sm bg-primary-600 opacity-75" />Tasa ADS %
+          <span className="w-2.5 h-2.5 rounded-sm bg-primary-600 opacity-75" />Inversion ADS
         </span>
         <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
           <span className="w-2.5 h-0.5 bg-accent-400" />ROAS
@@ -33,20 +33,17 @@ export function AdsRateRoasChart({ data }: AdsRateRoasChartProps) {
         data={chartData}
         barColor="#095789"
         lineColor="#ffa166"
-        yBarFormatter={(v) => `${v.toFixed(0)}%`}
+        yBarFormatter={(v) => formatCurrency(v, { compact: true })}
         yLineFormatter={(v) => `${v.toFixed(1)}x`}
         renderTooltip={(item) => {
           const d = data.find((x) => x.weekLabel === item.label);
           return (
             <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
               <p className="font-medium mb-1">{item.label}</p>
-              <p>Tasa ADS: {item.barValue.toFixed(1)}%</p>
+              <p>Inversion ADS: {formatCurrency(item.barValue)}</p>
               <p className="text-accent-400">ROAS: {item.lineValue.toFixed(1)}x</p>
               {d && (
-                <>
-                  <p className="text-gray-400 mt-1">Inv: {formatCurrency(d.adSpent)}</p>
-                  <p className="text-gray-400">Rev: {formatCurrency(d.adRevenue)}</p>
-                </>
+                <p className="text-gray-400 mt-1">Rev ADS: {formatCurrency(d.adRevenue)}</p>
               )}
             </div>
           );

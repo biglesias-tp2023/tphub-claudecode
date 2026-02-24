@@ -165,6 +165,8 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
   }
 }
 
+const CAL_SESSION_KEY = 'tphub-cal-state';
+
 function createInitialState(): CalendarState {
   const now = new Date();
   let isEditorOpen = false;
@@ -182,6 +184,27 @@ function createInitialState(): CalendarState {
     // Ignore errors
   }
 
+  // Restore persisted filters from sessionStorage
+  let currentMonth = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  let selectedPlatforms: CampaignPlatform[] = [];
+  let selectedStatuses: string[] = [];
+  let selectedEventCategories: EventCategory[] = ['holiday', 'sports', 'entertainment', 'commercial'];
+  let selectedRegion = 'ES';
+
+  try {
+    const stored = sessionStorage.getItem(CAL_SESSION_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.currentMonth) currentMonth = parsed.currentMonth;
+      if (parsed.selectedPlatforms) selectedPlatforms = parsed.selectedPlatforms;
+      if (parsed.selectedStatuses) selectedStatuses = parsed.selectedStatuses;
+      if (parsed.selectedEventCategories) selectedEventCategories = parsed.selectedEventCategories;
+      if (parsed.selectedRegion) selectedRegion = parsed.selectedRegion;
+    }
+  } catch {
+    // Ignore errors
+  }
+
   return {
     isEditorOpen,
     selectedDate: undefined,
@@ -189,12 +212,12 @@ function createInitialState(): CalendarState {
     detailModalDate: null,
     detailModalCampaigns: [],
     detailModalEvents: [],
-    currentMonth: { year: now.getFullYear(), month: now.getMonth() + 1 },
-    sidebarDate: now,
-    selectedPlatforms: [],
-    selectedStatuses: [],
-    selectedEventCategories: ['holiday', 'sports', 'entertainment', 'commercial'],
-    selectedRegion: 'ES',
+    currentMonth,
+    sidebarDate: new Date(currentMonth.year, currentMonth.month - 1, 1),
+    selectedPlatforms,
+    selectedStatuses,
+    selectedEventCategories,
+    selectedRegion,
   };
 }
 
@@ -208,6 +231,21 @@ export function CalendarPage() {
   const { toasts, closeToast, success } = useToast();
 
   const [state, dispatch] = useReducer(calendarReducer, null, createInitialState);
+
+  // Persist calendar filters to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CAL_SESSION_KEY, JSON.stringify({
+        currentMonth: state.currentMonth,
+        selectedPlatforms: state.selectedPlatforms,
+        selectedStatuses: state.selectedStatuses,
+        selectedEventCategories: state.selectedEventCategories,
+        selectedRegion: state.selectedRegion,
+      }));
+    } catch {
+      // quota exceeded — ignore
+    }
+  }, [state.currentMonth, state.selectedPlatforms, state.selectedStatuses, state.selectedEventCategories, state.selectedRegion]);
 
   // Client mode from URL params (for shared links)
   const isClientMode = searchParams.get('mode') === 'client';

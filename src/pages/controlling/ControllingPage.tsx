@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   Euro,
   ShoppingBag,
@@ -15,6 +15,7 @@ import { useControllingData, useWeeklyRevenue } from '@/features/controlling';
 import type { HierarchyRow } from '@/features/controlling';
 import { PortfolioCard, ChannelCard, HierarchyTable, DetailPanel } from '@/features/controlling/components';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useSessionState } from '@/hooks/useSessionState';
 import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
 import {
   exportControllingToCSV,
@@ -34,8 +35,16 @@ export function ControllingPage() {
   const { data, isLoading, error } = useControllingData();
   const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, weeklySegments, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 
-  // Detail panel state
-  const [selectedRow, setSelectedRow] = useState<HierarchyRow | null>(null);
+  // Detail panel state — persist selected row ID across navigation
+  const [selectedRowId, setSelectedRowId] = useSessionState<string | null>('tphub-controlling-selectedRow', null);
+  const selectedRow = useMemo(
+    () => (selectedRowId && data ? data.hierarchy.find((r) => r.id === selectedRowId) ?? null : null),
+    [selectedRowId, data]
+  );
+  const setSelectedRow = useCallback(
+    (row: HierarchyRow | null) => setSelectedRowId(row?.id ?? null),
+    [setSelectedRowId]
+  );
 
   // Period labels for comparison - use actual dateRange values
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
@@ -267,6 +276,7 @@ export function ControllingPage() {
       {/* Detail Panel (Drawer) */}
       <DetailPanel
         row={selectedRow}
+        hierarchy={hierarchy}
         weeklyMetrics={weeklyMetrics}
         weeklySegments={weeklySegments}
         onClose={() => setSelectedRow(null)}

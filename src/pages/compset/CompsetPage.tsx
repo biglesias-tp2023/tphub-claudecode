@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import {
   LayoutDashboard,
   Package,
@@ -29,7 +29,7 @@ const tabs: { id: CompsetTabId; label: string; icon: React.ElementType }[] = [
 ];
 
 export function CompsetPage() {
-  const [activeTab, setActiveTab] = useState<CompsetTabId>('overview');
+  const [activeTab, setActiveTab] = useSessionState<CompsetTabId>('tphub-compset-activeTab', 'overview');
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const companyId = companyIds[0] ?? '1';
 

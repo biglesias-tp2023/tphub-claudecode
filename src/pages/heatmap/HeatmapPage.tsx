@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import { Spinner } from '@/components/ui/Spinner';
 import { DashboardFilters } from '@/features/dashboard';
 import { useHeatmapData, HeatmapGrid, MetricSelector } from '@/features/heatmap';
@@ -7,7 +8,7 @@ import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filter
 import { getPeriodLabelsFromRange } from '@/utils/formatters';
 
 export function HeatmapPage() {
-  const [metric, setMetric] = useState<HeatmapMetric>('revenue');
+  const [metric, setMetric] = useSessionState<HeatmapMetric>('tphub-heatmap-metric', 'revenue');
 
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange } = useDashboardFiltersStore();

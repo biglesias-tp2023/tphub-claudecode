@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import {
   Users,
   UserPlus,
@@ -36,7 +37,7 @@ type CohortGranularity = 'week' | 'month';
 export function CustomersPage() {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange } = useDashboardFiltersStore();
-  const [cohortGranularity, setCohortGranularity] = useState<CohortGranularity>('month');
+  const [cohortGranularity, setCohortGranularity] = useSessionState<CohortGranularity>('tphub-customers-cohortGranularity', 'month');
 
   // Fetch all customer data
   const metricsQuery = useCustomerMetrics();

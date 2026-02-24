@@ -20,7 +20,9 @@ import {
   PromosRateOrganicChart,
   PromoVsOrganicChart,
   CustomerSegmentsChart,
+  AdsHourlyChart,
 } from './detail-panel';
+import { useAdsHourlyData } from '../hooks/useAdsHourlyData';
 
 const LEVEL_ICONS: Record<HierarchyRow['level'], React.ElementType> = {
   company: Building2,
@@ -61,25 +63,51 @@ function ChartSection({ title, icon: Icon, children, placeholder }: ChartSection
   );
 }
 
+/** Count descendants by level for a given row */
+function getDescendantsSummary(row: HierarchyRow, hierarchy: HierarchyRow[]): string {
+  const descendants: HierarchyRow[] = [];
+  const queue = [row.id];
+  while (queue.length > 0) {
+    const parentId = queue.shift()!;
+    for (const r of hierarchy) {
+      if (r.parentId === parentId) {
+        descendants.push(r);
+        queue.push(r.id);
+      }
+    }
+  }
+  const parts: string[] = [];
+  const brands = descendants.filter((r) => r.level === 'brand').length;
+  const addresses = descendants.filter((r) => r.level === 'address').length;
+  const channels = descendants.filter((r) => r.level === 'channel').length;
+  if (brands > 0) parts.push(`${brands} marca${brands !== 1 ? 's' : ''}`);
+  if (addresses > 0) parts.push(`${addresses} establecimiento${addresses !== 1 ? 's' : ''}`);
+  if (channels > 0) parts.push(`${channels} canal${channels !== 1 ? 'es' : ''}`);
+  return parts.join(' · ');
+}
+
 interface DetailPanelProps {
   row: HierarchyRow | null;
+  hierarchy: HierarchyRow[];
   weeklyMetrics: Map<string, WeekMetrics[]>;
   weeklySegments: Map<string, WeekSegmentData[]>;
   onClose: () => void;
 }
 
-export function DetailPanel({ row, weeklyMetrics, weeklySegments, onClose }: DetailPanelProps) {
+export function DetailPanel({ row, hierarchy, weeklyMetrics, weeklySegments, onClose }: DetailPanelProps) {
   const { data, segments } = useDetailPanelData({
     rowId: row?.id ?? null,
     weeklyMetrics,
     weeklySegments,
   });
+  const { data: adsHourlyData, isLoading: adsHourlyLoading } = useAdsHourlyData(row);
 
   if (!row) return null;
 
   const Icon = LEVEL_ICONS[row.level];
   const levelLabel = LEVEL_LABELS[row.level];
   const hasData = data && data.length > 0;
+  const descendantsSummary = row.level !== 'channel' ? getDescendantsSummary(row, hierarchy) : '';
 
   const headerContent = (
     <div>
@@ -99,7 +127,10 @@ export function DetailPanel({ row, weeklyMetrics, weeklySegments, onClose }: Det
           )}
         </div>
       </div>
-      <p className="text-[10px] text-gray-400 mt-2">
+      {descendantsSummary && (
+        <p className="text-[10px] text-gray-500 mt-1.5">{descendantsSummary}</p>
+      )}
+      <p className="text-[10px] text-gray-400 mt-1">
         Ultimas 8 semanas completas (lun-dom)
       </p>
     </div>
@@ -128,23 +159,25 @@ export function DetailPanel({ row, weeklyMetrics, weeklySegments, onClose }: Det
             <CustomerSegmentsChart data={segments ?? []} />
           </ChartSection>
 
-          {/* Chart 3: Tasa ADS + ROAS */}
-          <ChartSection title="Tasa ADS + ROAS" icon={Megaphone}>
+          {/* Chart 3: Inversion en ADS + ROAS ADS */}
+          <ChartSection title="Inversion en ADS + ROAS ADS" icon={Megaphone}>
             <AdsRateRoasChart data={data} />
           </ChartSection>
 
-          {/* Chart 4: Tasa Promos + Organico */}
-          <ChartSection title="Tasa Promos + Organico" icon={Tag}>
+          {/* Chart 4: Inversion en Promos vs. Retorno */}
+          <ChartSection title="Inversion en Promos vs. Retorno" icon={Tag}>
             <PromosRateOrganicChart data={data} />
           </ChartSection>
 
-          {/* Chart 5: Venta Promo vs Organica */}
-          <ChartSection title="Venta Promo vs Organica" icon={BarChart3}>
+          {/* Chart 5: Venta con Promocion vs. Venta Organica */}
+          <ChartSection title="Venta con Promocion vs. Venta Organica" icon={BarChart3}>
             <PromoVsOrganicChart data={data} />
           </ChartSection>
 
-          {/* Chart 6: Heatmap Gasto ADS - Placeholder */}
-          <ChartSection title="Heatmap Gasto ADS" icon={Clock} placeholder />
+          {/* Chart 6: Inversion en ADS por horas */}
+          <ChartSection title="Inversion en ADS por horas" icon={Clock}>
+            <AdsHourlyChart data={adsHourlyData ?? []} isLoading={adsHourlyLoading} />
+          </ChartSection>
         </>
       )}
     </Drawer>

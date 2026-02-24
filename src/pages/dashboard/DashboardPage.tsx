@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import { TrendingUp, TrendingDown, ShoppingBag, DollarSign, Users, BarChart3 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -76,7 +76,7 @@ export function DashboardPage() {
   const { datePreset, channelIds } = useDashboardFiltersStore();
   const { data, isLoading, error } = useDashboardData();
 
-  const [showByChannel, setShowByChannel] = useState(false);
+  const [showByChannel, setShowByChannel] = useSessionState('tphub-dashboard-showByChannel', false);
 
   const companyText = companyIds.length === 0
     ? 'Todos los negocios'

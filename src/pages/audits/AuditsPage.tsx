@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -120,7 +121,7 @@ export function AuditsPage() {
   const { toasts, closeToast, success: showSuccess, error: showError } = useToast();
 
   // State
-  const [filters, setFilters] = useState<AuditFilters>({
+  const [filters, setFilters] = useSessionState<AuditFilters>('tphub-audits-filters', {
     search: '',
     type: null,
     status: null,

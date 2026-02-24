@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import { Navigate } from 'react-router-dom';
 import { UserPlus, Users, Mail, Clock, Crown, Shield, FolderTree } from 'lucide-react';
 import { Spinner, Button } from '@/components/ui';
@@ -25,7 +26,7 @@ export function AdminPage() {
   const [editingCompanies, setEditingCompanies] = useState<Profile | null>(null);
   const [editingRole, setEditingRole] = useState<Profile | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>('users');
+  const [activeTab, setActiveTab] = useSessionState<TabId>('tphub-admin-activeTab', 'users');
 
   // Count users by role
   const ownerCount = users.filter((u) => u.role === 'owner').length;

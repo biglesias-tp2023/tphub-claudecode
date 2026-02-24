@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useSessionState } from '@/hooks/useSessionState';
 import { cn } from '@/utils/cn';
 import { Spinner } from '@/components/ui';
 import { ExportButtons, type ExportFormat, type PreviewTableData } from '@/components/common';
@@ -36,7 +37,7 @@ const TABS: Tab[] = [
 ];
 
 export function ReputationPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('general');
+  const [activeTab, setActiveTab] = useSessionState<TabId>('tphub-reputation-activeTab', 'general');
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const { datePreset } = useDashboardFiltersStore();
   const { data, isLoading, error } = useReputationData();

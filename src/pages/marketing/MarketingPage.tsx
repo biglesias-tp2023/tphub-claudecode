@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useSessionSet } from '@/hooks/useSessionState';
 import {
   Eye,
   MousePointerClick,
@@ -158,8 +159,9 @@ export function MarketingPage() {
 
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
 
-  const [selectedKpis, setSelectedKpis] = useState<Set<KpiId>>(
-    () => new Set(['clicks', 'adOrders', 'adSpent'])
+  const [selectedKpis, setSelectedKpis] = useSessionSet<KpiId>(
+    'tphub-marketing-selectedKpis',
+    ['clicks', 'adOrders', 'adSpent']
   );
 
   const toggleKpi = useCallback((kpiId: KpiId) => {

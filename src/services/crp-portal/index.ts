@@ -183,12 +183,14 @@ export {
 
 export type { CrpProduct } from './products';
 
-// Ads (timeseries for Marketing dashboard)
-export { fetchAdsTimeseries } from './ads';
+// Ads (timeseries for Marketing dashboard + hourly distribution)
+export { fetchAdsTimeseries, fetchAdsHourlyDistribution } from './ads';
 
 export type {
   AdsTimeseriesParams,
   AdsTimeseriesRow,
+  AdsHourlyDistributionParams,
+  AdsHourlyDistributionRow,
 } from './ads';
 
 // Customers (analytics)
