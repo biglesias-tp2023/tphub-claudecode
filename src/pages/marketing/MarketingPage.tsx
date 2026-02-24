@@ -8,6 +8,7 @@ import {
   Percent,
   CircleDollarSign,
   UserPlus,
+  Info,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { DashboardFilters } from '@/features/dashboard';
@@ -31,6 +32,7 @@ interface KpiConfig {
   color: string;
   type: KpiType;
   chartDataKey: string;
+  tooltip?: { description: string; formula: string };
 }
 
 const KPI_CONFIG: KpiConfig[] = [
@@ -40,10 +42,10 @@ const KPI_CONFIG: KpiConfig[] = [
   { id: 'adOrders', icon: ShoppingCart, color: '#10b981', type: 'volume', chartDataKey: 'orders' },
   { id: 'adSpent', icon: Banknote, color: '#6366f1', type: 'volume', chartDataKey: 'adSpent' },
   // Efficiency (dashed lines, right Y-axis)
-  { id: 'roas', icon: TrendingUp, color: '#8b5cf6', type: 'efficiency', chartDataKey: 'roas' },
-  { id: 'ctr', icon: Percent, color: '#ec4899', type: 'efficiency', chartDataKey: 'ctr' },
-  { id: 'cpc', icon: CircleDollarSign, color: '#f59e0b', type: 'efficiency', chartDataKey: 'cpc' },
-  { id: 'cac', icon: UserPlus, color: '#14b8a6', type: 'efficiency', chartDataKey: 'cac' },
+  { id: 'roas', icon: TrendingUp, color: '#8b5cf6', type: 'efficiency', chartDataKey: 'roas', tooltip: { description: 'Return On Ad Spend. Mide cuántos euros de ingreso genera cada euro invertido en publicidad.', formula: 'Ingresos Ads / Inversión Ads' } },
+  { id: 'ctr', icon: Percent, color: '#ec4899', type: 'efficiency', chartDataKey: 'ctr', tooltip: { description: 'Click-Through Rate. Porcentaje de impresiones que generan un click.', formula: '(Clicks / Impresiones) × 100' } },
+  { id: 'cpc', icon: CircleDollarSign, color: '#f59e0b', type: 'efficiency', chartDataKey: 'cpc', tooltip: { description: 'Cost Per Click. Coste medio de cada click en los anuncios.', formula: 'Inversión Ads / Clicks' } },
+  { id: 'cac', icon: UserPlus, color: '#14b8a6', type: 'efficiency', chartDataKey: 'cac', tooltip: { description: 'Customer Acquisition Cost. Coste medio de conseguir un pedido a través de publicidad.', formula: 'Inversión Ads / Pedidos Ads' } },
 ];
 
 const MAX_SELECTED = 4;
@@ -77,6 +79,7 @@ function formatScorecardValue(scorecard: MarketingScorecard): string {
 function Scorecard({ scorecard, config, isSelected, onToggle, disabled }: ScorecardProps) {
   const isPositive = scorecard.change >= 0;
   const Icon = config.icon;
+  const [showTooltip, setShowTooltip] = useState(false);
 
   return (
     <button
@@ -104,6 +107,26 @@ function Scorecard({ scorecard, config, isSelected, onToggle, disabled }: Scorec
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
           {scorecard.label}
         </span>
+        {config.tooltip && (
+          <div className="relative ml-auto">
+            <div
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+            >
+              <Info className="w-3.5 h-3.5 text-gray-300 hover:text-gray-500 transition-colors" />
+            </div>
+            {showTooltip && (
+              <div className="absolute bottom-full right-0 mb-2 w-56 bg-gray-900 text-white rounded-lg p-3 shadow-xl z-50 pointer-events-none">
+                <p className="text-xs leading-relaxed">{config.tooltip.description}</p>
+                <div className="mt-2 pt-2 border-t border-gray-700">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Fórmula</p>
+                  <p className="text-xs font-mono text-emerald-300">{config.tooltip.formula}</p>
+                </div>
+                <div className="absolute -bottom-1 right-4 w-2 h-2 bg-gray-900 rotate-45" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <p className="text-xl font-bold text-gray-900 tabular-nums">
         {formatScorecardValue(scorecard)}

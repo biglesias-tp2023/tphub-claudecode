@@ -200,6 +200,7 @@ export {
   fetchMultiPlatformAnalysis,
   fetchRevenueConcentration,
   fetchPostPromoHealth,
+  fetchWeeklyCustomerSegments,
 } from './customers';
 
 export type {
@@ -212,6 +213,7 @@ export type {
   MultiPlatformAnalysis,
   RevenueConcentration,
   PostPromoHealth,
+  CustomerSegmentRow,
 } from './customers';
 
 // ============================================

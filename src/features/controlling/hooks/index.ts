@@ -12,7 +12,7 @@ export type { UseOrdersDataParams, OrdersDataResult } from './useOrdersData';
 export { useHierarchyData } from './useHierarchyData';
 
 export { useWeeklyRevenue } from './useWeeklyRevenue';
-export type { WeekMetrics } from './useWeeklyRevenue';
+export type { WeekMetrics, WeekSegmentData } from './useWeeklyRevenue';
 
 export { useDetailPanelData } from './useDetailPanelData';
 export type { DetailWeekData } from './useDetailPanelData';

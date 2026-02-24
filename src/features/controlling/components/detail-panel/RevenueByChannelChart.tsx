@@ -49,7 +49,7 @@ export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
           },
         ]}
         yTickFormatter={(v) => formatCurrency(v, { compact: true })}
-        margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+        margin={{ top: 8, right: 8, left: 40, bottom: 0 }}
         renderTooltip={(dp, xLabel) => (
           <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
             <p className="font-medium mb-1">{xLabel}</p>

@@ -32,7 +32,7 @@ export function ControllingPage() {
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const dateRange = useDashboardFiltersStore((s) => s.dateRange);
   const { data, isLoading, error } = useControllingData();
-  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
+  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, weeklySegments, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 
   // Detail panel state
   const [selectedRow, setSelectedRow] = useState<HierarchyRow | null>(null);
@@ -268,6 +268,7 @@ export function ControllingPage() {
       <DetailPanel
         row={selectedRow}
         weeklyMetrics={weeklyMetrics}
+        weeklySegments={weeklySegments}
         onClose={() => setSelectedRow(null)}
       />
     </div>

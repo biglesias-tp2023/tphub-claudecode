@@ -8,6 +8,7 @@
  * aggregates revenue by hierarchy row ID to produce sparkline data.
  *
  * Also aggregates ALL metrics per row for the detail panel charts.
+ * Also fetches customer segments per row for the detail panel.
  *
  * @module features/controlling/hooks/useWeeklyRevenue
  */
@@ -15,8 +16,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useCompanyIds } from '@/stores/filtersStore';
-import { fetchControllingMetricsRPC, PORTAL_IDS } from '@/services/crp-portal';
-import type { ControllingMetricsRow } from '@/services/crp-portal';
+import { fetchControllingMetricsRPC, fetchWeeklyCustomerSegments, PORTAL_IDS } from '@/services/crp-portal';
+import type { ControllingMetricsRow, CustomerSegmentRow } from '@/services/crp-portal';
 import type { ChannelId } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
 
@@ -47,6 +48,14 @@ export interface WeekMetrics {
   pedidosUbereats: number;
 }
 
+/** Customer segment data for a single week, for a given row ID */
+export interface WeekSegmentData {
+  weekLabel: string;
+  newCustomers: number;
+  occasionalCustomers: number;
+  frequentCustomers: number;
+}
+
 /**
  * Calculate 8 complete week ranges (Mon-Sun) going backwards from the
  * most recent completed week.
@@ -69,10 +78,14 @@ function getLast8Weeks(): WeekRange[] {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
+    // Label as DD/MM (Monday date)
+    const dd = String(weekStart.getDate()).padStart(2, '0');
+    const mm = String(weekStart.getMonth() + 1).padStart(2, '0');
+
     weeks.unshift({
       start: formatDate(weekStart),
       end: formatDate(weekEnd),
-      label: `S${9 - i}`,
+      label: `${dd}/${mm}`,
     });
   }
 
@@ -96,6 +109,11 @@ interface AggregatedWeek {
 /** Full metrics aggregation for a single week */
 interface AggregatedWeekMetrics {
   byRowId: Map<string, Omit<WeekMetrics, 'weekLabel' | 'weekStart'>>;
+}
+
+/** Segment aggregation for a single week */
+interface AggregatedWeekSegments {
+  byRowId: Map<string, { newCustomers: number; occasionalCustomers: number; frequentCustomers: number }>;
 }
 
 /**
@@ -192,6 +210,47 @@ function aggregateAllMetricsByRowId(rows: ControllingMetricsRow[]): AggregatedWe
   return { byRowId };
 }
 
+/** Empty segment counters */
+function emptySegments() {
+  return { newCustomers: 0, occasionalCustomers: 0, frequentCustomers: 0 };
+}
+
+/**
+ * Aggregate customer segment rows into a map by row ID (same keys as metrics).
+ */
+function aggregateSegmentsByRowId(rows: CustomerSegmentRow[]): AggregatedWeekSegments {
+  const byRowId = new Map<string, { newCustomers: number; occasionalCustomers: number; frequentCustomers: number }>();
+
+  const getOrCreate = (key: string) => {
+    let s = byRowId.get(key);
+    if (!s) {
+      s = emptySegments();
+      byRowId.set(key, s);
+    }
+    return s;
+  };
+
+  const addToSegments = (s: ReturnType<typeof emptySegments>, row: CustomerSegmentRow) => {
+    s.newCustomers += row.new_customers || 0;
+    s.occasionalCustomers += row.occasional_customers || 0;
+    s.frequentCustomers += row.frequent_customers || 0;
+  };
+
+  for (const row of rows) {
+    const companyId = row.pfk_id_company;
+    const storeId = row.pfk_id_store;
+    const addressId = row.pfk_id_store_address;
+    const portalId = row.pfk_id_portal;
+
+    addToSegments(getOrCreate(`company-${companyId}`), row);
+    addToSegments(getOrCreate(`brand::${companyId}::${storeId}`), row);
+    addToSegments(getOrCreate(`address::${companyId}::${addressId}`), row);
+    addToSegments(getOrCreate(`channel::${companyId}::${addressId}::${portalId}`), row);
+  }
+
+  return { byRowId };
+}
+
 // ============================================
 // HOOK
 // ============================================
@@ -202,6 +261,7 @@ function aggregateAllMetricsByRowId(rows: ControllingMetricsRow[]): AggregatedWe
  *
  * @returns weeklyRevenue - Map<rowId, number[]> with 8 values per entity
  * @returns weeklyMetrics - Map<rowId, WeekMetrics[]> with 8 full metric snapshots per entity
+ * @returns weeklySegments - Map<rowId, WeekSegmentData[]> with 8 segment snapshots per entity
  * @returns weekLabels - string[] with week labels (S1..S8)
  * @returns isLoading - Whether data is still loading
  */
@@ -214,23 +274,36 @@ export function useWeeklyRevenue() {
     byRowId: Map<string, number[]>;
     byChannel: Map<ChannelId, number[]>;
     metricsByRowId: Map<string, WeekMetrics[]>;
+    segmentsByRowId: Map<string, WeekSegmentData[]>;
   }
 
   const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', [...companyIds].sort().join(',')],
     queryFn: async () => {
-      // Fetch all 8 weeks in parallel
-      const weeklyResults = await Promise.all(
-        weeks.map((week) =>
-          fetchControllingMetricsRPC(companyIds, week.start, week.end)
-        )
-      );
+      // Fetch all 8 weeks of metrics + segments in parallel (16 calls total)
+      const [weeklyResults, weeklySegmentResults] = await Promise.all([
+        // 8 metrics calls
+        Promise.all(
+          weeks.map((week) =>
+            fetchControllingMetricsRPC(companyIds, week.start, week.end)
+          )
+        ),
+        // 8 segment calls
+        Promise.all(
+          weeks.map((week) =>
+            fetchWeeklyCustomerSegments(companyIds, week.start, week.end)
+          )
+        ),
+      ]);
 
       // Aggregate each week's data (revenue-only for sparklines)
       const weeklyAggs = weeklyResults.map(aggregateRevenueByRowId);
 
       // Aggregate each week's FULL metrics (for detail panel)
       const weeklyMetricsAggs = weeklyResults.map(aggregateAllMetricsByRowId);
+
+      // Aggregate each week's customer segments
+      const weeklySegmentsAggs = weeklySegmentResults.map(aggregateSegmentsByRowId);
 
       // Build row-level map: rowId → [week1, ..., week8] (revenue only)
       const allRowIds = new Set<string>();
@@ -240,6 +313,11 @@ export function useWeeklyRevenue() {
         }
       }
       for (const agg of weeklyMetricsAggs) {
+        for (const key of agg.byRowId.keys()) {
+          allRowIds.add(key);
+        }
+      }
+      for (const agg of weeklySegmentsAggs) {
         for (const key of agg.byRowId.keys()) {
           allRowIds.add(key);
         }
@@ -279,7 +357,22 @@ export function useWeeklyRevenue() {
         );
       }
 
-      return { byRowId, byChannel, metricsByRowId };
+      // Build segments map: rowId → WeekSegmentData[]
+      const segmentsByRowId = new Map<string, WeekSegmentData[]>();
+      for (const rowId of allRowIds) {
+        segmentsByRowId.set(
+          rowId,
+          weeklySegmentsAggs.map((agg, i) => {
+            const s = agg.byRowId.get(rowId) || emptySegments();
+            return {
+              weekLabel: weeks[i].label,
+              ...s,
+            };
+          })
+        );
+      }
+
+      return { byRowId, byChannel, metricsByRowId, segmentsByRowId };
     },
     enabled: companyIds.length > 0,
     retry: 1,
@@ -290,11 +383,13 @@ export function useWeeklyRevenue() {
   const emptyRowMap = useMemo(() => new Map<string, number[]>(), []);
   const emptyChannelMap = useMemo(() => new Map<ChannelId, number[]>(), []);
   const emptyMetricsMap = useMemo(() => new Map<string, WeekMetrics[]>(), []);
+  const emptySegmentsMap = useMemo(() => new Map<string, WeekSegmentData[]>(), []);
 
   return {
     weeklyRevenue: query.data?.byRowId || emptyRowMap,
     channelWeeklyRevenue: query.data?.byChannel || emptyChannelMap,
     weeklyMetrics: query.data?.metricsByRowId || emptyMetricsMap,
+    weeklySegments: query.data?.segmentsByRowId || emptySegmentsMap,
     weekLabels: weeks.map((w) => w.label),
     isLoading: query.isLoading,
   };

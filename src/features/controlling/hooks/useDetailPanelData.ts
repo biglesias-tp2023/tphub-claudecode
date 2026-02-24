@@ -4,11 +4,13 @@
  * Consumes weeklyMetrics from useWeeklyRevenue and computes derived
  * metrics for the detail panel charts (ADS rate, ROAS, promo rate, etc.)
  *
+ * Also filters weeklySegments by the selected row ID.
+ *
  * @module features/controlling/hooks/useDetailPanelData
  */
 
 import { useMemo } from 'react';
-import type { WeekMetrics } from './useWeeklyRevenue';
+import type { WeekMetrics, WeekSegmentData } from './useWeeklyRevenue';
 
 /** Derived metrics for a single week, used by the detail panel charts */
 export interface DetailWeekData {
@@ -37,9 +39,10 @@ export interface DetailWeekData {
 interface UseDetailPanelDataParams {
   rowId: string | null;
   weeklyMetrics: Map<string, WeekMetrics[]>;
+  weeklySegments: Map<string, WeekSegmentData[]>;
 }
 
-export function useDetailPanelData({ rowId, weeklyMetrics }: UseDetailPanelDataParams) {
+export function useDetailPanelData({ rowId, weeklyMetrics, weeklySegments }: UseDetailPanelDataParams) {
   const data = useMemo((): DetailWeekData[] | null => {
     if (!rowId) return null;
     const metrics = weeklyMetrics.get(rowId);
@@ -72,5 +75,12 @@ export function useDetailPanelData({ rowId, weeklyMetrics }: UseDetailPanelDataP
     });
   }, [rowId, weeklyMetrics]);
 
-  return { data };
+  const segments = useMemo((): WeekSegmentData[] | null => {
+    if (!rowId) return null;
+    const segs = weeklySegments.get(rowId);
+    if (!segs || segs.length === 0) return null;
+    return segs;
+  }, [rowId, weeklySegments]);
+
+  return { data, segments };
 }

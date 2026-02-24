@@ -12,13 +12,14 @@ import {
 } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer/Drawer';
 import type { HierarchyRow } from '../hooks/useControllingData';
-import type { WeekMetrics } from '../hooks/useWeeklyRevenue';
+import type { WeekMetrics, WeekSegmentData } from '../hooks/useWeeklyRevenue';
 import { useDetailPanelData } from '../hooks/useDetailPanelData';
 import {
   RevenueByChannelChart,
   AdsRateRoasChart,
   PromosRateOrganicChart,
   PromoVsOrganicChart,
+  CustomerSegmentsChart,
 } from './detail-panel';
 
 const LEVEL_ICONS: Record<HierarchyRow['level'], React.ElementType> = {
@@ -63,13 +64,15 @@ function ChartSection({ title, icon: Icon, children, placeholder }: ChartSection
 interface DetailPanelProps {
   row: HierarchyRow | null;
   weeklyMetrics: Map<string, WeekMetrics[]>;
+  weeklySegments: Map<string, WeekSegmentData[]>;
   onClose: () => void;
 }
 
-export function DetailPanel({ row, weeklyMetrics, onClose }: DetailPanelProps) {
-  const { data } = useDetailPanelData({
+export function DetailPanel({ row, weeklyMetrics, weeklySegments, onClose }: DetailPanelProps) {
+  const { data, segments } = useDetailPanelData({
     rowId: row?.id ?? null,
     weeklyMetrics,
+    weeklySegments,
   });
 
   if (!row) return null;
@@ -120,8 +123,10 @@ export function DetailPanel({ row, weeklyMetrics, onClose }: DetailPanelProps) {
             <RevenueByChannelChart data={data} />
           </ChartSection>
 
-          {/* Chart 2: Segmentacion Clientes - Placeholder */}
-          <ChartSection title="Segmentacion Clientes" icon={Users} placeholder />
+          {/* Chart 2: Segmentacion Clientes */}
+          <ChartSection title="Segmentacion Clientes" icon={Users}>
+            <CustomerSegmentsChart data={segments ?? []} />
+          </ChartSection>
 
           {/* Chart 3: Tasa ADS + ROAS */}
           <ChartSection title="Tasa ADS + ROAS" icon={Megaphone}>

@@ -31,6 +31,17 @@ import { PORTAL_IDS } from './types';
 // TYPES
 // ============================================
 
+/** Row returned by the get_customer_segments RPC */
+export interface CustomerSegmentRow {
+  pfk_id_company: string;
+  pfk_id_store: string;
+  pfk_id_store_address: string;
+  pfk_id_portal: string;
+  new_customers: number;
+  occasional_customers: number;
+  frequent_customers: number;
+}
+
 export interface FetchCustomerDataParams {
   /** Filter by company IDs */
   companyIds?: number[];
@@ -904,4 +915,35 @@ export async function fetchPostPromoHealth(
     dormidos,
     total: customerOrders.size,
   };
+}
+
+// ============================================
+// WEEKLY CUSTOMER SEGMENTS (RPC)
+// ============================================
+
+/**
+ * Fetches customer segments for a given week using the get_customer_segments RPC.
+ *
+ * Classifies customers who ordered during the week by their historical frequency:
+ * - New: 0 prior orders in 183-day lookback
+ * - Occasional: 1-3 prior orders
+ * - Frequent: 4+ prior orders
+ */
+export async function fetchWeeklyCustomerSegments(
+  companyIds: string[],
+  weekStart: string,
+  weekEnd: string,
+): Promise<CustomerSegmentRow[]> {
+  const { data, error } = await supabase.rpc('get_customer_segments', {
+    p_company_ids: companyIds,
+    p_week_start: `${weekStart}T00:00:00`,
+    p_week_end: `${weekEnd}T23:59:59`,
+  });
+
+  if (error) {
+    console.error('[fetchWeeklyCustomerSegments] RPC error:', error);
+    return [];
+  }
+
+  return (data ?? []) as CustomerSegmentRow[];
 }
