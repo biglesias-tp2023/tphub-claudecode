@@ -203,6 +203,7 @@ export {
   fetchRevenueConcentration,
   fetchPostPromoHealth,
   fetchWeeklyCustomerSegments,
+  fetchWeeklyCustomerSegmentsBatch,
 } from './customers';
 
 export type {
@@ -216,6 +217,7 @@ export type {
   RevenueConcentration,
   PostPromoHealth,
   CustomerSegmentRow,
+  CustomerSegmentBatchRow,
 } from './customers';
 
 // ============================================

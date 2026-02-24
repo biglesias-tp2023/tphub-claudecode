@@ -16,7 +16,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useCompanyIds } from '@/stores/filtersStore';
-import { fetchControllingMetricsRPC, fetchWeeklyCustomerSegments, PORTAL_IDS } from '@/services/crp-portal';
+import { fetchControllingMetricsRPC, fetchWeeklyCustomerSegmentsBatch, PORTAL_IDS } from '@/services/crp-portal';
 import type { ControllingMetricsRow, CustomerSegmentRow } from '@/services/crp-portal';
 import type { ChannelId } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
@@ -280,19 +280,19 @@ export function useWeeklyRevenue() {
   const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', [...companyIds].sort().join(',')],
     queryFn: async () => {
-      // Fetch all 8 weeks of metrics + segments in parallel (16 calls total)
+      // Fetch all 8 weeks of metrics in parallel + segments in a single batch call
       const [weeklyResults, weeklySegmentResults] = await Promise.all([
-        // 8 metrics calls
+        // 8 metrics calls (lightweight, no timeout issue)
         Promise.all(
           weeks.map((week) =>
             fetchControllingMetricsRPC(companyIds, week.start, week.end)
           )
         ),
-        // 8 segment calls
-        Promise.all(
-          weeks.map((week) =>
-            fetchWeeklyCustomerSegments(companyIds, week.start, week.end)
-          )
+        // 1 batch call for all 8 weeks of segments (avoids 8 parallel timeouts)
+        fetchWeeklyCustomerSegmentsBatch(
+          companyIds,
+          weeks.map((w) => `${w.start}T00:00:00`),
+          weeks.map((w) => `${w.end}T23:59:59`),
         ),
       ]);
 

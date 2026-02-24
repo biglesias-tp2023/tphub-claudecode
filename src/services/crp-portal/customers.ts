@@ -947,3 +947,56 @@ export async function fetchWeeklyCustomerSegments(
 
   return (data ?? []) as CustomerSegmentRow[];
 }
+
+/** Row returned by get_customer_segments_batch (includes week_idx) */
+export interface CustomerSegmentBatchRow extends CustomerSegmentRow {
+  week_idx: number;
+}
+
+/**
+ * Fetches customer segments for multiple weeks in a single RPC call.
+ *
+ * Replaces 8 parallel calls to fetchWeeklyCustomerSegments with one batch call
+ * that processes weeks sequentially on the server side, reusing buffer cache
+ * across iterations (lookback windows overlap ~97%).
+ *
+ * @returns Array of arrays — one per week, ordered by weekStarts index
+ */
+export async function fetchWeeklyCustomerSegmentsBatch(
+  companyIds: string[],
+  weekStarts: string[],
+  weekEnds: string[],
+): Promise<CustomerSegmentRow[][]> {
+  const { data, error } = await supabase.rpc('get_customer_segments_batch', {
+    p_company_ids: companyIds,
+    p_week_starts: weekStarts,
+    p_week_ends: weekEnds,
+  });
+
+  if (error) {
+    console.error('[fetchWeeklyCustomerSegmentsBatch] RPC error:', error);
+    // Return empty arrays for each week
+    return weekStarts.map(() => []);
+  }
+
+  const rows = (data ?? []) as CustomerSegmentBatchRow[];
+
+  // Group by week_idx (1-based from the SQL function)
+  const result: CustomerSegmentRow[][] = weekStarts.map(() => []);
+  for (const row of rows) {
+    const idx = row.week_idx - 1; // SQL uses 1-based index
+    if (idx >= 0 && idx < result.length) {
+      result[idx].push({
+        pfk_id_company: row.pfk_id_company,
+        pfk_id_store: row.pfk_id_store,
+        pfk_id_store_address: row.pfk_id_store_address,
+        pfk_id_portal: row.pfk_id_portal,
+        new_customers: row.new_customers,
+        occasional_customers: row.occasional_customers,
+        frequent_customers: row.frequent_customers,
+      });
+    }
+  }
+
+  return result;
+}
