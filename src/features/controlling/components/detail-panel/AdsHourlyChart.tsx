@@ -9,6 +9,9 @@ import type { AdsWeeklyHeatmapRow } from '@/services/crp-portal';
 // ============================================
 
 const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const START_HOUR = 10;
+const END_HOUR = 23;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => i + START_HOUR);
 
 interface AdsHourlyChartProps {
   data: AdsWeeklyHeatmapRow[];
@@ -34,23 +37,6 @@ function buildLookup(data: AdsWeeklyHeatmapRow[]): Map<string, AdsWeeklyHeatmapR
   return map;
 }
 
-/** Determine the hour range that actually has data */
-function getHourRange(data: AdsWeeklyHeatmapRow[]): { start: number; end: number } {
-  if (data.length === 0) return { start: 7, end: 23 };
-
-  let minH = 23;
-  let maxH = 0;
-  for (const row of data) {
-    if (row.adSpent > 0) {
-      if (row.hourOfDay < minH) minH = row.hourOfDay;
-      if (row.hourOfDay > maxH) maxH = row.hourOfDay;
-    }
-  }
-
-  // Clamp to reasonable range, at least 7-23
-  return { start: Math.min(minH, 7), end: Math.max(maxH, 23) };
-}
-
 // ============================================
 // COMPONENT
 // ============================================
@@ -59,11 +45,6 @@ export function AdsHourlyChart({ data, isLoading }: AdsHourlyChartProps) {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
 
   const lookup = useMemo(() => buildLookup(data), [data]);
-  const hourRange = useMemo(() => getHourRange(data), [data]);
-  const hours = useMemo(
-    () => Array.from({ length: hourRange.end - hourRange.start + 1 }, (_, i) => i + hourRange.start),
-    [hourRange]
-  );
 
   const maxAdSpent = useMemo(() => {
     let max = 0;
@@ -124,60 +105,60 @@ export function AdsHourlyChart({ data, isLoading }: AdsHourlyChartProps) {
         </div>
       </div>
 
-      {/* Heatmap table */}
+      {/* Heatmap table: rows = hours (10-23), columns = days (Lun-Dom) */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="w-9 pb-1" />
-              {hours.map((h) => (
+              <th className="w-10 pb-1" />
+              {DAY_LABELS.map((label, i) => (
                 <th
-                  key={h}
-                  className="text-[10px] font-medium text-gray-400 pb-1 text-center"
+                  key={label}
+                  className={`text-[10px] font-medium pb-1 text-center ${
+                    i >= 5 ? 'text-primary-600' : 'text-gray-400'
+                  }`}
                 >
-                  {h}
+                  {label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {DAY_LABELS.map((dayLabel, dayIdx) => {
-              const dayOfWeek = dayIdx + 1; // 1=Mon .. 7=Sun
-              return (
-                <tr key={dayOfWeek}>
-                  <td className="text-[10px] font-medium text-gray-500 text-right pr-1.5 py-0 whitespace-nowrap">
-                    {dayLabel}
-                  </td>
-                  {hours.map((h) => {
-                    const key = `${dayOfWeek}-${h}`;
-                    const cell = lookup.get(key);
-                    const spent = cell?.adSpent ?? 0;
-                    const bgColor = spent > 0 ? (colorScale(spent) as string) : '#ffffff';
-                    const normalized = maxAdSpent > 0 ? spent / maxAdSpent : 0;
-                    const textColor = normalized > 0.55 ? '#ffffff' : '#6b7280';
+            {HOURS.map((h) => (
+              <tr key={h}>
+                <td className="text-[10px] font-medium text-gray-400 text-right pr-1.5 py-0 whitespace-nowrap font-mono">
+                  {h}:00
+                </td>
+                {DAY_LABELS.map((_, dayIdx) => {
+                  const dayOfWeek = dayIdx + 1;
+                  const key = `${dayOfWeek}-${h}`;
+                  const cell = lookup.get(key);
+                  const spent = cell?.adSpent ?? 0;
+                  const bgColor = spent > 0 ? (colorScale(spent) as string) : '#ffffff';
+                  const normalized = maxAdSpent > 0 ? spent / maxAdSpent : 0;
+                  const textColor = normalized > 0.55 ? '#ffffff' : '#6b7280';
 
-                    return (
-                      <td
-                        key={h}
-                        className="p-0 border border-gray-100"
-                        onMouseMove={(e) => {
-                          if (cell && spent > 0) handleMouseMove(cell, e);
-                          else setTooltip(null);
-                        }}
-                        onMouseLeave={handleMouseLeave}
+                  return (
+                    <td
+                      key={dayIdx}
+                      className="p-0 border border-gray-100"
+                      onMouseMove={(e) => {
+                        if (cell && spent > 0) handleMouseMove(cell, e);
+                        else setTooltip(null);
+                      }}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <div
+                        className="flex items-center justify-center h-6 min-w-[60px] text-[9px] tabular-nums transition-colors cursor-default"
+                        style={{ backgroundColor: bgColor, color: textColor }}
                       >
-                        <div
-                          className="flex items-center justify-center h-6 min-w-[28px] text-[9px] tabular-nums transition-colors cursor-default"
-                          style={{ backgroundColor: bgColor, color: textColor }}
-                        >
-                          {spent > 0 ? formatCurrency(spent, { compact: true }) : ''}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
+                        {spent > 0 ? formatCurrency(spent, { compact: true }) : ''}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
