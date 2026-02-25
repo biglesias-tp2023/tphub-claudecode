@@ -5,3 +5,4 @@ export { InviteUserModal } from './InviteUserModal';
 export { PendingInvitations } from './PendingInvitations';
 export { CategoryMappingTab } from './CategoryMappingTab';
 export { CategoryMappingStats } from './CategoryMappingStats';
+export { AlertPreferencesTab } from './AlertPreferencesTab';

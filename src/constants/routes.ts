@@ -20,6 +20,7 @@ export const ROUTES = {
   MAPS: '/maps',
   MARKET: '/market',
   MARKETING: '/marketing',
+  MY_CLIENTS: '/my-clients',
   ADMIN: '/admin',
 
   // Catch-all

@@ -27,6 +27,8 @@ const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ def
 const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
 // Marketing: advertising analytics
 const MarketingPage = lazyWithRetry(() => import('@/pages/marketing').then(m => ({ default: m.MarketingPage })));
+// My Clients: alert preferences per company
+const MyClientsPage = lazyWithRetry(() => import('@/pages/my-clients').then(m => ({ default: m.MyClientsPage })));
 // Admin: user management (admin-only)
 const AdminPage = lazyWithRetry(() => import('@/pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 // Public shared pages
@@ -142,7 +144,7 @@ export const router = createBrowserRouter([
       { path: 'admin', element: <LazyPage><AdminPage /></LazyPage> },
       { path: 'admin/users', element: <LazyPage><AdminPage /></LazyPage> },
       // Consultant portal - unified page
-      { path: 'my-clients', element: <PlaceholderPage title="Mis Clientes" /> },
+      { path: 'my-clients', element: <LazyPage><MyClientsPage /></LazyPage> },
     ],
   },
   // Public routes (no authentication required)

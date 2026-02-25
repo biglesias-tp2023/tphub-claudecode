@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
+import { sendEmail, buildAlertEmailHtml } from './email';
 
 // ============================================
 // Types
@@ -91,6 +92,22 @@ interface ConsultantProfile {
   slack_user_id: string | null;
 }
 
+interface DbAlertPreference {
+  id: string;
+  consultant_id: string;
+  company_id: string;
+  orders_enabled: boolean;
+  reviews_enabled: boolean;
+  ads_enabled: boolean;
+  promos_enabled: boolean;
+  slack_enabled: boolean;
+  email_enabled: boolean;
+  orders_threshold: number | null;
+  reviews_threshold: number | null;
+  ads_roas_threshold: number | null;
+  promos_threshold: number | null;
+}
+
 interface ConsultantGroup {
   consultant: {
     name: string;
@@ -101,6 +118,10 @@ interface ConsultantGroup {
   reviews: ReviewAnomaly[];
   ads: AdsAnomaly[];
   promos: PromoAnomaly[];
+  /** Whether this consultant wants Slack notifications (default true) */
+  wantsSlack: boolean;
+  /** Whether this consultant wants Email notifications */
+  wantsEmail: boolean;
 }
 
 // ============================================
@@ -137,6 +158,7 @@ function groupAnomaliesByConsultant(
   reviewAnomalies: ReviewAnomaly[],
   adsAnomalies: AdsAnomaly[],
   promoAnomalies: PromoAnomaly[],
+  prefsMap: Map<string, DbAlertPreference>,
 ): Record<string, ConsultantGroup> {
   const groups: Record<string, ConsultantGroup> = {};
 
@@ -151,7 +173,11 @@ function groupAnomaliesByConsultant(
     }
   }
 
-  const getOrCreateGroup = (profile: ConsultantProfile): ConsultantGroup => {
+  // Helper to get pref for a consultant+company pair
+  const getPref = (consultantId: string, companyId: string): DbAlertPreference | undefined =>
+    prefsMap.get(`${consultantId}:${companyId}`);
+
+  const getOrCreateGroup = (profile: ConsultantProfile, companyId: string): ConsultantGroup => {
     if (!groups[profile.id]) {
       groups[profile.id] = {
         consultant: {
@@ -163,7 +189,16 @@ function groupAnomaliesByConsultant(
         reviews: [],
         ads: [],
         promos: [],
+        wantsSlack: true,
+        wantsEmail: false,
       };
+    }
+    // Update channel preferences — if any company has email enabled, flag it
+    const pref = getPref(profile.id, companyId);
+    if (pref) {
+      if (pref.email_enabled) groups[profile.id].wantsEmail = true;
+      // Only set wantsSlack false if ALL prefs have it disabled
+      // (keep default true unless explicitly overridden)
     }
     return groups[profile.id];
   };
@@ -177,16 +212,27 @@ function groupAnomaliesByConsultant(
         reviews: [],
         ads: [],
         promos: [],
+        wantsSlack: true,
+        wantsEmail: false,
       };
     }
     return groups[key];
   };
 
-  // Group order anomalies
+  // Group order anomalies (filtered by preferences)
   for (const anomaly of orderAnomalies) {
     const consultants = companyToConsultants.get(anomaly.company_id);
     if (consultants && consultants.length > 0) {
-      for (const c of consultants) getOrCreateGroup(c).orders.push(anomaly);
+      for (const c of consultants) {
+        const pref = getPref(c.id, anomaly.company_id);
+        // Skip if orders disabled for this consultant+company
+        if (pref && !pref.orders_enabled) continue;
+        // Check custom threshold
+        if (pref?.orders_threshold != null) {
+          if (anomaly.orders_deviation_pct > pref.orders_threshold) continue;
+        }
+        getOrCreateGroup(c, anomaly.company_id).orders.push(anomaly);
+      }
     } else {
       getUnassignedGroup().orders.push(anomaly);
     }
@@ -196,7 +242,11 @@ function groupAnomaliesByConsultant(
   for (const anomaly of reviewAnomalies) {
     const consultants = companyToConsultants.get(anomaly.company_id);
     if (consultants && consultants.length > 0) {
-      for (const c of consultants) getOrCreateGroup(c).reviews.push(anomaly);
+      for (const c of consultants) {
+        const pref = getPref(c.id, anomaly.company_id);
+        if (pref && !pref.reviews_enabled) continue;
+        getOrCreateGroup(c, anomaly.company_id).reviews.push(anomaly);
+      }
     } else {
       getUnassignedGroup().reviews.push(anomaly);
     }
@@ -206,7 +256,11 @@ function groupAnomaliesByConsultant(
   for (const anomaly of adsAnomalies) {
     const consultants = companyToConsultants.get(anomaly.company_id);
     if (consultants && consultants.length > 0) {
-      for (const c of consultants) getOrCreateGroup(c).ads.push(anomaly);
+      for (const c of consultants) {
+        const pref = getPref(c.id, anomaly.company_id);
+        if (pref && !pref.ads_enabled) continue;
+        getOrCreateGroup(c, anomaly.company_id).ads.push(anomaly);
+      }
     } else {
       getUnassignedGroup().ads.push(anomaly);
     }
@@ -216,7 +270,11 @@ function groupAnomaliesByConsultant(
   for (const anomaly of promoAnomalies) {
     const consultants = companyToConsultants.get(anomaly.company_id);
     if (consultants && consultants.length > 0) {
-      for (const c of consultants) getOrCreateGroup(c).promos.push(anomaly);
+      for (const c of consultants) {
+        const pref = getPref(c.id, anomaly.company_id);
+        if (pref && !pref.promos_enabled) continue;
+        getOrCreateGroup(c, anomaly.company_id).promos.push(anomaly);
+      }
     } else {
       getUnassignedGroup().promos.push(anomaly);
     }
@@ -441,13 +499,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[daily-alerts] Profiles query error:', profilesError.message);
   }
 
-  // 8. Group anomalies by consultant
+  // 7b. Fetch alert preferences
+  console.log('[daily-alerts] Fetching alert preferences');
+  const { data: prefsData, error: prefsError } = await supabase
+    .from('alert_preferences')
+    .select('*');
+
+  if (prefsError) {
+    console.log('[daily-alerts] Prefs query error (non-fatal, using defaults):', prefsError.message);
+  }
+
+  // Build prefs map: key = "consultantId:companyId"
+  const prefsMap = new Map<string, DbAlertPreference>();
+  if (prefsData) {
+    for (const pref of prefsData as DbAlertPreference[]) {
+      prefsMap.set(`${pref.consultant_id}:${pref.company_id}`, pref);
+    }
+  }
+  console.log(`[daily-alerts] Loaded ${prefsMap.size} alert preferences`);
+
+  // 8. Group anomalies by consultant (filtered by preferences)
   const groups = groupAnomaliesByConsultant(
     (profiles as ConsultantProfile[]) ?? [],
     orderAnomalies,
     reviewAnomalies,
     adsAnomalies,
     promoAnomalies,
+    prefsMap,
   );
 
   console.log(`[daily-alerts] Grouped into ${Object.keys(groups).length} consultant groups`);
@@ -460,6 +538,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[daily-alerts] Sending to Slack');
   await sendSlack(message);
 
+  // 10b. Send email to consultants who have email_enabled
+  let emailsSent = 0;
+  for (const group of Object.values(groups)) {
+    if (!group.wantsEmail || !group.consultant.email) continue;
+    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
+    if (totalAnomalies === 0) continue;
+
+    const sections = [];
+    if (group.orders.length > 0) {
+      sections.push({
+        title: 'Pedidos',
+        items: group.orders.map(
+          (a) =>
+            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — ${a.yesterday_orders} pedidos (media: ${a.avg_orders_baseline}) → ${a.orders_deviation_pct}%`
+        ),
+      });
+    }
+    if (group.reviews.length > 0) {
+      sections.push({
+        title: 'Resenas',
+        items: group.reviews.map(
+          (a) =>
+            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`
+        ),
+      });
+    }
+    if (group.promos.length > 0) {
+      sections.push({
+        title: 'Promos',
+        items: group.promos.map(
+          (a) =>
+            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — ${a.yesterday_promos}\u20AC promos (${a.yesterday_promo_rate}% de ventas) → +${a.promo_spend_deviation_pct}%`
+        ),
+      });
+    }
+    if (group.ads.length > 0) {
+      sections.push({
+        title: 'Publicidad',
+        items: group.ads.map(
+          (a) =>
+            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`
+        ),
+      });
+    }
+
+    const html = buildAlertEmailHtml(
+      group.consultant.name,
+      getYesterdayLabel(),
+      sections
+    );
+
+    const sent = await sendEmail({
+      to: group.consultant.email,
+      subject: `Alertas diarias — ${getYesterdayLabel()}`,
+      html,
+    });
+    if (sent) emailsSent++;
+  }
+
+  if (emailsSent > 0) {
+    console.log(`[daily-alerts] Sent ${emailsSent} email(s)`);
+  }
+
   // 11. Respond
   console.log('[daily-alerts] Done');
   return res.status(200).json({
@@ -469,5 +610,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ads_anomalies: adsAnomalies.length,
     promo_anomalies: promoAnomalies.length,
     consultants_notified: Object.keys(groups).length,
+    emails_sent: emailsSent,
+    preferences_loaded: prefsMap.size,
   });
 }

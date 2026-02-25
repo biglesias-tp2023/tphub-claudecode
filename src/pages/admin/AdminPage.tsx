@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSessionState } from '@/hooks/useSessionState';
 import { Navigate } from 'react-router-dom';
-import { UserPlus, Users, Mail, Clock, Crown, Shield, FolderTree } from 'lucide-react';
+import { UserPlus, Users, Mail, Clock, Crown, Shield, FolderTree, Bell } from 'lucide-react';
 import { Spinner, Button } from '@/components/ui';
 import { useIsAdmin, useCanInviteUsers } from '@/stores/authStore';
 import {
@@ -13,10 +13,11 @@ import {
   PendingInvitations,
   usePendingInvitations,
   CategoryMappingTab,
+  AlertPreferencesTab,
 } from '@/features/admin';
 import type { Profile } from '@/types';
 
-type TabId = 'users' | 'invitations' | 'mapping';
+type TabId = 'users' | 'invitations' | 'mapping' | 'alerts';
 
 export function AdminPage() {
   const isAdmin = useIsAdmin();
@@ -71,6 +72,11 @@ export function AdminPage() {
       id: 'mapping' as TabId,
       label: 'Categorías Menú',
       icon: FolderTree,
+    },
+    {
+      id: 'alerts' as TabId,
+      label: 'Alertas',
+      icon: Bell,
     },
   ];
 
@@ -238,6 +244,20 @@ export function AdminPage() {
                 </p>
               </div>
               <CategoryMappingTab />
+            </>
+          )}
+
+          {activeTab === 'alerts' && (
+            <>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Preferencias de Alertas
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Configura qué alertas recibe cada consultor por empresa (categorías, canales, umbrales).
+                </p>
+              </div>
+              <AlertPreferencesTab />
             </>
           )}
 

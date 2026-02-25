@@ -85,6 +85,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .select('id, email, full_name, assigned_company_ids, role, slack_user_id')
     .in('role', ['consultant', 'manager', 'admin']);
 
+  // Fetch alert preferences
+  const { data: prefsData, error: prefsError } = await supabase
+    .from('alert_preferences')
+    .select('*');
+
   // Group by consultant
   const companyToConsultants = new Map<string, ConsultantProfile[]>();
   if (profiles) {
@@ -129,6 +134,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     threshold,
     errors: errors.length > 0 ? errors : undefined,
     profiles_error: profilesError?.message,
+    prefs_error: prefsError?.message,
+    prefs_count: prefsData?.length ?? 0,
+    alert_preferences: prefsData ?? [],
     summary: {
       order_anomalies: orderAnomalies.length,
       review_anomalies: reviewAnomalies.length,
