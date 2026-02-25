@@ -5,6 +5,8 @@
  * @module api/alerts/email
  */
 
+import { escapeHtml } from './auth';
+
 interface SendEmailParams {
   to: string;
   subject: string;
@@ -68,7 +70,7 @@ export function buildAlertEmailHtml(
       (s) => `
       <div style="margin-bottom: 16px;">
         <h3 style="color: #095789; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">
-          ${s.title}
+          ${escapeHtml(s.title)}
         </h3>
         <ul style="margin: 0; padding: 0 0 0 16px; color: #374151; font-size: 13px; line-height: 1.6;">
           ${s.items.map((item) => `<li>${item}</li>`).join('\n')}
@@ -92,14 +94,14 @@ export function buildAlertEmailHtml(
         Alertas diarias
       </h1>
       <p style="color: rgba(255,255,255,0.8); font-size: 13px; margin: 4px 0 0;">
-        ${dateLabel}
+        ${escapeHtml(dateLabel)}
       </p>
     </div>
 
     <!-- Body -->
     <div style="background-color: white; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb; border-top: none;">
       <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px;">
-        Hola ${consultantName}, estas son las anomalias detectadas en tus empresas:
+        Hola ${escapeHtml(consultantName)}, estas son las anomalias detectadas en tus empresas:
       </p>
       ${sectionHtml}
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />

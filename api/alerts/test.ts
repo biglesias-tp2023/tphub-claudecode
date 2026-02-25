@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { verifyCronSecret } from './auth';
 
 /**
  * Test endpoint for daily alerts.
@@ -28,9 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify auth
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Verify auth (timing-safe comparison)
+  if (!verifyCronSecret(req.headers.authorization as string | undefined)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

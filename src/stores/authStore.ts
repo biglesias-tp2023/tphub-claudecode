@@ -162,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
           console.error('Error signing out:', error);
         } finally {
           // Always clear state, even if signOut fails
+          localStorage.clear();
           sessionStorage.clear();
           useGlobalFiltersStore.getState().resetOnLogout();
 
@@ -276,6 +277,8 @@ supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
     // Only clear local state — do NOT call logout() to avoid infinite loop
     // (logout -> signOut -> SIGNED_OUT event -> logout -> ...)
+    localStorage.clear();
+    sessionStorage.clear();
     useGlobalFiltersStore.getState().resetOnLogout();
     useAuthStore.setState({
       user: null,

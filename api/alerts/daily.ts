@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { sendEmail, buildAlertEmailHtml } from './email';
+import { escapeHtml, verifyCronSecret } from './auth';
 
 // ============================================
 // Types
@@ -413,9 +414,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // 2. Verify auth
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // 2. Verify auth (timing-safe comparison)
+  if (!verifyCronSecret(req.headers.authorization as string | undefined)) {
     console.log('[daily-alerts] Unauthorized request');
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -466,7 +466,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[daily-alerts] RPC errors:', errors);
     await sendSlack(`:warning: Errores en alertas diarias:\n${errors.join('\n')}`);
     if (errors.length === 4) {
-      return res.status(500).json({ errors });
+      return res.status(500).json({ error: 'Failed to fetch anomaly data' });
     }
   }
 
@@ -551,7 +551,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: 'Pedidos',
         items: group.orders.map(
           (a) =>
-            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — ${a.yesterday_orders} pedidos (media: ${a.avg_orders_baseline}) → ${a.orders_deviation_pct}%`
+            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — ${a.yesterday_orders} pedidos (media: ${a.avg_orders_baseline}) → ${a.orders_deviation_pct}%`
         ),
       });
     }
@@ -560,7 +560,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: 'Resenas',
         items: group.reviews.map(
           (a) =>
-            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`
+            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`
         ),
       });
     }
@@ -569,7 +569,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: 'Promos',
         items: group.promos.map(
           (a) =>
-            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — ${a.yesterday_promos}\u20AC promos (${a.yesterday_promo_rate}% de ventas) → +${a.promo_spend_deviation_pct}%`
+            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — ${a.yesterday_promos}\u20AC promos (${a.yesterday_promo_rate}% de ventas) → +${a.promo_spend_deviation_pct}%`
         ),
       });
     }
@@ -578,7 +578,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: 'Publicidad',
         items: group.ads.map(
           (a) =>
-            `<strong>${a.company_name} — ${a.store_name}</strong> | ${a.address_name} (${a.channel}) — ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`
+            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`
         ),
       });
     }
