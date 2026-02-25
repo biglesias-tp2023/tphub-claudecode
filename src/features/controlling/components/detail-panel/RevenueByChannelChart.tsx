@@ -51,8 +51,12 @@ export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
             stackId: 'revenue',
           },
         ]}
-        yTickFormatter={(v) => formatCurrency(v, { compact: true })}
-        margin={{ top: 8, right: 8, left: 40, bottom: 0 }}
+        yTickFormatter={(v) => {
+          if (v === 0) return '0 €';
+          if (v >= 1000) return formatCurrency(v, { compact: true });
+          return `${Math.round(v)} €`;
+        }}
+        margin={{ top: 8, right: 8, left: 50, bottom: 0 }}
         renderTooltip={(dp, xLabel) => {
           const glovo = Number(dp.glovo) || 0;
           const ubereats = Number(dp.ubereats) || 0;

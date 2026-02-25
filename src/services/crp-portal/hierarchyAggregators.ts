@@ -220,7 +220,7 @@ export function buildHierarchyFromRPCMetrics(
     rows.push({
       id: `company-${company.id}`,
       level: 'company',
-      name: `${company.name} (${company.id})`,
+      name: company.name,
       companyId: companyKey,
       metrics: toFinalMetrics(currentAgg.byCompany.get(companyKey), previousAgg.byCompany.get(companyKey)),
     });
@@ -232,7 +232,7 @@ export function buildHierarchyFromRPCMetrics(
     rows.push({
       id: `brand::${store.companyId}::${store.id}`,
       level: 'brand',
-      name: `${store.name} (${store.id})`,
+      name: store.name,
       parentId: `company-${store.companyId}`,
       companyId: String(store.companyId),
       brandId: store.id,
@@ -254,7 +254,7 @@ export function buildHierarchyFromRPCMetrics(
       rows.push({
         id: `address::${address.companyId}::${address.id}`,
         level: 'address',
-        name: `${address.name} (${address.id})`,
+        name: address.name,
         parentId,
         companyId: address.companyId,
         brandId: parentStore?.id,
@@ -272,7 +272,7 @@ export function buildHierarchyFromRPCMetrics(
           rows.push({
             id: `channel::${address.companyId}::${address.id}::${portal.id}`,
             level: 'channel',
-            name: `${portal.name} (${portal.id})`,
+            name: portal.name,
             parentId: `address::${address.companyId}::${address.id}`,
             companyId: address.companyId,
             brandId: parentStore?.id,
@@ -291,7 +291,7 @@ export function buildHierarchyFromRPCMetrics(
       rows.push({
         id: `address::${address.companyId}::${address.id}`,
         level: 'address',
-        name: `${address.name} (${address.id})`,
+        name: address.name,
         parentId,
         companyId: address.companyId,
         brandId: firstStore?.id,

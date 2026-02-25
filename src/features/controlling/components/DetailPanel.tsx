@@ -11,6 +11,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Drawer } from '@/components/ui/Drawer/Drawer';
+import { formatCurrency } from '@/utils/formatters';
 import type { HierarchyRow } from '../hooks/useControllingData';
 import type { WeekMetrics, WeekSegmentData } from '../hooks/useWeeklyRevenue';
 import { useDetailPanelData } from '../hooks/useDetailPanelData';
@@ -139,12 +140,22 @@ export function DetailPanel({ row, hierarchy, weeklyMetrics, weeklySegments, onC
         <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
           <Icon className="w-4 h-4 text-primary-600" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-gray-900 truncate">{row.name}</h2>
           {row.subtitle && (
             <p className="text-xs text-gray-500 truncate">{row.subtitle}</p>
           )}
         </div>
+        {row.ventas > 0 && (
+          <div className="text-right shrink-0">
+            <p className="text-sm font-semibold text-gray-900">{formatCurrency(row.ventas)}</p>
+            {row.ventasChange !== 0 && (
+              <p className={`text-[10px] font-medium ${row.ventasChange > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {row.ventasChange > 0 ? '+' : ''}{row.ventasChange.toFixed(1)}%
+              </p>
+            )}
+          </div>
+        )}
       </div>
       {descendantsSummary && (
         <p className="text-[10px] text-gray-500 mt-1.5">{descendantsSummary}</p>
