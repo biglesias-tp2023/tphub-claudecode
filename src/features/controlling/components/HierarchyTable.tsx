@@ -31,12 +31,14 @@ type SortColumn =
   | 'porcentajeRecurrentes'
   | 'inversionAds'
   | 'adsPercentage'
+  | 'ventasAds'
   | 'roas'
   | 'impressions'
   | 'clicks'
   | 'adOrders'
   | 'inversionPromos'
   | 'promosPercentage'
+  | 'ventasPromos'
   | 'promosRoas'
   | 'organicOrders'
   | 'ratingGlovo'
@@ -224,6 +226,7 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
         <>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionAds != null ? formatCurrency(row.inversionAds) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adsPercentage != null ? `${row.adsPercentage.toFixed(1)}%` : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ventasAds != null ? formatCurrency(row.ventasAds) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.roas != null ? row.roas.toFixed(1) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.impressions ? formatNumber(row.impressions) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.clicks ? formatNumber(row.clicks) : '-'}</td>
@@ -234,6 +237,7 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
         <>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ventasPromos != null ? formatCurrency(row.ventasPromos) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? `${row.organicOrders.toFixed(1)}%` : '-'}</td>
         </>
@@ -581,6 +585,13 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     onSort={handleSort}
                   />
                   <SortableHeader
+                    column="ventasAds"
+                    label="Ventas Ads"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
                     column="roas"
                     label="ROAS"
                     currentSort={sortColumn}
@@ -622,6 +633,13 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                   <SortableHeader
                     column="promosPercentage"
                     label="Promos %"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="ventasPromos"
+                    label="Ventas Promos"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}

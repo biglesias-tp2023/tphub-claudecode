@@ -95,6 +95,7 @@ export interface HierarchyRow {
   // Publicidad
   inversionAds?: number;
   adsPercentage?: number;
+  ventasAds?: number;
   roas?: number;
   impressions?: number;
   clicks?: number;
@@ -103,6 +104,7 @@ export interface HierarchyRow {
   // Promociones (phase 2 - optional)
   inversionPromos?: number;
   promosPercentage?: number;
+  ventasPromos?: number;
   promosRoas?: number;
   organicOrders?: number;
 
@@ -157,6 +159,7 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     inversionAds: row.metrics.adSpent,
     adsPercentage: row.metrics.ventas > 0
       ? (row.metrics.adSpent / row.metrics.ventas) * 100 : 0,
+    ventasAds: row.metrics.adRevenue,
     roas: row.metrics.roas,
     impressions: row.metrics.impressions,
     clicks: row.metrics.clicks,
@@ -165,6 +168,8 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     inversionPromos: row.metrics.descuentos,
     promosPercentage: row.metrics.ventas > 0
       ? (row.metrics.descuentos / row.metrics.ventas) * 100 : 0,
+    ventasPromos: row.metrics.descuentos > 0
+      ? row.metrics.descuentos * (row.metrics.ventas / row.metrics.descuentos) : 0,
     promosRoas: row.metrics.descuentos > 0
       ? row.metrics.ventas / row.metrics.descuentos : 0,
     // Organico = % of orders without promotion
