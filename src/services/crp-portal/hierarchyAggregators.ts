@@ -43,6 +43,24 @@ function createEmptyRPCBase(): RPCBaseMetrics {
   };
 }
 
+function addMetrics(target: RPCBaseMetrics, source: RPCBaseMetrics) {
+  target.ventas += source.ventas;
+  target.pedidos += source.pedidos;
+  target.nuevos += source.nuevos;
+  target.descuentos += source.descuentos;
+  target.reembolsos += source.reembolsos;
+  target.promotedOrders += source.promotedOrders;
+  target.adSpent += source.adSpent;
+  target.adRevenue += source.adRevenue;
+  target.impressions += source.impressions;
+  target.clicks += source.clicks;
+  target.adOrders += source.adOrders;
+  target.glovoRatingSum += source.glovoRatingSum;
+  target.glovoReviews += source.glovoReviews;
+  target.uberRatingSum += source.uberRatingSum;
+  target.uberReviews += source.uberReviews;
+}
+
 export interface AggregatedRPCMetrics {
   byPortal: Map<string, RPCBaseMetrics>;
   byAddress: Map<string, RPCBaseMetrics>;
@@ -96,25 +114,6 @@ export function aggregateRPCMetrics(rows: ControllingMetricsRow[]): AggregatedRP
       agg.uberReviews += totalReviews;
     }
   }
-
-  // Helper to accumulate metrics
-  const addMetrics = (target: RPCBaseMetrics, source: RPCBaseMetrics) => {
-    target.ventas += source.ventas;
-    target.pedidos += source.pedidos;
-    target.nuevos += source.nuevos;
-    target.descuentos += source.descuentos;
-    target.reembolsos += source.reembolsos;
-    target.promotedOrders += source.promotedOrders;
-    target.adSpent += source.adSpent;
-    target.adRevenue += source.adRevenue;
-    target.impressions += source.impressions;
-    target.clicks += source.clicks;
-    target.adOrders += source.adOrders;
-    target.glovoRatingSum += source.glovoRatingSum;
-    target.glovoReviews += source.glovoReviews;
-    target.uberRatingSum += source.uberRatingSum;
-    target.uberReviews += source.uberReviews;
-  };
 
   // Step 2: Address level from portals
   for (const [portalKey, metrics] of byPortal) {
@@ -240,9 +239,46 @@ export function buildHierarchyFromRPCMetrics(
     });
   }
 
+  // Helper to sum RPCBaseMetrics from multiple address IDs
+  const sumAddressMetrics = (
+    allIds: string[], companyId: string, storeId: string,
+    agg: AggregatedRPCMetrics
+  ): RPCBaseMetrics | undefined => {
+    let result: RPCBaseMetrics | undefined;
+    for (const addrId of allIds) {
+      const m = agg.byAddress.get(`${companyId}::${storeId}::${addrId}`);
+      if (m) {
+        if (!result) result = createEmptyRPCBase();
+        addMetrics(result, m);
+      }
+    }
+    return result;
+  };
+
+  const sumPortalMetrics = (
+    allIds: string[], companyId: string, storeId: string, portalId: string,
+    agg: AggregatedRPCMetrics
+  ): RPCBaseMetrics | undefined => {
+    let result: RPCBaseMetrics | undefined;
+    for (const addrId of allIds) {
+      const m = agg.byPortal.get(`${companyId}::${storeId}::${addrId}::${portalId}`);
+      if (m) {
+        if (!result) result = createEmptyRPCBase();
+        addMetrics(result, m);
+      }
+    }
+    return result;
+  };
+
   // 3. ADDRESS rows
   for (const address of addresses) {
-    const mappedStoreId = addressToStoreMap.get(address.id) || address.storeId;
+    // Try all allIds to find mapped store
+    let mappedStoreId: string | undefined;
+    for (const addrId of address.allIds) {
+      const storeId = addressToStoreMap.get(addrId);
+      if (storeId) { mappedStoreId = storeId; break; }
+    }
+    if (!mappedStoreId) mappedStoreId = address.storeId;
 
     if (mappedStoreId) {
       const parentStore = stores.find(s => s.id === mappedStoreId && s.companyId === address.companyId);
@@ -250,7 +286,9 @@ export function buildHierarchyFromRPCMetrics(
         ? `brand::${parentStore.companyId}::${parentStore.id}`
         : `company-${address.companyId}`;
 
-      const addressKey = `${address.companyId}::${mappedStoreId}::${address.id}`;
+      const currentAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, currentAgg);
+      const previousAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, previousAgg);
+
       rows.push({
         id: `address::${address.companyId}::${address.id}`,
         level: 'address',
@@ -258,14 +296,13 @@ export function buildHierarchyFromRPCMetrics(
         parentId,
         companyId: address.companyId,
         brandId: parentStore?.id,
-        metrics: toFinalMetrics(currentAgg.byAddress.get(addressKey), previousAgg.byAddress.get(addressKey)),
+        metrics: toFinalMetrics(currentAddrMetrics, previousAddrMetrics),
       });
 
       // PORTAL rows
       for (const portal of portals) {
-        const portalKey = `${address.companyId}::${mappedStoreId}::${address.id}::${portal.id}`;
-        const portalCurrent = currentAgg.byPortal.get(portalKey);
-        const portalPrevious = previousAgg.byPortal.get(portalKey);
+        const portalCurrent = sumPortalMetrics(address.allIds, address.companyId, mappedStoreId, portal.id, currentAgg);
+        const portalPrevious = sumPortalMetrics(address.allIds, address.companyId, mappedStoreId, portal.id, previousAgg);
         const channelId = portalIdToChannelId(portal.id);
 
         if (portalCurrent || portalPrevious) {

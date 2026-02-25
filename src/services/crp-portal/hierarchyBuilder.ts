@@ -6,7 +6,7 @@
 
 import { supabase } from '../supabase';
 import type { DbCrpOrderHead } from './types';
-import { deduplicateAndFilterDeleted } from './utils';
+import { deduplicateAndFilterDeleted, deduplicateBy } from './utils';
 import { portalIdToChannelId } from './orders';
 import type { HierarchyMetrics, HierarchyDataRow } from './hierarchy';
 
@@ -110,21 +110,24 @@ export async function fetchAllDimensions(
     name: c.des_company_name,
   }));
 
-  const activeStores = deduplicateAndFilterDeleted(
+  // For stores/addresses/portals: use deduplicateBy (keep deleted entries too)
+  // because deleted dimensions may still have orders in the selected period
+  // and we need them for the hierarchy to sum correctly.
+  const uniqueStores = deduplicateBy(
     storesResult.data || [],
     s => String(s.pk_id_store)
   );
-  const stores: StoreDim[] = activeStores.map(s => ({
+  const stores: StoreDim[] = uniqueStores.map(s => ({
     id: String(s.pk_id_store),
     name: s.des_store,
     companyId: String(s.pfk_id_company),
   }));
 
-  const activeAddresses = deduplicateAndFilterDeleted(
+  const uniqueAddresses = deduplicateBy(
     addressesResult.data || [],
     a => String(a.pk_id_address)
   );
-  const addresses: AddressDim[] = activeAddresses.map(a => ({
+  const addresses: AddressDim[] = uniqueAddresses.map(a => ({
     id: String(a.pk_id_address),
     name: a.des_address || '',
     companyId: String(a.pfk_id_company),
@@ -132,11 +135,11 @@ export async function fetchAllDimensions(
     storeId: undefined,
   }));
 
-  const activePortals = deduplicateAndFilterDeleted(
+  const uniquePortals = deduplicateBy(
     portalsResult.data || [],
     p => String(p.pk_id_portal)
   );
-  const portals: PortalDim[] = activePortals.map(p => ({
+  const portals: PortalDim[] = uniquePortals.map(p => ({
     id: String(p.pk_id_portal),
     name: p.des_portal,
   }));
