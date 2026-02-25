@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Info } from 'lucide-react';
+import { MetricTooltip, tooltipContent } from '@/components/common';
 import { cn } from '@/utils/cn';
 import type { CohortData } from '@/services/crp-portal';
 
@@ -76,10 +77,6 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
     return granularity === 'week' ? `+${i}S` : `+${i}M`;
   });
 
-  const tooltipText = viewMode === 'cumulative'
-    ? '% de clientes que han vuelto al menos una vez hasta este período'
-    : '% de clientes que compraron específicamente en este período';
-
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
       {/* Toggle Header */}
@@ -109,12 +106,17 @@ export function CohortHeatmap({ data, granularity }: CohortHeatmapProps) {
               Por período
             </button>
           </div>
-          <span
-            className="cursor-help text-gray-400"
-            title={tooltipText}
+          <MetricTooltip
+            content={tooltipContent(
+              'Tabla de retención por cohortes. Cada fila es un grupo de clientes que hicieron su primera compra en el mismo período.',
+              viewMode === 'cumulative'
+                ? 'Acumulado: % de clientes que han vuelto al menos una vez hasta este período.'
+                : 'Por período: % de clientes que compraron específicamente en este período.',
+              'Permite detectar si la retención mejora o empeora entre cohortes. Una diagonal estable es señal de buena salud.'
+            )}
           >
             <Info className="w-4 h-4" />
-          </span>
+          </MetricTooltip>
         </div>
       </div>
 
