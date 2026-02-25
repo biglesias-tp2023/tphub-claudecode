@@ -1,3 +1,4 @@
+export { ErrorAlert } from './ErrorAlert';
 export { ProtectedRoute } from './ProtectedRoute';
 export { ChunkLoadErrorBoundary } from './ChunkLoadErrorBoundary';
 export { ExportButtons } from './ExportButtons';

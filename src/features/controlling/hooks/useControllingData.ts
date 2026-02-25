@@ -7,7 +7,11 @@ import { useHierarchyData } from './useHierarchyData';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from './idExpansion';
+import { CHANNELS } from '@/constants/channels';
 import type { HierarchyDataRow } from '@/services/crp-portal';
+
+/** Default open time percentage when CRP Portal data is not available */
+const DEFAULT_OPEN_TIME_PERCENT = 80;
 
 // ============================================
 // TYPES
@@ -211,9 +215,9 @@ function createDefaultPortfolio(): PortfolioMetrics {
  */
 function createDefaultChannels(): ChannelMetrics[] {
   const config = [
-    { id: 'glovo' as ChannelId, name: 'Glovo', color: '#FFC244', logo: '' },
-    { id: 'ubereats' as ChannelId, name: 'Uber Eats', color: '#06C167', logo: '' },
-    { id: 'justeat' as ChannelId, name: 'Just Eat', color: '#FF8000', logo: '' },
+    { id: 'glovo' as ChannelId, name: CHANNELS.glovo.name, color: CHANNELS.glovo.color, logo: '' },
+    { id: 'ubereats' as ChannelId, name: CHANNELS.ubereats.name, color: CHANNELS.ubereats.color, logo: '' },
+    { id: 'justeat' as ChannelId, name: CHANNELS.justeat.name, color: CHANNELS.justeat.color, logo: '' },
   ];
 
   return config.map((cfg) => ({
@@ -305,7 +309,7 @@ export function useControllingData() {
         ticketMedio: current.avgTicket,
         ticketMedioChange: changes.avgTicketChange,
         // Open time not yet available from CRP Portal
-        openTime: 80, // Default
+        openTime: DEFAULT_OPEN_TIME_PERCENT,
         openTimeChange: 0,
         // Ads from CRP Portal advertising table
         inversionAds: current.totalAdSpent,
@@ -340,9 +344,9 @@ export function useControllingData() {
         current.byChannel.justeat.orders;
 
       const channelConfig = [
-        { id: 'glovo' as ChannelId, name: 'Glovo', color: '#FFC244', logo: '' },
-        { id: 'ubereats' as ChannelId, name: 'Uber Eats', color: '#06C167', logo: '' },
-        { id: 'justeat' as ChannelId, name: 'Just Eat', color: '#FF8000', logo: '' },
+        { id: 'glovo' as ChannelId, name: CHANNELS.glovo.name, color: CHANNELS.glovo.color, logo: '' },
+        { id: 'ubereats' as ChannelId, name: CHANNELS.ubereats.name, color: CHANNELS.ubereats.color, logo: '' },
+        { id: 'justeat' as ChannelId, name: CHANNELS.justeat.name, color: CHANNELS.justeat.color, logo: '' },
       ];
 
       channels = channelConfig.map((cfg) => {
@@ -365,7 +369,7 @@ export function useControllingData() {
           pedidos: channelData.orders,
           pedidosPercentage: totalChannelOrders > 0 ? (channelData.orders / totalChannelOrders) * 100 : 0,
           ticketMedio: channelData.orders > 0 ? channelData.revenue / channelData.orders : 0,
-          openTime: 80, // Default
+          openTime: DEFAULT_OPEN_TIME_PERCENT,
           ads: channelData.adSpent,
           adsPercentage: channelData.revenue > 0
             ? (channelData.adSpent / channelData.revenue) * 100 : 0,

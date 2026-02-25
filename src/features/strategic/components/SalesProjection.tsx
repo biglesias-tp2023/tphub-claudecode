@@ -117,7 +117,7 @@ export function SalesProjection({
     isCurrent: m.isCurrent,
   })), [months, targetRevenue, effectiveActualRevenue, effectiveActualAds, effectiveActualPromos, activeChannels, calculations]);
 
-  const currentMonthIndex = months.findIndex((m) => m.isCurrent);
+  const currentMonthIndex = useMemo(() => months.findIndex((m) => m.isCurrent), [months]);
   /* eslint-disable react-hooks/purity */
   const daysRemaining = useMemo(() => {
     const diff = new Date(config.endDate).getTime() - Date.now();
@@ -182,6 +182,45 @@ export function SalesProjection({
         break;
     }
   }, [months, activeChannels, calculations, config, restaurantName, targetRevenue, actualRevenue, actualAds, effectiveActualPromos]);
+
+  // Memoized chart series config
+  const chartSeries = useMemo<AreaSeriesConfig[]>(() => [
+    { dataKey: 'targetRevenue', name: 'Objetivo', color: '#095789', gradientOpacity: [0.15, 0], strokeWidth: 2 },
+    ...(showActual ? [{ dataKey: 'actualRevenue', name: 'Real', color: '#10B981', gradientOpacity: [0.15, 0] as [number, number], strokeWidth: 2 }] : []),
+  ], [showActual]);
+
+  // Memoized reference lines config
+  const chartReferenceLines = useMemo<ReferenceLineConfig[]>(() =>
+    currentMonthIndex >= 0 ? [{
+      x: months[currentMonthIndex].label,
+      stroke: '#6366F1',
+      strokeDasharray: '4 4',
+      label: 'Hoy',
+      labelColor: '#6366F1',
+    }] : [],
+  [currentMonthIndex, months]);
+
+  // Memoized tooltip renderer
+  const renderChartTooltip = useCallback((dataPoint: Record<string, unknown>, xLabel: string) => {
+    const d = dataPoint as Record<string, number>;
+    return (
+      <div className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg rounded-xl border border-gray-100 text-xs">
+        <p className="font-semibold text-gray-900 mb-2">{xLabel}</p>
+        <div className="space-y-1.5">
+          <Row label="Objetivo de Ventas" value={d.targetRevenue} color="text-primary-600" />
+          {d.actualRevenue > 0 && <Row label="Venta Actual" value={d.actualRevenue} color="text-emerald-600" />}
+          <div className="border-t border-gray-100 pt-1.5 mt-1.5">
+            <Row label="Presupuesto ADS" value={d.targetAds} color="text-amber-600" />
+            {d.actualAds > 0 && <Row label="Inv. Actual ADS" value={d.actualAds} color="text-amber-500" />}
+          </div>
+          <div className="border-t border-gray-100 pt-1.5 mt-1.5">
+            <Row label="Presupuesto Promo" value={d.targetPromos} color="text-purple-600" />
+            {d.actualPromos > 0 && <Row label="Inv. Actual Promo" value={d.actualPromos} color="text-purple-500" />}
+          </div>
+        </div>
+      </div>
+    );
+  }, []);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -265,42 +304,14 @@ export function SalesProjection({
           <AreaChart
             data={chartData}
             xKey="month"
-            series={[
-              { dataKey: 'targetRevenue', name: 'Objetivo', color: '#095789', gradientOpacity: [0.15, 0], strokeWidth: 2 },
-              ...(showActual ? [{ dataKey: 'actualRevenue', name: 'Real', color: '#10B981', gradientOpacity: [0.15, 0] as [number, number], strokeWidth: 2 }] : []),
-            ] satisfies AreaSeriesConfig[]}
+            series={chartSeries}
             margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
             gridVertical={false}
             tickFontSize={10}
             tickColor="#9CA3AF"
             yTickFormatter={fmtK}
-            referenceLines={currentMonthIndex >= 0 ? [{
-              x: months[currentMonthIndex].label,
-              stroke: '#6366F1',
-              strokeDasharray: '4 4',
-              label: 'Hoy',
-              labelColor: '#6366F1',
-            } satisfies ReferenceLineConfig] : []}
-            renderTooltip={(dataPoint, xLabel) => {
-              const d = dataPoint as Record<string, number>;
-              return (
-                <div className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg rounded-xl border border-gray-100 text-xs">
-                  <p className="font-semibold text-gray-900 mb-2">{xLabel}</p>
-                  <div className="space-y-1.5">
-                    <Row label="Objetivo de Ventas" value={d.targetRevenue} color="text-primary-600" />
-                    {d.actualRevenue > 0 && <Row label="Venta Actual" value={d.actualRevenue} color="text-emerald-600" />}
-                    <div className="border-t border-gray-100 pt-1.5 mt-1.5">
-                      <Row label="Presupuesto ADS" value={d.targetAds} color="text-amber-600" />
-                      {d.actualAds > 0 && <Row label="Inv. Actual ADS" value={d.actualAds} color="text-amber-500" />}
-                    </div>
-                    <div className="border-t border-gray-100 pt-1.5 mt-1.5">
-                      <Row label="Presupuesto Promo" value={d.targetPromos} color="text-purple-600" />
-                      {d.actualPromos > 0 && <Row label="Inv. Actual Promo" value={d.actualPromos} color="text-purple-500" />}
-                    </div>
-                  </div>
-                </div>
-              );
-            }}
+            referenceLines={chartReferenceLines}
+            renderTooltip={renderChartTooltip}
           />
         </div>
         <div className="flex items-center justify-center gap-6 mt-3 text-[10px]">
@@ -366,7 +377,7 @@ export function SalesProjection({
                           <SalesTableRow
                             key={`target-${ch}`}
                             label={channel?.name || ch}
-                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
+                            logoUrl={channel?.logo || '/images/platforms/glovo.png'}
                             months={months}
                             values={targetRevenue}
                             channel={ch}
@@ -382,7 +393,7 @@ export function SalesProjection({
                           <SalesTableRow
                             key={`actual-${ch}`}
                             label={channel?.name || ch}
-                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
+                            logoUrl={channel?.logo || '/images/platforms/glovo.png'}
                             months={months}
                             values={effectiveActualRevenue}
                             channel={ch}
@@ -427,7 +438,7 @@ export function SalesProjection({
                           <SalesTableRow
                             key={`ads-${ch}`}
                             label={`${channel?.name} (${getPercent(config.maxAdsPercent, ch)}%)`}
-                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
+                            logoUrl={channel?.logo || '/images/platforms/glovo.png'}
                             months={months}
                             values={targetData}
                             channel={ch}
@@ -443,7 +454,7 @@ export function SalesProjection({
                           <SalesTableRow
                             key={`ads-actual-${ch}`}
                             label={channel?.name || ch}
-                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
+                            logoUrl={channel?.logo || '/images/platforms/glovo.png'}
                             months={months}
                             values={effectiveActualAds}
                             channel={ch}
@@ -491,7 +502,7 @@ export function SalesProjection({
                           <SalesTableRow
                             key={`promos-${ch}`}
                             label={`${channel?.name} (${getPercent(config.maxPromosPercent, ch)}%)`}
-                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
+                            logoUrl={channel?.logo || '/images/platforms/glovo.png'}
                             months={months}
                             values={targetData}
                             channel={ch}
@@ -507,7 +518,7 @@ export function SalesProjection({
                           <SalesTableRow
                             key={`promos-actual-${ch}`}
                             label={channel?.name || ch}
-                            logoUrl={channel?.logo || '/images/channels/glovo.png'}
+                            logoUrl={channel?.logo || '/images/platforms/glovo.png'}
                             months={months}
                             values={effectiveActualPromos}
                             channel={ch}

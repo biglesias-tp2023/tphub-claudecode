@@ -21,7 +21,7 @@ import {
 } from '@/services/crp-portal';
 import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams, OrderDetails } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
-import { formatDate, getPreviousPeriodRange } from '@/features/controlling/hooks/dateUtils';
+import { formatDate, getPreviousPeriodRange } from '@/utils/dateUtils';
 
 // ============================================
 // TYPES

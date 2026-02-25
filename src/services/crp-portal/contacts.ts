@@ -39,7 +39,9 @@ export async function fetchContactsByCompanyId(companyId: string): Promise<Hubsp
     .single();
 
   if (monthError || !latestMonth) {
-    console.error('No month found for company:', companyId, monthError);
+    if (import.meta.env.DEV) {
+      console.error('[crp-portal] fetchContactsByCompanyId: no month found for company', companyId, monthError);
+    }
     return [];
   }
 
@@ -56,7 +58,9 @@ export async function fetchContactsByCompanyId(companyId: string): Promise<Hubsp
   const { data: companyContacts, error: contactsError } = await step2Query;
 
   if (contactsError || !companyContacts?.length) {
-    console.error('No contacts for company:', companyId, contactsError);
+    if (import.meta.env.DEV) {
+      console.error('[crp-portal] fetchContactsByCompanyId: no contacts for company', companyId, contactsError);
+    }
     return [];
   }
 
@@ -70,7 +74,9 @@ export async function fetchContactsByCompanyId(companyId: string): Promise<Hubsp
     .order('pk_ts_month', { ascending: false });
 
   if (detailsError || !contacts?.length) {
-    console.error('No contact details found', detailsError);
+    if (import.meta.env.DEV) {
+      console.error('[crp-portal] fetchContactsByCompanyId: no contact details found', detailsError);
+    }
     return [];
   }
 

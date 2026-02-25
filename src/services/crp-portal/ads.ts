@@ -10,6 +10,7 @@
 import { supabase } from '../supabase';
 import type { ChannelId } from '@/types';
 import { PORTAL_IDS } from './types';
+import { handleCrpError } from './errors';
 
 // ============================================
 // TYPES
@@ -113,8 +114,7 @@ export async function fetchAdsTimeseries(
   });
 
   if (error) {
-    console.error('Error fetching ads timeseries:', error);
-    throw error;
+    handleCrpError('fetchAdsTimeseries', error);
   }
 
   return ((data || []) as Array<{
@@ -159,8 +159,7 @@ export async function fetchAdsHourlyDistribution(
   });
 
   if (error) {
-    console.error('Error fetching ads hourly distribution:', error);
-    throw error;
+    handleCrpError('fetchAdsHourlyDistribution', error);
   }
 
   return ((data || []) as Array<{
@@ -205,8 +204,7 @@ export async function fetchAdsWeeklyHeatmap(
   });
 
   if (error) {
-    console.error('Error fetching ads weekly heatmap:', error);
-    throw error;
+    handleCrpError('fetchAdsWeeklyHeatmap', error);
   }
 
   return ((data || []) as Array<{

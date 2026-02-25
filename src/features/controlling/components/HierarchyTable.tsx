@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -108,6 +108,150 @@ function SortableHeader({ column, label, currentSort, currentDirection, onSort, 
     </th>
   );
 }
+
+// --- Extracted row component (memoized) ---
+
+interface HierarchyTableRowProps {
+  row: HierarchyRow & { _depth: number };
+  canExpand: boolean;
+  isExpanded: boolean;
+  activeTabs: ReadonlySet<ViewTab>;
+  onRowClick?: (row: HierarchyRow) => void;
+  onToggleRow: (id: string) => void;
+  weeklyRevenue: Map<string, number[]>;
+  weeklyRevenueLoading: boolean;
+}
+
+const HierarchyTableRow = React.memo(function HierarchyTableRow({
+  row,
+  canExpand,
+  isExpanded,
+  activeTabs,
+  onRowClick,
+  onToggleRow,
+  weeklyRevenue,
+  weeklyRevenueLoading,
+}: HierarchyTableRowProps) {
+  const Icon = LEVEL_ICONS[row.level];
+  const depth = row._depth;
+
+  const handleRowClick = useCallback(() => {
+    onRowClick?.(row);
+  }, [onRowClick, row]);
+
+  const handleToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggleRow(row.id);
+    },
+    [onToggleRow, row.id]
+  );
+
+  return (
+    <tr
+      className={cn(
+        'border-b border-gray-50 hover:bg-gray-50/50 transition-colors',
+        row.level === 'company' && 'bg-primary-50/60',
+        row.level === 'channel' && 'bg-gray-50/30',
+        onRowClick && 'cursor-pointer'
+      )}
+      onClick={handleRowClick}
+    >
+      <td className="py-2.5 px-4">
+        <div
+          className="flex items-center gap-2"
+          style={{ paddingLeft: depth * 20 }}
+        >
+          {canExpand ? (
+            <button
+              onClick={handleToggle}
+              className="p-0.5 hover:bg-gray-200 rounded"
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+          ) : (
+            <span className="w-4" />
+          )}
+          {row.channelId ? (
+            <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium', CHANNEL_COLORS[row.channelId])}>
+              {row.name}
+            </span>
+          ) : (
+            <>
+              <Icon className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-900">{row.name}</span>
+              {row.subtitle && (
+                <span className="text-gray-400 text-xs">{row.subtitle}</span>
+              )}
+            </>
+          )}
+        </div>
+      </td>
+      <td className="text-right py-2.5 px-2 font-medium text-gray-900 text-sm tabular-nums">
+        {formatCurrency(row.ventas)}
+      </td>
+      <td className="text-right py-2.5 px-2 text-xs tabular-nums">
+        <span className={row.ventasChange >= 0 ? 'text-emerald-600' : 'text-red-500'}>
+          {row.ventasChange >= 0 ? '+' : ''}{row.ventasChange.toFixed(1)}%
+        </span>
+      </td>
+      <td className="py-2.5 px-1 text-center">
+        {weeklyRevenueLoading ? (
+          <div className="inline-block w-[90px] h-[28px] bg-gray-100 rounded animate-pulse" />
+        ) : (
+          <Sparkline
+            data={weeklyRevenue.get(row.id) || []}
+            color={row.level === 'company' ? '#095789' : '#9ca3af'}
+            areaOpacity={row.level === 'company' ? 0.1 : 0.06}
+          />
+        )}
+      </td>
+      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.pedidos)}</td>
+      {activeTabs.has('rendimiento') && (
+        <>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ticketMedio.toFixed(1)}{'\u20AC'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.nuevosClientes)}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeNuevos.toFixed(1)}%</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.recurrentesClientes)}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeRecurrentes.toFixed(1)}%</td>
+        </>
+      )}
+      {activeTabs.has('publicidad') && (
+        <>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionAds != null ? formatCurrency(row.inversionAds) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adsPercentage != null ? `${row.adsPercentage.toFixed(1)}%` : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.roas != null ? row.roas.toFixed(1) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.impressions ? formatNumber(row.impressions) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.clicks ? formatNumber(row.clicks) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adOrders ? formatNumber(row.adOrders) : '-'}</td>
+        </>
+      )}
+      {activeTabs.has('promociones') && (
+        <>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? `${row.organicOrders.toFixed(1)}%` : '-'}</td>
+        </>
+      )}
+      {activeTabs.has('operaciones') && (
+        <>
+          <td className="text-right py-2.5 px-2 text-gray-400 text-sm">-</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${row.ratingGlovo.toFixed(1)}%` : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsGlovo ? formatNumber(row.reviewsGlovo) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingUber ? row.ratingUber.toFixed(1) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsUber ? formatNumber(row.reviewsUber) : '-'}</td>
+        </>
+      )}
+    </tr>
+  );
+});
+
+// --- Main table component ---
 
 export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenueLoading, onRowClick }: HierarchyTableProps) {
   const [activeTabs, setActiveTabs] = useSessionSet<ViewTab>('tphub-ht-tabs', ['rendimiento']);
@@ -554,116 +698,19 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map((row) => {
-              const Icon = LEVEL_ICONS[row.level];
-              const canExpand = hasChildren(row.id);
-              const isExpanded = expandedRows.has(row.id);
-              const depth = row._depth;
-
-              return (
-                <tr
-                  key={row.id}
-                  className={cn(
-                    'border-b border-gray-50 hover:bg-gray-50/50 transition-colors',
-                    row.level === 'company' && 'bg-primary-50/60',
-                    row.level === 'channel' && 'bg-gray-50/30',
-                    onRowClick && 'cursor-pointer'
-                  )}
-                  onClick={() => onRowClick?.(row)}
-                >
-                  <td className="py-2.5 px-4">
-                    <div
-                      className="flex items-center gap-2"
-                      style={{ paddingLeft: depth * 20 }}
-                    >
-                      {canExpand ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleRow(row.id); }}
-                          className="p-0.5 hover:bg-gray-200 rounded"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                          )}
-                        </button>
-                      ) : (
-                        <span className="w-4" />
-                      )}
-                      {row.channelId ? (
-                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-medium', CHANNEL_COLORS[row.channelId])}>
-                          {row.name}
-                        </span>
-                      ) : (
-                        <>
-                          <Icon className="w-3.5 h-3.5 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">{row.name}</span>
-                          {row.subtitle && (
-                            <span className="text-gray-400 text-xs">{row.subtitle}</span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td className="text-right py-2.5 px-2 font-medium text-gray-900 text-sm tabular-nums">
-                    {formatCurrency(row.ventas)}
-                  </td>
-                  <td className="text-right py-2.5 px-2 text-xs tabular-nums">
-                    <span className={row.ventasChange >= 0 ? 'text-emerald-600' : 'text-red-500'}>
-                      {row.ventasChange >= 0 ? '+' : ''}{row.ventasChange.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-1 text-center">
-                    {weeklyRevenueLoading ? (
-                      <div className="inline-block w-[90px] h-[28px] bg-gray-100 rounded animate-pulse" />
-                    ) : (
-                      <Sparkline
-                        data={weeklyRevenue.get(row.id) || []}
-                        color={row.level === 'company' ? '#095789' : '#9ca3af'}
-                        areaOpacity={row.level === 'company' ? 0.1 : 0.06}
-                      />
-                    )}
-                  </td>
-                  <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.pedidos)}</td>
-                  {activeTabs.has('rendimiento') && (
-                    <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ticketMedio.toFixed(1)}{'\u20AC'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.nuevosClientes)}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeNuevos.toFixed(1)}%</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.recurrentesClientes)}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeRecurrentes.toFixed(1)}%</td>
-                    </>
-                  )}
-                  {activeTabs.has('publicidad') && (
-                    <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionAds != null ? formatCurrency(row.inversionAds) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adsPercentage != null ? `${row.adsPercentage.toFixed(1)}%` : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.roas != null ? row.roas.toFixed(1) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.impressions ? formatNumber(row.impressions) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.clicks ? formatNumber(row.clicks) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.adOrders ? formatNumber(row.adOrders) : '-'}</td>
-                    </>
-                  )}
-                  {activeTabs.has('promociones') && (
-                    <>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosPercentage != null ? `${row.promosPercentage.toFixed(1)}%` : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.promosRoas != null ? row.promosRoas.toFixed(1) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums" title="Pedidos sin promocion">{row.organicOrders != null ? `${row.organicOrders.toFixed(1)}%` : '-'}</td>
-                    </>
-                  )}
-                  {activeTabs.has('operaciones') && (
-                    <>
-                      <td className="text-right py-2.5 px-2 text-gray-400 text-sm">-</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${row.ratingGlovo.toFixed(1)}%` : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsGlovo ? formatNumber(row.reviewsGlovo) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingUber ? row.ratingUber.toFixed(1) : '-'}</td>
-                      <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsUber ? formatNumber(row.reviewsUber) : '-'}</td>
-                    </>
-                  )}
-                </tr>
-              );
-            })}
+            {visibleRows.map((row) => (
+              <HierarchyTableRow
+                key={row.id}
+                row={row}
+                canExpand={hasChildren(row.id)}
+                isExpanded={expandedRows.has(row.id)}
+                activeTabs={activeTabs}
+                onRowClick={onRowClick}
+                onToggleRow={toggleRow}
+                weeklyRevenue={weeklyRevenue}
+                weeklyRevenueLoading={weeklyRevenueLoading}
+              />
+            ))}
           </tbody>
         </table>
       </div>

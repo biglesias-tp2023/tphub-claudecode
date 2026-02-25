@@ -11,9 +11,9 @@ export const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string; spa
 };
 
 export const CHANNEL_LOGOS: Record<ChannelId, string> = {
-  glovo: '/images/channels/glovo.png',
-  ubereats: '/images/channels/ubereats.png',
-  justeat: '/images/channels/justeat.webp',
+  glovo: '/images/platforms/glovo.png',
+  ubereats: '/images/platforms/ubereats.png',
+  justeat: '/images/platforms/justeat.webp',
 };
 
 interface ChannelCardProps {

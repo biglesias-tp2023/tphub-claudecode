@@ -39,9 +39,9 @@ type Step = 'channels' | 'investment' | 'baseline' | 'targets';
 // ============================================
 
 const CHANNELS: { id: SalesChannel; name: string; logoUrl: string; color: string; bg: string }[] = [
-  { id: 'glovo', name: 'Glovo', logoUrl: '/images/channels/glovo.png', color: 'border-yellow-400 bg-yellow-50', bg: 'bg-yellow-400' },
-  { id: 'ubereats', name: 'Uber Eats', logoUrl: '/images/channels/ubereats.png', color: 'border-green-500 bg-green-50', bg: 'bg-green-500' },
-  { id: 'justeat', name: 'Just Eat', logoUrl: '/images/channels/justeat.webp', color: 'border-orange-500 bg-orange-50', bg: 'bg-orange-500' },
+  { id: 'glovo', name: 'Glovo', logoUrl: '/images/platforms/glovo.png', color: 'border-yellow-400 bg-yellow-50', bg: 'bg-yellow-400' },
+  { id: 'ubereats', name: 'Uber Eats', logoUrl: '/images/platforms/ubereats.png', color: 'border-green-500 bg-green-50', bg: 'bg-green-500' },
+  { id: 'justeat', name: 'Just Eat', logoUrl: '/images/platforms/justeat.webp', color: 'border-orange-500 bg-orange-50', bg: 'bg-orange-500' },
 ];
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];

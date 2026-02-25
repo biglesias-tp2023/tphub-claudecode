@@ -23,6 +23,7 @@ import type { Restaurant } from '@/types';
 import type { DbCrpAddress, FetchRestaurantsParams } from './types';
 import { mapRestaurant } from './mappers';
 import { groupAddressesByName, parseNumericIds, deduplicateAndFilterDeleted } from './utils';
+import { handleCrpError } from './errors';
 
 /** Table name for addresses/restaurants in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_address';
@@ -82,8 +83,7 @@ export async function fetchRestaurants(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching CRP addresses:', error);
-    throw new Error(`Error fetching restaurants: ${error.message}`);
+    handleCrpError('fetchRestaurants', error);
   }
 
   // Step 1: Deduplicate by pk_id_address and filter deleted records

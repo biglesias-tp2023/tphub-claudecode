@@ -48,6 +48,73 @@ export function CalendarGrid({
   }, []);
   const todayStr = formatLocalDate(today);
 
+  // Pre-calculate the date strings for all 42 grid cells
+  const gridDateStrings = useMemo(() => {
+    const dateStrings: string[] = [];
+
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+
+    let dayOfWeek = firstDay.getDay();
+    dayOfWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+    // Previous month dates
+    const prevMonthLastDay = new Date(year, month - 1, 0);
+    for (let i = dayOfWeek - 1; i >= 0; i--) {
+      const date = new Date(year, month - 2, prevMonthLastDay.getDate() - i);
+      dateStrings.push(formatLocalDate(date));
+    }
+
+    // Current month dates
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      dateStrings.push(formatLocalDate(new Date(year, month - 1, day)));
+    }
+
+    // Next month dates
+    const remainingDays = 42 - dateStrings.length;
+    for (let day = 1; day <= remainingDays; day++) {
+      dateStrings.push(formatLocalDate(new Date(year, month, day)));
+    }
+
+    return dateStrings;
+  }, [year, month]);
+
+  // Pre-calculate Map<dateStr, PromotionalCampaign[]> for all grid dates
+  const campaignsByDate = useMemo(() => {
+    const map = new Map<string, PromotionalCampaign[]>();
+    for (const dateStr of gridDateStrings) {
+      const matching = campaigns.filter(
+        c => c.startDate <= dateStr && c.endDate >= dateStr
+      );
+      map.set(dateStr, matching);
+    }
+    return map;
+  }, [campaigns, gridDateStrings]);
+
+  // Pre-calculate Map<dateStr, CalendarEvent[]> for all grid dates
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    for (const dateStr of gridDateStrings) {
+      const matching = events.filter(event => {
+        if (event.endDate) {
+          return event.eventDate <= dateStr && event.endDate >= dateStr;
+        }
+        return event.eventDate === dateStr;
+      });
+      map.set(dateStr, matching);
+    }
+    return map;
+  }, [events, gridDateStrings]);
+
+  // Pre-calculate Map<dateStr, WeatherForecast> for quick lookup
+  const weatherByDate = useMemo(() => {
+    const map = new Map<string, WeatherForecast>();
+    for (const w of weatherForecasts) {
+      map.set(w.date, w);
+    }
+    return map;
+  }, [weatherForecasts]);
+
   const calendarDays = useMemo(() => {
     const days: CalendarDayData[] = [];
 
@@ -70,9 +137,9 @@ export function CalendarGrid({
         date,
         isCurrentMonth: false,
         isToday: dateStr === todayStr,
-        campaigns: getCampaignsForDate(campaigns, dateStr),
-        events: getEventsForDate(events, dateStr),
-        weather: weatherForecasts.find(w => w.date === dateStr),
+        campaigns: campaignsByDate.get(dateStr) ?? [],
+        events: eventsByDate.get(dateStr) ?? [],
+        weather: weatherByDate.get(dateStr),
       });
     }
 
@@ -85,9 +152,9 @@ export function CalendarGrid({
         date,
         isCurrentMonth: true,
         isToday: dateStr === todayStr,
-        campaigns: getCampaignsForDate(campaigns, dateStr),
-        events: getEventsForDate(events, dateStr),
-        weather: weatherForecasts.find(w => w.date === dateStr),
+        campaigns: campaignsByDate.get(dateStr) ?? [],
+        events: eventsByDate.get(dateStr) ?? [],
+        weather: weatherByDate.get(dateStr),
       });
     }
 
@@ -101,14 +168,14 @@ export function CalendarGrid({
         date,
         isCurrentMonth: false,
         isToday: dateStr === todayStr,
-        campaigns: getCampaignsForDate(campaigns, dateStr),
-        events: getEventsForDate(events, dateStr),
-        weather: weatherForecasts.find(w => w.date === dateStr),
+        campaigns: campaignsByDate.get(dateStr) ?? [],
+        events: eventsByDate.get(dateStr) ?? [],
+        weather: weatherByDate.get(dateStr),
       });
     }
 
     return days;
-  }, [year, month, campaigns, events, weatherForecasts, todayStr]);
+  }, [year, month, campaignsByDate, eventsByDate, weatherByDate, todayStr]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-full flex flex-col">
@@ -126,9 +193,9 @@ export function CalendarGrid({
 
       {/* Calendar grid */}
       <div className="grid grid-cols-7 flex-1">
-        {calendarDays.map((dayData, index) => (
+        {calendarDays.map((dayData) => (
           <CalendarDay
-            key={index}
+            key={formatLocalDate(dayData.date)}
             date={dayData.date}
             isCurrentMonth={dayData.isCurrentMonth}
             isToday={dayData.isToday}
@@ -144,24 +211,3 @@ export function CalendarGrid({
   );
 }
 
-/**
- * Get campaigns that are active on a specific date
- */
-function getCampaignsForDate(campaigns: PromotionalCampaign[], dateStr: string): PromotionalCampaign[] {
-  return campaigns.filter(campaign => {
-    return campaign.startDate <= dateStr && campaign.endDate >= dateStr;
-  });
-}
-
-/**
- * Get events for a specific date
- */
-function getEventsForDate(events: CalendarEvent[], dateStr: string): CalendarEvent[] {
-  return events.filter(event => {
-    // Check if event is on this date (including multi-day events)
-    if (event.endDate) {
-      return event.eventDate <= dateStr && event.endDate >= dateStr;
-    }
-    return event.eventDate === dateStr;
-  });
-}

@@ -58,3 +58,44 @@ export function parseNumericIds(ids: string[]): number[] {
     .map((id) => parseInt(id, 10))
     .filter((id) => !isNaN(id) && id > 0);
 }
+
+interface WeekRange {
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
+  label: string; // Short label like "03/02"
+}
+
+/**
+ * Calculate N complete week ranges (Mon-Sun) going backwards from the
+ * most recent completed week. Labels are DD/MM of each Monday.
+ */
+export function getLastNWeeks(n: number): WeekRange[] {
+  const today = new Date();
+  const dow = today.getDay();
+  const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+
+  const currentMonday = new Date(today);
+  currentMonday.setDate(today.getDate() - daysSinceMonday);
+  currentMonday.setHours(0, 0, 0, 0);
+
+  const weeks: WeekRange[] = [];
+
+  for (let i = 1; i <= n; i++) {
+    const weekStart = new Date(currentMonday);
+    weekStart.setDate(currentMonday.getDate() - i * 7);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const dd = String(weekStart.getDate()).padStart(2, '0');
+    const mm = String(weekStart.getMonth() + 1).padStart(2, '0');
+
+    weeks.unshift({
+      start: formatDate(weekStart),
+      end: formatDate(weekEnd),
+      label: `${dd}/${mm}`,
+    });
+  }
+
+  return weeks;
+}

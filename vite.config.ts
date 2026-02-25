@@ -17,7 +17,8 @@ export default defineConfig({
         manualChunks: {
           'vendor-maps': ['leaflet', 'react-leaflet'],
           'vendor-charts': ['d3'],
-          'vendor-export': ['jspdf', 'jspdf-autotable', 'xlsx'],
+          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
+          'vendor-excel': ['xlsx'],
         },
       },
     },

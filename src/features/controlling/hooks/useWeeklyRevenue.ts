@@ -16,16 +16,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useCompanyIds } from '@/stores/filtersStore';
-import { fetchControllingMetricsRPC, fetchWeeklyCustomerSegmentsBatch, PORTAL_IDS } from '@/services/crp-portal';
+import { fetchControllingMetricsRPC, fetchWeeklyCustomerSegmentsBatch } from '@/services/crp-portal';
+import { portalIdToChannelId } from '@/services/crp-portal/orders';
 import type { ControllingMetricsRow, CustomerSegmentRow } from '@/services/crp-portal';
 import type { ChannelId } from '@/types';
-import { formatDate } from '@/utils/dateUtils';
-
-interface WeekRange {
-  start: string; // YYYY-MM-DD
-  end: string;   // YYYY-MM-DD
-  label: string; // Short label like "S1", "S2"...
-}
+import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
+import { getLastNWeeks } from '@/utils/dateUtils';
 
 /** Full metrics for a single week, for a given row ID */
 export interface WeekMetrics {
@@ -56,50 +52,8 @@ export interface WeekSegmentData {
   frequentCustomers: number;
 }
 
-/**
- * Calculate 8 complete week ranges (Mon-Sun) going backwards from the
- * most recent completed week.
- */
-function getLast8Weeks(): WeekRange[] {
-  const today = new Date();
-  const dow = today.getDay();
-  const daysSinceMonday = dow === 0 ? 6 : dow - 1;
-
-  const currentMonday = new Date(today);
-  currentMonday.setDate(today.getDate() - daysSinceMonday);
-  currentMonday.setHours(0, 0, 0, 0);
-
-  const weeks: WeekRange[] = [];
-
-  for (let i = 1; i <= 8; i++) {
-    const weekStart = new Date(currentMonday);
-    weekStart.setDate(currentMonday.getDate() - i * 7);
-
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-
-    // Label as DD/MM (Monday date)
-    const dd = String(weekStart.getDate()).padStart(2, '0');
-    const mm = String(weekStart.getMonth() + 1).padStart(2, '0');
-
-    weeks.unshift({
-      start: formatDate(weekStart),
-      end: formatDate(weekEnd),
-      label: `${dd}/${mm}`,
-    });
-  }
-
-  return weeks;
-}
-
-/**
- * Maps a portal ID to a channel ID.
- */
-function portalToChannel(portalId: string): ChannelId | null {
-  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
-  if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
-  return null;
-}
+/** Number of complete weeks to fetch for sparklines */
+const SPARKLINE_WEEKS = 8;
 
 interface AggregatedWeek {
   byRowId: Map<string, number>;
@@ -139,7 +93,7 @@ function aggregateRevenueByRowId(rows: ControllingMetricsRow[]): AggregatedWeek 
     addRow(`address::${companyId}::${addressId}`, revenue);
     addRow(`channel::${companyId}::${addressId}::${portalId}`, revenue);
 
-    const channelId = portalToChannel(portalId);
+    const channelId = portalIdToChannelId(portalId);
     if (channelId) {
       byChannel.set(channelId, (byChannel.get(channelId) || 0) + revenue);
     }
@@ -199,7 +153,7 @@ function aggregateAllMetricsByRowId(rows: ControllingMetricsRow[]): AggregatedWe
     const storeId = row.pfk_id_store;
     const addressId = row.pfk_id_store_address;
     const portalId = row.pfk_id_portal;
-    const channelId = portalToChannel(portalId);
+    const channelId = portalIdToChannelId(portalId);
 
     addToMetrics(getOrCreate(`company-${companyId}`), row, channelId);
     addToMetrics(getOrCreate(`brand::${companyId}::${storeId}`), row, channelId);
@@ -268,7 +222,7 @@ function aggregateSegmentsByRowId(rows: CustomerSegmentRow[]): AggregatedWeekSeg
 export function useWeeklyRevenue() {
   const companyIds = useCompanyIds();
 
-  const weeks = useMemo(() => getLast8Weeks(), []);
+  const weeks = useMemo(() => getLastNWeeks(SPARKLINE_WEEKS), []);
 
   interface WeeklyRevenueData {
     byRowId: Map<string, number[]>;
@@ -376,8 +330,8 @@ export function useWeeklyRevenue() {
     },
     enabled: companyIds.length > 0,
     retry: 1,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
   });
 
   const emptyRowMap = useMemo(() => new Map<string, number[]>(), []);

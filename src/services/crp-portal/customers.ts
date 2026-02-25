@@ -26,6 +26,7 @@
 import { supabase } from '../supabase';
 import type { ChannelId } from '@/types';
 import { PORTAL_IDS } from './types';
+import { handleCrpError } from './errors';
 
 // ============================================
 // TYPES
@@ -299,8 +300,7 @@ async function fetchCustomerOrders(params: FetchCustomerDataParams): Promise<Cus
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching customer orders:', error);
-      throw error;
+      handleCrpError('fetchCustomerOrders', error);
     }
 
     if (data && data.length > 0) {
@@ -941,8 +941,7 @@ export async function fetchWeeklyCustomerSegments(
   });
 
   if (error) {
-    console.error('[fetchWeeklyCustomerSegments] RPC error:', error);
-    return [];
+    handleCrpError('fetchWeeklyCustomerSegments', error);
   }
 
   return (data ?? []) as CustomerSegmentRow[];
@@ -974,9 +973,7 @@ export async function fetchWeeklyCustomerSegmentsBatch(
   });
 
   if (error) {
-    console.error('[fetchWeeklyCustomerSegmentsBatch] RPC error:', error);
-    // Return empty arrays for each week
-    return weekStarts.map(() => []);
+    handleCrpError('fetchWeeklyCustomerSegmentsBatch', error);
   }
 
   const rows = (data ?? []) as CustomerSegmentBatchRow[];

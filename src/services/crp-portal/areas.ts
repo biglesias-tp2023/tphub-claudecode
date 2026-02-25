@@ -17,6 +17,7 @@ import type { Area } from '@/types';
 import type { DbCrpBusinessArea } from './types';
 import { mapArea } from './mappers';
 import { deduplicateBy } from './utils';
+import { handleCrpError } from './errors';
 
 /** Table name for business areas in CRP Portal */
 const TABLE_NAME = 'crp_portal__ct_business_area';
@@ -41,8 +42,7 @@ export async function fetchAreas(): Promise<Area[]> {
     .order('des_business_area');
 
   if (error) {
-    console.error('Error fetching CRP business areas:', error);
-    throw new Error(`Error fetching areas: ${error.message}`);
+    handleCrpError('fetchAreas', error);
   }
 
   const uniqueAreas = deduplicateBy(

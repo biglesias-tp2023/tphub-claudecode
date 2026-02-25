@@ -17,6 +17,7 @@ import type { Brand } from '@/types';
 import type { DbCrpStore } from './types';
 import { mapBrand } from './mappers';
 import { groupByName, parseNumericIds, normalizeName, deduplicateAndFilterDeleted } from './utils';
+import { handleCrpError } from './errors';
 
 /** Table name for stores/brands in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_store';
@@ -58,8 +59,7 @@ export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching CRP stores:', error);
-    throw new Error(`Error fetching brands: ${error.message}`);
+    handleCrpError('fetchBrands', error);
   }
 
   // Step 1: Deduplicate by pk_id_store and filter deleted records

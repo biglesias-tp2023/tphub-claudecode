@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Cloud, Flag, Trophy, Tv, ShoppingBag, type LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { resolveIcon } from '@/utils/iconResolver';
@@ -26,7 +26,27 @@ const EVENT_CATEGORY_CONFIG: Record<EventCategory, { icon: LucideIcon; color: st
 
 const MAX_VISIBLE_CAMPAIGNS = 2;
 
-export function CalendarDay({
+/**
+ * Custom comparator for React.memo.
+ * Shallow comparison for primitives, reference equality for objects/arrays.
+ */
+function areCalendarDayPropsEqual(
+  prev: CalendarDayProps,
+  next: CalendarDayProps
+): boolean {
+  return (
+    prev.date === next.date &&
+    prev.isCurrentMonth === next.isCurrentMonth &&
+    prev.isToday === next.isToday &&
+    prev.campaigns === next.campaigns &&
+    prev.events === next.events &&
+    prev.weather === next.weather &&
+    prev.onCampaignClick === next.onCampaignClick &&
+    prev.onDayClick === next.onDayClick
+  );
+}
+
+export const CalendarDay = memo(function CalendarDay({
   date,
   isCurrentMonth,
   isToday,
@@ -221,4 +241,4 @@ export function CalendarDay({
       </div>
     </div>
   );
-}
+}, areCalendarDayPropsEqual);

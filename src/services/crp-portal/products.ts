@@ -10,6 +10,7 @@
 
 import { supabase } from '../supabase';
 import type { CampaignPlatform } from '@/types';
+import { handleCrpError } from './errors';
 
 // ============================================
 // CONSTANTS
@@ -192,8 +193,7 @@ export async function fetchCrpProductsByIds(
     .limit(productIds.length * 3);
 
   if (error) {
-    console.error('Error fetching products by IDs:', error);
-    return [];
+    handleCrpError('fetchCrpProductsByIds', error);
   }
 
   if (!data || data.length === 0) {

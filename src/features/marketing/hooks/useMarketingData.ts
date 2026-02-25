@@ -15,7 +15,7 @@ import { useOrdersData } from '@/features/controlling/hooks/useOrdersData';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
-import { formatDate } from '@/features/controlling/hooks/dateUtils';
+import { formatDate } from '@/utils/dateUtils';
 import { fetchAdsTimeseries } from '@/services/crp-portal';
 import type { AdsTimeseriesRow } from '@/services/crp-portal';
 

@@ -46,9 +46,9 @@ type Channel = 'glovo' | 'ubereats' | 'justeat';
 // ============================================
 
 const CHANNELS: { id: Channel; label: string; color: string; logo: string }[] = [
-  { id: 'glovo', label: 'Glovo', color: '#FFC244', logo: '/images/channels/glovo.png' },
-  { id: 'ubereats', label: 'UberEats', color: '#06C167', logo: '/images/channels/ubereats.png' },
-  { id: 'justeat', label: 'JustEat', color: '#FF8000', logo: '/images/channels/justeat.webp' },
+  { id: 'glovo', label: 'Glovo', color: '#FFC244', logo: '/images/platforms/glovo.png' },
+  { id: 'ubereats', label: 'UberEats', color: '#06C167', logo: '/images/platforms/ubereats.png' },
+  { id: 'justeat', label: 'JustEat', color: '#FF8000', logo: '/images/platforms/justeat.webp' },
 ];
 
 const DEFAULT_INVESTMENT: InvestmentConfig = { glovo: 0, ubereats: 0, justeat: 0 };

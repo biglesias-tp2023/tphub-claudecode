@@ -16,6 +16,7 @@
 import { supabase } from '../supabase';
 import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
+import { handleCrpError } from './errors';
 
 // ============================================
 // TYPES
@@ -186,8 +187,7 @@ export async function fetchCrpReviewsAggregated(
   });
 
   if (error) {
-    console.error('Error fetching reviews aggregation RPC:', error);
-    throw error;
+    handleCrpError('fetchCrpReviewsAggregated', error);
   }
 
   const rows = (data || []) as ReviewsAggregationRPCRow[];
@@ -275,8 +275,7 @@ export async function fetchCrpReviewsHeatmap(
   });
 
   if (error) {
-    console.error('Error fetching reviews heatmap RPC:', error);
-    throw error;
+    handleCrpError('fetchCrpReviewsHeatmap', error);
   }
 
   const rows = (data || []) as ReviewsHeatmapRPCRow[];
@@ -358,8 +357,7 @@ export async function fetchOrderDetails(
       .in('pk_uuid_order', chunk);
 
     if (error) {
-      console.error('Error fetching order details:', error);
-      throw error;
+      handleCrpError('fetchOrderDetails', error);
     }
 
     for (const row of data || []) {
@@ -424,8 +422,7 @@ export async function fetchReviewTags(
       .in('pk_id_review', chunk);
 
     if (error) {
-      console.error('Error fetching review tags:', error);
-      throw error;
+      handleCrpError('fetchReviewTags', error);
     }
 
     for (const row of data || []) {
@@ -478,8 +475,7 @@ export async function fetchCrpReviewsRaw(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching raw reviews:', error);
-    throw error;
+    handleCrpError('fetchCrpReviewsRaw', error);
   }
 
   return (data || []) as RawReview[];

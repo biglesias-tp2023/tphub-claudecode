@@ -29,6 +29,7 @@ import { supabase } from '../supabase';
 import type { DbCrpOrderHead } from './types';
 import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
+import { handleCrpError } from './errors';
 
 // ============================================
 // TYPES
@@ -260,8 +261,7 @@ export async function fetchCrpOrdersRaw(
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching CRP orders:', error);
-      throw error;
+      handleCrpError('fetchCrpOrdersRaw', error);
     }
 
     if (data && data.length > 0) {
@@ -274,7 +274,7 @@ export async function fetchCrpOrdersRaw(
     }
   }
 
-  if (pageCount >= MAX_PAGES) {
+  if (pageCount >= MAX_PAGES && import.meta.env.DEV) {
     console.warn(`fetchCrpOrdersRaw: hit ${MAX_PAGES}-page safety limit (${allOrders.length} rows). Consider narrowing the date range.`);
   }
 
@@ -343,8 +343,7 @@ export async function fetchCrpOrdersAggregated(
   });
 
   if (error) {
-    console.error('Error fetching orders aggregation RPC:', error);
-    throw error;
+    handleCrpError('fetchCrpOrdersAggregated', error);
   }
 
   const rows = (data || []) as OrdersAggregationRPCRow[];
@@ -563,8 +562,7 @@ export async function fetchMonthlyRevenueByChannel(
   });
 
   if (error) {
-    console.error('Error fetching monthly revenue by channel:', error);
-    throw error;
+    handleCrpError('fetchMonthlyRevenueByChannel', error);
   }
 
   return (data || []) as MonthlyRevenueRow[];

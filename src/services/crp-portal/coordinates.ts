@@ -13,6 +13,7 @@
 import { supabase } from '../supabase';
 import type { Restaurant } from '@/types';
 import type { DbRestaurantCoordinate, FetchCoordinatesParams } from './types';
+import { handleCrpError } from './errors';
 
 /** Table name for restaurant coordinates */
 const TABLE_NAME = 'tphub_restaurant_coordinates';
@@ -93,8 +94,7 @@ export async function fetchRestaurantCoordinates(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching restaurant coordinates:', error);
-    throw new Error(`Error fetching restaurant coordinates: ${error.message}`);
+    handleCrpError('fetchRestaurantCoordinates', error);
   }
 
   return (data as DbRestaurantCoordinate[]).map(mapCoordinateToRestaurant);

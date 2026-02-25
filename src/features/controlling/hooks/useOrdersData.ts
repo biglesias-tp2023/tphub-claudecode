@@ -21,10 +21,11 @@
  * @module features/controlling/hooks/useOrdersData
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchCrpOrdersComparison } from '@/services/crp-portal';
 import type { OrdersAggregation } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
+import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { formatDate, getPreviousPeriodRange } from './dateUtils';
 
 // ============================================
@@ -133,8 +134,8 @@ export function useOrdersData(params: UseOrdersDataParams) {
     enabled: companyIds.length > 0,
     // Limit retries to prevent amplifying RPC timeouts (default=3 → 1)
     retry: 1,
-    // Keep data fresh but avoid excessive refetching
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
+    placeholderData: keepPreviousData,
   });
 }

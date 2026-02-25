@@ -16,6 +16,7 @@ import { supabase } from '../supabase';
 import type { DbCrpPortal, Portal } from './types';
 import { mapPortal } from './mappers';
 import { deduplicateBy } from './utils';
+import { handleCrpError } from './errors';
 
 /** Table name for portals in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_portal';
@@ -40,8 +41,7 @@ export async function fetchPortals(): Promise<Portal[]> {
     .order('des_portal');
 
   if (error) {
-    console.error('Error fetching CRP portals:', error);
-    throw new Error(`Error fetching portals: ${error.message}`);
+    handleCrpError('fetchPortals', error);
   }
 
   const uniquePortals = deduplicateBy(

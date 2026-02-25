@@ -9,7 +9,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
-import { ExportButtons, DataFreshnessIndicator, type ExportFormat, type PreviewTableData } from '@/components/common';
+import { ErrorAlert, ExportButtons, DataFreshnessIndicator, type ExportFormat, type PreviewTableData } from '@/components/common';
 import { DashboardFilters } from '@/features/dashboard';
 import { useControllingData, useWeeklyRevenue } from '@/features/controlling';
 import type { HierarchyRow } from '@/features/controlling';
@@ -157,7 +157,7 @@ export function ControllingPage() {
   if (error || !data) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-red-600">Error al cargar los datos</p>
+        <ErrorAlert error={error instanceof Error ? error : new Error('Error al cargar los datos')} />
       </div>
     );
   }

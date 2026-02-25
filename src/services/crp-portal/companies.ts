@@ -17,6 +17,7 @@ import type { DbCrpCompany } from './types';
 import { VALID_COMPANY_STATUSES } from './types';
 import { mapCompany } from './mappers';
 import { deduplicateByNameKeepingLatest, getCurrentMonthFilter } from './utils';
+import { handleCrpError } from './errors';
 
 /** Table name for companies in CRP Portal */
 const TABLE_NAME = 'crp_portal__dt_company';
@@ -49,8 +50,7 @@ export async function fetchCompanies(): Promise<Company[]> {
     .order('des_company_name');
 
   if (error) {
-    console.error('Error fetching CRP companies:', error);
-    throw new Error(`Error fetching companies: ${error.message}`);
+    handleCrpError('fetchCompanies', error);
   }
 
   // Deduplicate by NAME (des_company_name) case-insensitive, keeping the most recent pk_ts_month

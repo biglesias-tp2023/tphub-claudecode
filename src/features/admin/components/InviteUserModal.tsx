@@ -263,186 +263,33 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Email *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@ejemplo.com"
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    required
-                  />
-                </div>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  El usuario podrá acceder con su cuenta de Google
-                </p>
-              </div>
+              <InviteEmailStep email={email} onEmailChange={setEmail} />
 
-              {/* Role */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Rol
-                </label>
-                {availableRoles.length === 0 ? (
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-500">
-                      No tienes permisos para invitar usuarios.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {availableRoles.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <label
-                          key={option.value}
-                          className={cn(
-                            'flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
-                            role === option.value
-                              ? 'border-primary-500 bg-primary-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          )}
-                        >
-                          <input
-                            type="radio"
-                            name="role"
-                            value={option.value}
-                            checked={role === option.value}
-                            onChange={() => setRole(option.value)}
-                            className="mt-0.5 text-primary-600 focus:ring-primary-500"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900">
-                                {option.label}
-                              </span>
-                              {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {option.description}
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <InviteRoleStep
+                role={role}
+                onRoleChange={setRole}
+                availableRoles={availableRoles}
+              />
 
-              {/* Companies - only show for roles that need company assignment */}
-              {/* superadmin and admin have access to everything, no need to assign companies */}
               {!['superadmin', 'admin'].includes(role) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    <Building2 className="inline-block w-4 h-4 mr-1" />
-                    Compañías asignadas
-                  </label>
-
-                  {/* Search */}
-                  <div className="relative mb-2">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar compañía..."
-                      className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
-                      >
-                        <X className="w-3 h-3 text-gray-400" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Filters row */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs text-gray-500">
-                      {filteredCompanies.length} de {companies.length}
-                    </span>
-                    <div className="flex-1" />
-
-                    {/* Status Filter */}
-                    <FilterDropdown
-                      label="Status"
-                      options={uniqueStatuses}
-                      selected={statusFilters}
-                      onChange={setStatusFilters}
-                      getOptionLabel={(s) => statusLabels[s] || s}
-                    />
-
-                    {/* KAM Filter */}
-                    <FilterDropdown
-                      label="KAM"
-                      options={uniqueKams}
-                      selected={kamFilters}
-                      onChange={setKamFilters}
-                      getOptionLabel={(k) => k.split(' ')[0]}
-                      getOptionTitle={(k) => k}
-                    />
-                  </div>
-
-                  {loadingCompanies ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Spinner size="sm" />
-                    </div>
-                  ) : filteredCompanies.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-4 text-center">
-                      {searchQuery
-                        ? `No se encontraron compañías para "${searchQuery}"`
-                        : 'No hay compañías disponibles'}
-                    </p>
-                  ) : (
-                    <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto">
-                      {filteredCompanies.map((company) => (
-                        <CompanyItem
-                          key={company.id}
-                          company={company}
-                          isSelected={selectedCompanyIds.includes(company.id)}
-                          onToggle={() => toggleCompany(company.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Selection actions */}
-                  <div className="flex items-center justify-between mt-2">
-                    <p className={cn('text-xs', selectedCompanyIds.length === 0 ? 'text-red-500 font-medium' : 'text-gray-500')}>
-                      {selectedCompanyIds.length === 0
-                        ? '⚠ Debes asignar al menos una compañía'
-                        : `${selectedCompanyIds.length} compañía(s) seleccionada(s)`}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSelectAll}
-                        className="text-xs text-primary-600 hover:text-primary-700"
-                      >
-                        Seleccionar todos
-                      </button>
-                      {selectedCompanyIds.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleClearSelection}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          Borrar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <InviteCompaniesStep
+                  searchInputRef={searchInputRef}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  filteredCompanies={filteredCompanies}
+                  totalCompanies={companies.length}
+                  selectedCompanyIds={selectedCompanyIds}
+                  onToggleCompany={toggleCompany}
+                  onSelectAll={handleSelectAll}
+                  onClearSelection={handleClearSelection}
+                  loadingCompanies={loadingCompanies}
+                  uniqueStatuses={uniqueStatuses}
+                  statusFilters={statusFilters}
+                  onStatusFiltersChange={setStatusFilters}
+                  uniqueKams={uniqueKams}
+                  kamFilters={kamFilters}
+                  onKamFiltersChange={setKamFilters}
+                />
               )}
 
               {/* Note */}
@@ -493,6 +340,220 @@ export function InviteUserModal({ isOpen, onClose }: InviteUserModalProps) {
             </div>
           </form>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// STEP SUB-COMPONENTS
+// ============================================
+
+function InviteEmailStep({ email, onEmailChange }: { email: string; onEmailChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        Email *
+      </label>
+      <div className="relative">
+        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          placeholder="usuario@ejemplo.com"
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          required
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-gray-500">
+        El usuario podrá acceder con su cuenta de Google
+      </p>
+    </div>
+  );
+}
+
+function InviteRoleStep({
+  role,
+  onRoleChange,
+  availableRoles,
+}: {
+  role: UserRole;
+  onRoleChange: (r: UserRole) => void;
+  availableRoles: RoleOption[];
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">Rol</label>
+      {availableRoles.length === 0 ? (
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+          <p className="text-sm text-gray-500">No tienes permisos para invitar usuarios.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {availableRoles.map((option) => {
+            const Icon = option.icon;
+            return (
+              <label
+                key={option.value}
+                className={cn(
+                  'flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors',
+                  role === option.value
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value={option.value}
+                  checked={role === option.value}
+                  onChange={() => onRoleChange(option.value)}
+                  className="mt-0.5 text-primary-600 focus:ring-primary-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{option.label}</span>
+                    {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+                  </div>
+                  <div className="text-sm text-gray-500">{option.description}</div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InviteCompaniesStep({
+  searchInputRef,
+  searchQuery,
+  onSearchChange,
+  filteredCompanies,
+  totalCompanies,
+  selectedCompanyIds,
+  onToggleCompany,
+  onSelectAll,
+  onClearSelection,
+  loadingCompanies,
+  uniqueStatuses,
+  statusFilters,
+  onStatusFiltersChange,
+  uniqueKams,
+  kamFilters,
+  onKamFiltersChange,
+}: {
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  filteredCompanies: Company[];
+  totalCompanies: number;
+  selectedCompanyIds: string[];
+  onToggleCompany: (id: string) => void;
+  onSelectAll: () => void;
+  onClearSelection: () => void;
+  loadingCompanies: boolean;
+  uniqueStatuses: string[];
+  statusFilters: string[];
+  onStatusFiltersChange: (v: string[]) => void;
+  uniqueKams: string[];
+  kamFilters: string[];
+  onKamFiltersChange: (v: string[]) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <Building2 className="inline-block w-4 h-4 mr-1" />
+        Compañías asignadas
+      </label>
+
+      {/* Search */}
+      <div className="relative mb-2">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          ref={searchInputRef}
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Buscar compañía..."
+          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => onSearchChange('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+          >
+            <X className="w-3 h-3 text-gray-400" />
+          </button>
+        )}
+      </div>
+
+      {/* Filters row */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs text-gray-500">
+          {filteredCompanies.length} de {totalCompanies}
+        </span>
+        <div className="flex-1" />
+        <FilterDropdown
+          label="Status"
+          options={uniqueStatuses}
+          selected={statusFilters}
+          onChange={onStatusFiltersChange}
+          getOptionLabel={(s) => statusLabels[s] || s}
+        />
+        <FilterDropdown
+          label="KAM"
+          options={uniqueKams}
+          selected={kamFilters}
+          onChange={onKamFiltersChange}
+          getOptionLabel={(k) => k.split(' ')[0]}
+          getOptionTitle={(k) => k}
+        />
+      </div>
+
+      {loadingCompanies ? (
+        <div className="flex items-center justify-center py-4">
+          <Spinner size="sm" />
+        </div>
+      ) : filteredCompanies.length === 0 ? (
+        <p className="text-sm text-gray-500 py-4 text-center">
+          {searchQuery
+            ? `No se encontraron compañías para "${searchQuery}"`
+            : 'No hay compañías disponibles'}
+        </p>
+      ) : (
+        <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto">
+          {filteredCompanies.map((company) => (
+            <CompanyItem
+              key={company.id}
+              company={company}
+              isSelected={selectedCompanyIds.includes(company.id)}
+              onToggle={() => onToggleCompany(company.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Selection actions */}
+      <div className="flex items-center justify-between mt-2">
+        <p className={cn('text-xs', selectedCompanyIds.length === 0 ? 'text-red-500 font-medium' : 'text-gray-500')}>
+          {selectedCompanyIds.length === 0
+            ? 'Debes asignar al menos una compañía'
+            : `${selectedCompanyIds.length} compañía(s) seleccionada(s)`}
+        </p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onSelectAll} className="text-xs text-primary-600 hover:text-primary-700">
+            Seleccionar todos
+          </button>
+          {selectedCompanyIds.length > 0 && (
+            <button type="button" onClick={onClearSelection} className="text-xs text-gray-500 hover:text-gray-700">
+              Borrar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

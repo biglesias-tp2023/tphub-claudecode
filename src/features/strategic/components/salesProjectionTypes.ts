@@ -47,9 +47,9 @@ export type TabType = 'revenue' | 'ads' | 'promos';
 // ============================================
 
 export const CHANNELS: { id: SalesChannel; name: string; color: string; logo: string }[] = [
-  { id: 'glovo', name: 'Glovo', color: '#FFC244', logo: '/images/channels/glovo.png' },
-  { id: 'ubereats', name: 'UberEats', color: '#06C167', logo: '/images/channels/ubereats.png' },
-  { id: 'justeat', name: 'JustEat', color: '#FF8000', logo: '/images/channels/justeat.webp' },
+  { id: 'glovo', name: 'Glovo', color: '#FFC244', logo: '/images/platforms/glovo.png' },
+  { id: 'ubereats', name: 'UberEats', color: '#06C167', logo: '/images/platforms/ubereats.png' },
+  { id: 'justeat', name: 'JustEat', color: '#FF8000', logo: '/images/platforms/justeat.webp' },
 ];
 
 export const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];

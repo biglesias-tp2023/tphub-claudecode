@@ -323,86 +323,27 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                 'flex flex-col max-h-[60vh]'
               )}
             >
-              {/* Search Header */}
-              <div className="flex items-center gap-3 p-4 border-b border-gray-100">
-                <Search className="w-5 h-5 text-gray-400 shrink-0" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setHighlightedIndex(0);
-                  }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Buscar compañía..."
-                  className="flex-1 text-sm outline-none placeholder:text-gray-400"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="p-1 hover:bg-gray-100 rounded"
-                  >
-                    <X className="w-4 h-4 text-gray-400" />
-                  </button>
-                )}
-                <button
-                  onClick={close}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label="Cerrar"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
+              <CompanySearchBar
+                inputRef={inputRef}
+                searchQuery={searchQuery}
+                onSearchChange={(q) => { setSearchQuery(q); setHighlightedIndex(0); }}
+                onClear={() => setSearchQuery('')}
+                onKeyDown={handleKeyDown}
+                onClose={close}
+              />
 
-              {/* Tabs & Filters Row */}
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100">
-                {/* Tabs */}
-                <button
-                  onClick={() => handleTabChange('all')}
-                  className={cn(
-                    'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
-                    activeTab === 'all'
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  )}
-                >
-                  Todos ({filteredCompanies.length})
-                </button>
-                <button
-                  onClick={() => handleTabChange('selected')}
-                  className={cn(
-                    'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
-                    activeTab === 'selected'
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  )}
-                >
-                  Seleccionados ({selectedCompanies.length})
-                </button>
-
-                <div className="flex-1" />
-
-                {/* Status Filter Dropdown */}
-                <FilterDropdown
-                  label="Status"
-                  options={uniqueStatuses}
-                  selected={statusFilters}
-                  onChange={setStatusFilters}
-                  getOptionLabel={(s) => statusLabels[s] || s}
-                  getOptionStyle={(s) => statusConfig[s]}
-                />
-
-                {/* KAM Filter Dropdown */}
-                <FilterDropdown
-                  label="KAM"
-                  options={uniqueKams}
-                  selected={kamFilters}
-                  onChange={setKamFilters}
-                  getOptionLabel={(k) => k.split(' ')[0]}
-                  getOptionTitle={(k) => k}
-                />
-              </div>
+              <CompanyTabs
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                filteredCount={filteredCompanies.length}
+                selectedCount={selectedCompanies.length}
+                uniqueStatuses={uniqueStatuses}
+                statusFilters={statusFilters}
+                onStatusFiltersChange={setStatusFilters}
+                uniqueKams={uniqueKams}
+                kamFilters={kamFilters}
+                onKamFiltersChange={setKamFilters}
+              />
 
               {/* Content */}
               <div ref={listRef} className="flex-1 overflow-y-auto">
@@ -424,7 +365,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
                         company={company}
                         isSelected={companyIds.includes(company.id)}
                         isHighlighted={index === boundedHighlightedIndex}
-                        onSelect={() => handleToggleCompany(company)}
+                        onToggle={handleToggleCompany}
                       />
                     ))}
                   </div>
@@ -480,6 +421,121 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   );
 }
 
+// ============================================
+// SUB-COMPONENTS
+// ============================================
+
+function CompanySearchBar({
+  inputRef,
+  searchQuery,
+  onSearchChange,
+  onClear,
+  onKeyDown,
+  onClose,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onClear: () => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 p-4 border-b border-gray-100">
+      <Search className="w-5 h-5 text-gray-400 shrink-0" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={searchQuery}
+        onChange={(e) => onSearchChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder="Buscar compañía..."
+        className="flex-1 text-sm outline-none placeholder:text-gray-400"
+      />
+      {searchQuery && (
+        <button onClick={onClear} className="p-1 hover:bg-gray-100 rounded">
+          <X className="w-4 h-4 text-gray-400" />
+        </button>
+      )}
+      <button
+        onClick={onClose}
+        className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+        aria-label="Cerrar"
+      >
+        <X className="w-5 h-5 text-gray-500" />
+      </button>
+    </div>
+  );
+}
+
+function CompanyTabs({
+  activeTab,
+  onTabChange,
+  filteredCount,
+  selectedCount,
+  uniqueStatuses,
+  statusFilters,
+  onStatusFiltersChange,
+  uniqueKams,
+  kamFilters,
+  onKamFiltersChange,
+}: {
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
+  filteredCount: number;
+  selectedCount: number;
+  uniqueStatuses: string[];
+  statusFilters: string[];
+  onStatusFiltersChange: (values: string[]) => void;
+  uniqueKams: string[];
+  kamFilters: string[];
+  onKamFiltersChange: (values: string[]) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100">
+      <button
+        onClick={() => onTabChange('all')}
+        className={cn(
+          'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+          activeTab === 'all'
+            ? 'bg-primary-100 text-primary-700'
+            : 'text-gray-600 hover:bg-gray-100'
+        )}
+      >
+        Todos ({filteredCount})
+      </button>
+      <button
+        onClick={() => onTabChange('selected')}
+        className={cn(
+          'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+          activeTab === 'selected'
+            ? 'bg-primary-100 text-primary-700'
+            : 'text-gray-600 hover:bg-gray-100'
+        )}
+      >
+        Seleccionados ({selectedCount})
+      </button>
+      <div className="flex-1" />
+      <FilterDropdown
+        label="Status"
+        options={uniqueStatuses}
+        selected={statusFilters}
+        onChange={onStatusFiltersChange}
+        getOptionLabel={(s) => statusLabels[s] || s}
+        getOptionStyle={(s) => statusConfig[s]}
+      />
+      <FilterDropdown
+        label="KAM"
+        options={uniqueKams}
+        selected={kamFilters}
+        onChange={onKamFiltersChange}
+        getOptionLabel={(k) => k.split(' ')[0]}
+        getOptionTitle={(k) => k}
+      />
+    </div>
+  );
+}
+
 // Status tag styles - with shadow effect
 const statusConfig: Record<string, { text: string; bg: string; shadow: string }> = {
   'Cliente Activo': {
@@ -517,16 +573,20 @@ const CompanyItem = memo(function CompanyItem({
   company,
   isSelected,
   isHighlighted,
-  onSelect,
+  onToggle,
 }: {
   company: Company;
   isSelected: boolean;
   isHighlighted: boolean;
-  onSelect: () => void;
+  onToggle: (company: Company) => void;
 }) {
+  const handleClick = useCallback(() => {
+    onToggle(company);
+  }, [onToggle, company]);
+
   return (
     <button
-      onClick={onSelect}
+      onClick={handleClick}
       data-highlighted={isHighlighted}
       className={cn(
         'w-full flex items-center gap-3 px-4 py-2.5',

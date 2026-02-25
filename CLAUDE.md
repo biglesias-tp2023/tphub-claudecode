@@ -103,8 +103,24 @@ src/
 ├── stores/
 │   └── filtersStore.ts   # Zustand stores para filtros globales y dashboard
 ├── hooks/
+│   ├── useScrollLock.ts
+│   ├── useScheduledRefresh.ts
+│   ├── useToast.ts          # Toast notification hook
+│   └── useSessionState.ts   # Session-scoped state
 ├── types/
-└── constants/
+├── constants/
+│   ├── channels.ts          # Channel definitions (Glovo/UberEats/JustEat)
+│   ├── queryKeys.ts         # React Query cache keys
+│   ├── queryConfig.ts       # Stale/GC time tiers (SHORT/MEDIUM/LONG)
+│   ├── timeouts.ts          # Named timeout constants
+│   └── routes.ts            # Route paths
+└── utils/
+    ├── cn.ts                # Tailwind className helper
+    ├── formatters.ts        # Number/date formatting for display
+    ├── dateUtils.ts         # Date/ID utilities (formatDate, parseNumericIds, etc.)
+    ├── iconResolver.ts      # Curated Lucide icon map (tree-shakeable)
+    ├── lazyWithRetry.ts     # React.lazy with chunk reload on deploy
+    └── export/              # PDF/Excel/CSV export utilities
 ```
 
 ## CRP Portal Service (SOLID)
@@ -386,6 +402,44 @@ const { data, isLoading, error } = useOrdersData({
 4. Se calculan agregaciones (totales, por canal)
 5. Se compara con periodo anterior
 6. Datos reales sobreescriben datos demo en el dashboard
+
+### Weekly Revenue (Sparklines + Detail Panel)
+
+| Hook | Responsabilidad | Ubicacion |
+|------|-----------------|-----------|
+| `useWeeklyRevenue` | 8 semanas de revenue/metrics/segments por entidad | `features/controlling/hooks/` |
+
+**Datos que proporciona:**
+- `weeklyRevenue` — Map<rowId, number[]> para sparklines (8 valores)
+- `weeklyMetrics` — Map<rowId, WeekMetrics[]> métricas completas por semana
+- `weeklySegments` — Map<rowId, WeekSegmentData[]> segmentos de clientes por semana
+- `channelWeeklyRevenue` — Map<ChannelId, number[]> revenue por canal
+
+**Utilidad `getLastNWeeks(n)`** en `src/utils/dateUtils.ts` calcula N semanas completas (Lun-Dom) hacia atrás.
+
+### Hierarchy RPC
+
+El servicio de jerarquía (`services/crp-portal/hierarchy.ts`) está dividido en:
+
+| Archivo | Responsabilidad |
+|---------|-----------------|
+| `hierarchy.ts` | Barrel + public API (`fetchHierarchyData`, `fetchHierarchyDataRPC`) |
+| `hierarchyBuilder.ts` | Dimensiones + jerarquía desde órdenes raw |
+| `hierarchyAggregators.ts` | Agregación RPC bottom-up + jerarquía desde métricas |
+
+**Jerarquía**: Company → Store → Address → Portal (4 niveles)
+
+**Agregación bottom-up**: Portal → Address → Store → Company (métricas derivadas se calculan después de sumar).
+
+### Customer Segments
+
+El módulo `customers.ts` (`services/crp-portal/`) provee análisis de segmentación de clientes:
+
+- **Nuevos**: Primera compra en el período
+- **Ocasionales**: 1-2 pedidos en período
+- **Frecuentes**: 3+ pedidos en período
+
+Hook `fetchWeeklyCustomerSegmentsBatch` obtiene segmentos para múltiples semanas en una sola llamada batch al RPC `get_weekly_customer_segments_batch`.
 
 ## Calendario de Campanas
 
@@ -858,7 +912,6 @@ npm run lint     # ESLint
 ```bash
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=xxx
-VITE_DEV_AUTH_BYPASS=true  # Mock data
 ```
 
 ## Convenciones
@@ -942,135 +995,50 @@ accent-500:  #ff8533  - Hover en elementos naranja
 ### Stores (Zustand)
 
 ```typescript
-// Filtro global (persiste en Sidebar)
-const { companyIds, setCompanyIds } = useGlobalFiltersStore();
+// Selector hooks (previenen re-renders innecesarios)
+const companyIds = useCompanyIds();       // from useGlobalFiltersStore
+const brandIds = useBrandIds();           // from useDashboardFiltersStore
+const areaIds = useAreaIds();
+const channelIds = useChannelIds();
+const { dateRange, datePreset } = useDateFilters();
 
-// Filtros de dashboard (por pagina)
-const {
-  brandIds, setBrandIds,
-  areaIds, setAreaIds,
-  channelIds, setChannelIds,
-  dateRange, datePreset, setDatePreset
-} = useDashboardFiltersStore();
+// Acceso completo al store (para actions o campos menos frecuentes)
+const { setCompanyIds } = useGlobalFiltersStore();
+const { restaurantIds, setBrandIds, setDatePreset } = useDashboardFiltersStore();
+```
+
+### React Query Cache Tiers
+
+```typescript
+import { QUERY_STALE_SHORT, QUERY_GC_SHORT } from '@/constants/queryConfig';
+
+// SHORT  (2min stale / 5min gc)  — pedidos, metricas, campanas
+// MEDIUM (5min stale / 10min gc) — marcas, areas, restaurantes
+// LONG   (10min stale / 30min gc) — empresas, portales, configs
+```
+
+### Utilidades Centralizadas
+
+```typescript
+import { formatDate, parseNumericIds, getPreviousPeriodRange } from '@/utils/dateUtils';
+import { resolveIcon } from '@/utils/iconResolver';
+
+// formatDate: Date|string → 'YYYY-MM-DD' (usa fecha local, sin problemas de timezone)
+// parseNumericIds: string[] → number[] (filtra NaN e IDs <= 0)
+// resolveIcon: nombre → LucideIcon (mapa curado, evita import * de 564KB)
 ```
 
 ## Tareas Pendientes
-
-### Objetivos Estrategicos - Activar Supabase
-
-**Estado actual**: Modo mock activo (`VITE_DEV_AUTH_BYPASS=true`) - guarda en localStorage
-
-**Pasos para activar Supabase:**
-
-1. **Ejecutar migracion en Supabase SQL Editor**:
-   ```sql
-   -- Copiar contenido de:
-   -- supabase/migrations/011_strategic_objectives_standalone.sql
-   ```
-
-2. **Cambiar variable de entorno** en `.env.local`:
-   ```diff
-   - VITE_DEV_AUTH_BYPASS=true
-   + VITE_DEV_AUTH_BYPASS=false
-   ```
-
-3. **Reiniciar servidor de desarrollo**:
-   ```bash
-   npm run dev
-   ```
-
-4. **Verificar**:
-   - Ir a `/strategic`
-   - Crear objetivo seleccionando empresa del dropdown
-   - Verificar en Supabase Table Editor que el registro existe
-
-### Refactorizacion - Duplicidad de Codigo (COMPLETADO)
-
-**Componente EntityScopeSelector:**
-
-- **Solucion aplicada**: El componente ahora se llama `EntityScopeSelector` y esta en `components/common/`
-- Se mantiene alias `AuditScopeSelector` para backward compatibility
-- Nuevo prop `summaryLabel` permite personalizar el texto del resumen
-
-**Archivos modificados:**
-
-- `components/common/EntityScopeSelector.tsx` - Nuevo componente compartido
-- `components/common/index.ts` - Exports actualizados
-- `features/audits/components/index.ts` - Re-exporta desde common
-- `features/strategic/components/StrategicObjectiveEditor.tsx` - Usa EntityScopeSelector
-
-### Calendario - Migracion a Supabase (SOLUCIONADO)
-
-**Solucion aplicada**: Migracion `013_calendar_campaigns_crp_refs.sql` añade columnas CRP:
-
-- `crp_restaurant_id TEXT` - ID del restaurante en CRP Portal
-- `crp_company_id TEXT` - ID de la compañía en CRP Portal
-- `crp_brand_id TEXT` - ID de la marca en CRP Portal
-
-El hook `useCampaigns.ts` ahora soporta ambos modos (localStorage y Supabase).
-Para activar Supabase:
-
-```typescript
-// En useCampaigns.ts
-const USE_LOCAL_STORAGE = false;  // Activar Supabase
-```
-
-### Sistema de Invitaciones de Usuarios (NUEVO)
-
-**Archivos creados:**
-
-| Archivo | Descripción |
-|---------|-------------|
-| `supabase/migrations/012_user_invitations.sql` | Tabla `user_invitations` + trigger |
-| `src/services/invitations.ts` | CRUD invitaciones + Magic Link |
-| `src/features/admin/hooks/useInvitations.ts` | React Query hooks |
-| `src/features/admin/components/InviteUserModal.tsx` | Modal para invitar usuarios |
-| `src/features/admin/components/PendingInvitations.tsx` | Lista de invitaciones |
-
-**Flujo de invitación:**
-
-1. Admin va a `/admin` → "Invitar usuario"
-2. Introduce email, rol y compañías pre-asignadas
-3. Se crea registro en `user_invitations` con config
-4. Se envía Magic Link via `supabase.auth.signInWithOtp`
-5. Usuario hace click → crea cuenta automáticamente
-6. Trigger `on_profile_created_apply_invitation` aplica rol/compañías
-
-**Activar en producción:**
-
-1. Ejecutar `012_user_invitations.sql` en Supabase SQL Editor
-2. Ejecutar `013_calendar_campaigns_crp_refs.sql` en Supabase SQL Editor
-
-**Tipos añadidos a `models.ts`:**
-
-- `InvitationStatus`: 'pending' | 'accepted' | 'expired' | 'cancelled'
-- `UserInvitation`: Interfaz completa de invitación
-- `DbUserInvitation`: Tipo de base de datos
-
-### Multi-Portal ID Grouping (COMPLETADO)
-
-**Problema resuelto**: Las marcas/direcciones tenian IDs duplicados por portal (Glovo, Uber, JustEat).
-
-**Solucion implementada**:
-
-- `Brand` y `Restaurant` ahora tienen campo `allIds: string[]`
-- `groupByName` y `groupAddressesByName` en `utils.ts` para agrupar por nombre
-- `useControllingData` expande IDs seleccionados a todos los IDs relacionados
-- Los filtros de pedidos ahora capturan datos de todas las plataformas
-
-**Archivos modificados:**
-
-- `src/types/models.ts` - Agregado `allIds` a Brand y Restaurant
-- `src/services/crp-portal/utils.ts` - Funciones de agrupacion
-- `src/services/crp-portal/mappers.ts` - Mappers con allIds parameter
-- `src/services/crp-portal/brands.ts` - Usa `groupByName`
-- `src/services/crp-portal/restaurants.ts` - Usa `groupAddressesByName`
-- `src/features/controlling/hooks/useControllingData.ts` - Expansion de IDs
 
 ### Filtros de Fecha
 
 - El calendario personalizado no aparece al seleccionar "Personalizar"
 - Los filtros de fecha no actualizan datos correctamente en algunos casos
+
+### Migraciones SQL Pendientes en Producción
+
+1. Ejecutar `012_user_invitations.sql` en Supabase SQL Editor
+2. Ejecutar `013_calendar_campaigns_crp_refs.sql` en Supabase SQL Editor
 
 ---
 
