@@ -8,7 +8,8 @@
  * aggregates revenue by hierarchy row ID to produce sparkline data.
  *
  * Also aggregates ALL metrics per row for the detail panel charts.
- * Also fetches customer segments per row for the detail panel.
+ *
+ * Customer segments are loaded on-demand by useDetailSegments (lazy-load).
  *
  * @module features/controlling/hooks/useWeeklyRevenue
  */
@@ -16,9 +17,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useCompanyIds } from '@/stores/filtersStore';
-import { fetchControllingMetricsRPC, fetchWeeklyCustomerSegmentsBatch } from '@/services/crp-portal';
+import { fetchControllingMetricsRPC } from '@/services/crp-portal';
 import { portalIdToChannelId } from '@/services/crp-portal/orders';
-import type { ControllingMetricsRow, CustomerSegmentRow } from '@/services/crp-portal';
+import type { ControllingMetricsRow } from '@/services/crp-portal';
 import type { ChannelId } from '@/types';
 import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { getLastNWeeks } from '@/utils/dateUtils';
@@ -63,11 +64,6 @@ interface AggregatedWeek {
 /** Full metrics aggregation for a single week */
 interface AggregatedWeekMetrics {
   byRowId: Map<string, Omit<WeekMetrics, 'weekLabel' | 'weekStart'>>;
-}
-
-/** Segment aggregation for a single week */
-interface AggregatedWeekSegments {
-  byRowId: Map<string, { newCustomers: number; occasionalCustomers: number; frequentCustomers: number }>;
 }
 
 /**
@@ -164,47 +160,6 @@ function aggregateAllMetricsByRowId(rows: ControllingMetricsRow[]): AggregatedWe
   return { byRowId };
 }
 
-/** Empty segment counters */
-function emptySegments() {
-  return { newCustomers: 0, occasionalCustomers: 0, frequentCustomers: 0 };
-}
-
-/**
- * Aggregate customer segment rows into a map by row ID (same keys as metrics).
- */
-function aggregateSegmentsByRowId(rows: CustomerSegmentRow[]): AggregatedWeekSegments {
-  const byRowId = new Map<string, { newCustomers: number; occasionalCustomers: number; frequentCustomers: number }>();
-
-  const getOrCreate = (key: string) => {
-    let s = byRowId.get(key);
-    if (!s) {
-      s = emptySegments();
-      byRowId.set(key, s);
-    }
-    return s;
-  };
-
-  const addToSegments = (s: ReturnType<typeof emptySegments>, row: CustomerSegmentRow) => {
-    s.newCustomers += row.new_customers || 0;
-    s.occasionalCustomers += row.occasional_customers || 0;
-    s.frequentCustomers += row.frequent_customers || 0;
-  };
-
-  for (const row of rows) {
-    const companyId = row.pfk_id_company;
-    const storeId = row.pfk_id_store;
-    const addressId = row.pfk_id_store_address;
-    const portalId = row.pfk_id_portal;
-
-    addToSegments(getOrCreate(`company-${companyId}`), row);
-    addToSegments(getOrCreate(`brand::${companyId}::${storeId}`), row);
-    addToSegments(getOrCreate(`address::${companyId}::${addressId}`), row);
-    addToSegments(getOrCreate(`channel::${companyId}::${addressId}::${portalId}`), row);
-  }
-
-  return { byRowId };
-}
-
 // ============================================
 // HOOK
 // ============================================
@@ -215,7 +170,6 @@ function aggregateSegmentsByRowId(rows: CustomerSegmentRow[]): AggregatedWeekSeg
  *
  * @returns weeklyRevenue - Map<rowId, number[]> with 8 values per entity
  * @returns weeklyMetrics - Map<rowId, WeekMetrics[]> with 8 full metric snapshots per entity
- * @returns weeklySegments - Map<rowId, WeekSegmentData[]> with 8 segment snapshots per entity
  * @returns weekLabels - string[] with week labels (S1..S8)
  * @returns isLoading - Whether data is still loading
  */
@@ -228,36 +182,23 @@ export function useWeeklyRevenue() {
     byRowId: Map<string, number[]>;
     byChannel: Map<ChannelId, number[]>;
     metricsByRowId: Map<string, WeekMetrics[]>;
-    segmentsByRowId: Map<string, WeekSegmentData[]>;
   }
 
   const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', [...companyIds].sort().join(',')],
     queryFn: async () => {
-      // Fetch all 8 weeks of metrics in parallel + segments in a single batch call
-      const [weeklyResults, weeklySegmentResults] = await Promise.all([
-        // 8 metrics calls (lightweight, no timeout issue)
-        Promise.all(
-          weeks.map((week) =>
-            fetchControllingMetricsRPC(companyIds, week.start, week.end)
-          )
-        ),
-        // 1 batch call for all 8 weeks of segments (avoids 8 parallel timeouts)
-        fetchWeeklyCustomerSegmentsBatch(
-          companyIds,
-          weeks.map((w) => `${w.start}T00:00:00`),
-          weeks.map((w) => `${w.end}T23:59:59`),
-        ),
-      ]);
+      // Fetch all 8 weeks of metrics in parallel
+      const weeklyResults = await Promise.all(
+        weeks.map((week) =>
+          fetchControllingMetricsRPC(companyIds, week.start, week.end)
+        )
+      );
 
       // Aggregate each week's data (revenue-only for sparklines)
       const weeklyAggs = weeklyResults.map(aggregateRevenueByRowId);
 
       // Aggregate each week's FULL metrics (for detail panel)
       const weeklyMetricsAggs = weeklyResults.map(aggregateAllMetricsByRowId);
-
-      // Aggregate each week's customer segments
-      const weeklySegmentsAggs = weeklySegmentResults.map(aggregateSegmentsByRowId);
 
       // Build row-level map: rowId → [week1, ..., week8] (revenue only)
       const allRowIds = new Set<string>();
@@ -267,11 +208,6 @@ export function useWeeklyRevenue() {
         }
       }
       for (const agg of weeklyMetricsAggs) {
-        for (const key of agg.byRowId.keys()) {
-          allRowIds.add(key);
-        }
-      }
-      for (const agg of weeklySegmentsAggs) {
         for (const key of agg.byRowId.keys()) {
           allRowIds.add(key);
         }
@@ -311,22 +247,7 @@ export function useWeeklyRevenue() {
         );
       }
 
-      // Build segments map: rowId → WeekSegmentData[]
-      const segmentsByRowId = new Map<string, WeekSegmentData[]>();
-      for (const rowId of allRowIds) {
-        segmentsByRowId.set(
-          rowId,
-          weeklySegmentsAggs.map((agg, i) => {
-            const s = agg.byRowId.get(rowId) || emptySegments();
-            return {
-              weekLabel: weeks[i].label,
-              ...s,
-            };
-          })
-        );
-      }
-
-      return { byRowId, byChannel, metricsByRowId, segmentsByRowId };
+      return { byRowId, byChannel, metricsByRowId };
     },
     enabled: companyIds.length > 0,
     retry: 1,
@@ -337,13 +258,11 @@ export function useWeeklyRevenue() {
   const emptyRowMap = useMemo(() => new Map<string, number[]>(), []);
   const emptyChannelMap = useMemo(() => new Map<ChannelId, number[]>(), []);
   const emptyMetricsMap = useMemo(() => new Map<string, WeekMetrics[]>(), []);
-  const emptySegmentsMap = useMemo(() => new Map<string, WeekSegmentData[]>(), []);
 
   return {
     weeklyRevenue: query.data?.byRowId || emptyRowMap,
     channelWeeklyRevenue: query.data?.byChannel || emptyChannelMap,
     weeklyMetrics: query.data?.metricsByRowId || emptyMetricsMap,
-    weeklySegments: query.data?.segmentsByRowId || emptySegmentsMap,
     weekLabels: weeks.map((w) => w.label),
     isLoading: query.isLoading,
   };

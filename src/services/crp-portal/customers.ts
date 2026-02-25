@@ -970,7 +970,7 @@ export async function fetchWeeklyCustomerSegmentsBatch(
     p_company_ids: companyIds,
     p_week_starts: weekStarts,
     p_week_ends: weekEnds,
-  });
+  }).limit(10000);
 
   if (error) {
     handleCrpError('fetchWeeklyCustomerSegmentsBatch', error);

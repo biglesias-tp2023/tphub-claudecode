@@ -33,7 +33,7 @@ export function ControllingPage() {
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const dateRange = useDashboardFiltersStore((s) => s.dateRange);
   const { data, isLoading, error } = useControllingData();
-  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, weeklySegments, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
+  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 
   // Detail panel state — persist selected row ID across navigation
   const [selectedRowId, setSelectedRowId] = useSessionState<string | null>('tphub-controlling-selectedRow', null);
@@ -278,7 +278,6 @@ export function ControllingPage() {
         row={selectedRow}
         hierarchy={hierarchy}
         weeklyMetrics={weeklyMetrics}
-        weeklySegments={weeklySegments}
         onClose={() => setSelectedRow(null)}
       />
     </div>

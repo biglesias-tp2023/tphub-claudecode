@@ -13,8 +13,9 @@ import {
 import { Drawer } from '@/components/ui/Drawer/Drawer';
 import { formatCurrency } from '@/utils/formatters';
 import type { HierarchyRow } from '../hooks/useControllingData';
-import type { WeekMetrics, WeekSegmentData } from '../hooks/useWeeklyRevenue';
+import type { WeekMetrics } from '../hooks/useWeeklyRevenue';
 import { useDetailPanelData } from '../hooks/useDetailPanelData';
+import { useDetailSegments } from '../hooks/useDetailSegments';
 import {
   RevenueByChannelChart,
   AdsRateRoasChart,
@@ -103,16 +104,15 @@ interface DetailPanelProps {
   row: HierarchyRow | null;
   hierarchy: HierarchyRow[];
   weeklyMetrics: Map<string, WeekMetrics[]>;
-  weeklySegments: Map<string, WeekSegmentData[]>;
   onClose: () => void;
 }
 
-export function DetailPanel({ row, hierarchy, weeklyMetrics, weeklySegments, onClose }: DetailPanelProps) {
-  const { data, segments } = useDetailPanelData({
+export function DetailPanel({ row, hierarchy, weeklyMetrics, onClose }: DetailPanelProps) {
+  const { data } = useDetailPanelData({
     rowId: row?.id ?? null,
     weeklyMetrics,
-    weeklySegments,
   });
+  const { segments, isLoading: segmentsLoading } = useDetailSegments(row?.id ?? null);
   const { data: adsHourlyData, isLoading: adsHourlyLoading } = useAdsHourlyData(row);
 
   if (!row) return null;
@@ -186,7 +186,13 @@ export function DetailPanel({ row, hierarchy, weeklyMetrics, weeklySegments, onC
 
           {/* Chart 2: Segmentacion Clientes */}
           <ChartSection title="Segmentacion Clientes" icon={Users}>
-            <CustomerSegmentsChart data={segments ?? []} />
+            {segmentsLoading ? (
+              <div className="h-[180px] flex items-center justify-center">
+                <p className="text-xs text-gray-400">Cargando segmentos...</p>
+              </div>
+            ) : (
+              <CustomerSegmentsChart data={segments ?? []} />
+            )}
           </ChartSection>
 
           {/* Chart 3: Inversion en ADS + ROAS ADS */}
