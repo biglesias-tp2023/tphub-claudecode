@@ -5,7 +5,7 @@
  * @module api/alerts/email
  */
 
-import { escapeHtml } from './auth';
+import { escapeHtml } from './auth.js';
 
 interface SendEmailParams {
   to: string;

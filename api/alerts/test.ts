@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { verifyCronSecret } from './auth';
+import { verifyCronSecret } from './auth.js';
 
 /**
  * Test endpoint for daily alerts.

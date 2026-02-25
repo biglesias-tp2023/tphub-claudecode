@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { sendEmail, buildAlertEmailHtml } from './email';
-import { escapeHtml, verifyCronSecret } from './auth';
+import { sendEmail, buildAlertEmailHtml } from './email.js';
+import { escapeHtml, verifyCronSecret } from './auth.js';
 
 // ============================================
 // Types
