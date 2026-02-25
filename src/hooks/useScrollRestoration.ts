@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const STORAGE_KEY = 'tphub-scroll-positions';
+const MAX_RESTORE_ATTEMPTS = 8;
+const RESTORE_INTERVAL_MS = 100;
 
 function getPositions(): Record<string, number> {
   try {
@@ -26,6 +28,19 @@ function getPosition(pathname: string): number | undefined {
   return getPositions()[pathname];
 }
 
+/**
+ * Tries to restore scroll position with retries.
+ * Content loads async (React Query), so the page may not be tall enough
+ * on the first attempt. Retries until scrollTo succeeds or attempts run out.
+ */
+function restoreScroll(target: number, attempt = 0): void {
+  window.scrollTo(0, target);
+  const reached = Math.abs(window.scrollY - target) < 10;
+  if (!reached && attempt < MAX_RESTORE_ATTEMPTS) {
+    setTimeout(() => restoreScroll(target, attempt + 1), RESTORE_INTERVAL_MS);
+  }
+}
+
 export function useScrollRestoration() {
   const { pathname } = useLocation();
   const prevPathRef = useRef(pathname);
@@ -39,8 +54,8 @@ export function useScrollRestoration() {
 
     // Restore scroll position of the route we're entering
     const saved = getPosition(pathname);
-    if (saved != null) {
-      requestAnimationFrame(() => window.scrollTo(0, saved));
+    if (saved != null && saved > 0) {
+      requestAnimationFrame(() => restoreScroll(saved));
     } else {
       window.scrollTo(0, 0);
     }

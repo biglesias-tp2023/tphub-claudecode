@@ -285,7 +285,10 @@ supabase.auth.onAuthStateChange((event, session) => {
       error: null,
     });
   } else if (event === 'SIGNED_IN' && session) {
-    useAuthStore.getState().checkSession();
+    // Solo ejecutar si aún no se ha inicializado (evita re-init en token refresh)
+    if (!useAuthStore.getState().isInitialized) {
+      useAuthStore.getState().checkSession();
+    }
   }
 });
 

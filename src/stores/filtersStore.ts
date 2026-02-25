@@ -113,12 +113,23 @@ export const useGlobalFiltersStore = create<GlobalFiltersState>()(
       },
 
       initializeFromProfile: (assignedCompanyIds, role) => {
+        const { _initialized, companyIds } = get();
+
+        // Ya inicializado en esta sesión — solo actualizar metadata
+        if (_initialized) {
+          set({ _assignedCompanyIds: assignedCompanyIds, _userRole: role });
+          return;
+        }
+
         const isRestricted = !isUnrestrictedRole(role);
 
         if (isRestricted && assignedCompanyIds.length > 0) {
-          // Usuario restringido: forzar sus compañías asignadas
+          // Validar selección existente (puede venir de persist hydration)
+          const allowed = new Set(assignedCompanyIds);
+          const validExisting = companyIds.filter(id => allowed.has(id));
+
           set({
-            companyIds: assignedCompanyIds,
+            companyIds: validExisting.length > 0 ? validExisting : assignedCompanyIds,
             _assignedCompanyIds: assignedCompanyIds,
             _userRole: role,
             _initialized: true,
