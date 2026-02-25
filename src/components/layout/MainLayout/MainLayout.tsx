@@ -2,9 +2,11 @@ import { Outlet } from 'react-router-dom';
 import { cn } from '@/utils/cn';
 import { Sidebar } from '../Sidebar';
 import { useUIStore } from '@/stores/uiStore';
+import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 
 export function MainLayout() {
   const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed);
+  useScrollRestoration();
 
   return (
     <div className="min-h-screen bg-gray-100">

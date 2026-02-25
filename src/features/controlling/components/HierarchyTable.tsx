@@ -264,16 +264,12 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    // Restore scroll positions after first render
+    // Restore horizontal scroll position after first render
     requestAnimationFrame(() => {
       try {
         const scrollX = sessionStorage.getItem('tphub-ht-scroll-x');
-        const scrollY = sessionStorage.getItem('tphub-ht-scroll-y');
         if (scrollX && scrollContainerRef.current) {
           scrollContainerRef.current.scrollLeft = Number(scrollX);
-        }
-        if (scrollY) {
-          window.scrollTo(0, Number(scrollY));
         }
       } catch {
         // ignore
@@ -288,7 +284,6 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
         if (scrollContainerRef.current) {
           sessionStorage.setItem('tphub-ht-scroll-x', String(scrollContainerRef.current.scrollLeft));
         }
-        sessionStorage.setItem('tphub-ht-scroll-y', String(window.scrollY));
       } catch {
         // ignore
       }
@@ -296,12 +291,8 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
   }, []);
 
   useEffect(() => {
-    window.addEventListener('scroll', handleTableScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleTableScroll);
-      clearTimeout(scrollTimerRef.current);
-    };
-  }, [handleTableScroll]);
+    return () => clearTimeout(scrollTimerRef.current);
+  }, []);
 
   const toggleTab = (tab: ViewTab) => {
     setActiveTabs((prev) => {
