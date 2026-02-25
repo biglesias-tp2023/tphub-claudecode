@@ -1,4 +1,6 @@
+import { type ReactNode } from 'react';
 import { Info } from 'lucide-react';
+import { MetricTooltip } from '@/components/common';
 import { cn } from '@/utils/cn';
 
 interface CustomerScorecardProps {
@@ -7,8 +9,8 @@ interface CustomerScorecardProps {
   change?: number;
   icon: React.ElementType;
   subtitle?: string;
-  /** Tooltip text explaining the metric */
-  tooltip?: string;
+  /** Tooltip content — supports ReactNode for rich formatting */
+  tooltip?: ReactNode;
 }
 
 export function CustomerScorecard({ title, value, change, icon: Icon, subtitle, tooltip }: CustomerScorecardProps) {
@@ -23,12 +25,9 @@ export function CustomerScorecard({ title, value, change, icon: Icon, subtitle, 
         </div>
         <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</span>
         {tooltip && (
-          <span
-            className="cursor-help text-gray-300 ml-auto"
-            title={tooltip}
-          >
-            <Info className="w-3.5 h-3.5" />
-          </span>
+          <MetricTooltip content={tooltip}>
+            <Info className="w-3.5 h-3.5 ml-auto" />
+          </MetricTooltip>
         )}
       </div>
 

@@ -5,3 +5,6 @@ export { ChurnRiskTable } from './ChurnRiskTable';
 export { PlatformAnalysis } from './PlatformAnalysis';
 export { RevenueConcentration } from './RevenueConcentration';
 export { PostPromoHealth } from './PostPromoHealth';
+export { RFMSegmentation } from './RFMSegmentation';
+export { CustomerBaseTrend } from './CustomerBaseTrend';
+export { RepeatRateCards } from './RepeatRateCards';

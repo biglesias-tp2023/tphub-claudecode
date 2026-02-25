@@ -1,4 +1,5 @@
 import { Info } from 'lucide-react';
+import { MetricTooltip, tooltipContent } from '@/components/common';
 import { cn } from '@/utils/cn';
 import type { PostPromoHealth as PostPromoHealthType } from '@/services/crp-portal';
 
@@ -37,7 +38,7 @@ const SEGMENTS = [
     color: 'bg-gray-400',
     dotColor: 'bg-gray-400',
     textColor: 'text-gray-600',
-    tooltip: 'Cliente reactivado: llevaba +45 días sin pedir y volvió gracias a una promo. Mide si las promos sirven para recuperar clientes inactivos.',
+    tooltip: 'Cliente reactivado: llevaba +183 días sin pedir y volvió gracias a una promo. Mide si las promos sirven para recuperar clientes inactivos.',
   },
 ] as const;
 
@@ -53,12 +54,15 @@ export function PostPromoHealth({ data }: PostPromoHealthProps) {
       <div className="px-5 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-gray-900">Salud de la Cohorte Post-Promo</h3>
-          <span
-            className="cursor-help text-gray-300"
-            title="Clasifica a los clientes según su relación con las promociones: ¿se fidelizan tras la promo o solo compran con descuento? Ayuda a evaluar si tu estrategia promocional genera clientes rentables a largo plazo."
+          <MetricTooltip
+            content={tooltipContent(
+              'Clasifica a los clientes según su relación con las promociones: ¿se fidelizan tras la promo o solo compran con descuento?',
+              'Sticky: llegó con promo y volvió sin ella. Promocioneros: solo compra con descuento. Orgánico: nunca necesitó promo. Dormidos: inactivo +183d reactivado por promo.',
+              'Ayuda a evaluar si tu estrategia promocional genera clientes rentables a largo plazo o dependencia del descuento.'
+            )}
           >
             <Info className="w-3.5 h-3.5" />
-          </span>
+          </MetricTooltip>
         </div>
         <p className="text-xs text-gray-500 mt-0.5">
           Distribución de usuarios captados por comportamiento promocional
@@ -93,12 +97,9 @@ export function PostPromoHealth({ data }: PostPromoHealthProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
                     <span className={cn('text-xs font-medium', textColor)}>{label}</span>
-                    <span
-                      className="cursor-help text-gray-300"
-                      title={tooltip}
-                    >
+                    <MetricTooltip content={tooltip}>
                       <Info className="w-3 h-3" />
-                    </span>
+                    </MetricTooltip>
                   </div>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-sm font-bold text-gray-900 tabular-nums">{pct.toFixed(1)}%</span>

@@ -203,6 +203,9 @@ export {
   fetchMultiPlatformAnalysis,
   fetchRevenueConcentration,
   fetchPostPromoHealth,
+  fetchRFMAnalysis,
+  fetchRepeatRate,
+  fetchCustomerBaseTrend,
   fetchWeeklyCustomerSegments,
   fetchWeeklyCustomerSegmentsBatch,
 } from './customers';
@@ -217,6 +220,11 @@ export type {
   MultiPlatformAnalysis,
   RevenueConcentration,
   PostPromoHealth,
+  RFMSegment,
+  RFMSegmentData,
+  RFMAnalysis,
+  RepeatRateData,
+  CustomerBaseTrendWeek,
   CustomerSegmentRow,
   CustomerSegmentBatchRow,
 } from './customers';

@@ -871,7 +871,7 @@ export async function fetchPostPromoHealth(
   let organico = 0;
   let dormidos = 0;
 
-  const DORMANT_THRESHOLD_DAYS = 45;
+  const DORMANT_THRESHOLD_DAYS = 183;
 
   for (const [, custOrders] of customerOrders) {
     const sorted = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
@@ -915,6 +915,319 @@ export async function fetchPostPromoHealth(
     dormidos,
     total: customerOrders.size,
   };
+}
+
+// ============================================
+// RFM ANALYSIS
+// ============================================
+
+export type RFMSegment = 'champions' | 'loyal' | 'promising' | 'at_risk' | 'lost';
+
+export interface RFMSegmentData {
+  segment: RFMSegment;
+  count: number;
+  revenue: number;
+  avgTicket: number;
+  pctCustomers: number;
+  pctRevenue: number;
+}
+
+export interface RFMAnalysis {
+  segments: RFMSegmentData[];
+  totalCustomers: number;
+  totalRevenue: number;
+}
+
+/**
+ * Assign quintile scores (1-5) to a sorted array of values.
+ */
+function assignQuintiles(values: number[]): number[] {
+  const n = values.length;
+  if (n === 0) return [];
+
+  const sorted = [...values].map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+  const scores = new Array<number>(n);
+
+  for (let rank = 0; rank < n; rank++) {
+    const quintile = Math.min(5, Math.floor((rank / n) * 5) + 1);
+    scores[sorted[rank].i] = quintile;
+  }
+  return scores;
+}
+
+/**
+ * Map R/F/M scores to a segment.
+ */
+function rfmToSegment(r: number, f: number, m: number): RFMSegment {
+  if (r >= 4 && f >= 4 && m >= 4) return 'champions';
+  if (f >= 3 && m >= 3) return 'loyal';
+  if (r >= 4 && f <= 2) return 'promising';
+  if (r <= 2 && f >= 2) return 'at_risk';
+  return 'lost';
+}
+
+/**
+ * Fetches RFM (Recency, Frequency, Monetary) segmentation analysis.
+ */
+export async function fetchRFMAnalysis(params: FetchCustomerDataParams): Promise<RFMAnalysis> {
+  const orders = await fetchCustomerOrders(params);
+
+  if (orders.length === 0) {
+    return { segments: [], totalCustomers: 0, totalRevenue: 0 };
+  }
+
+  const endDate = new Date(params.endDate);
+
+  // Group by customer
+  const customerMap = new Map<string, { orders: CustomerOrder[] }>();
+  for (const order of orders) {
+    if (!customerMap.has(order.customerId)) {
+      customerMap.set(order.customerId, { orders: [] });
+    }
+    customerMap.get(order.customerId)!.orders.push(order);
+  }
+
+  const customerIds: string[] = [];
+  const recencies: number[] = [];
+  const frequencies: number[] = [];
+  const monetaries: number[] = [];
+
+  for (const [customerId, data] of customerMap) {
+    const sorted = data.orders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+    const recencyDays = Math.floor((endDate.getTime() - sorted[0].orderDate.getTime()) / (1000 * 60 * 60 * 24));
+    const frequency = sorted.length;
+    const monetary = sorted.reduce((sum, o) => sum + o.totalPrice, 0);
+
+    customerIds.push(customerId);
+    recencies.push(recencyDays);
+    frequencies.push(frequency);
+    monetaries.push(monetary);
+  }
+
+  // Recency is inverted: lower days = higher score, so we invert before assigning quintiles
+  const invertedRecencies = recencies.map((r) => -r);
+  const rScores = assignQuintiles(invertedRecencies);
+  const fScores = assignQuintiles(frequencies);
+  const mScores = assignQuintiles(monetaries);
+
+  // Aggregate by segment
+  const segmentAgg = new Map<RFMSegment, { count: number; revenue: number; totalOrders: number }>();
+  let totalRevenue = 0;
+
+  for (let i = 0; i < customerIds.length; i++) {
+    const segment = rfmToSegment(rScores[i], fScores[i], mScores[i]);
+    if (!segmentAgg.has(segment)) {
+      segmentAgg.set(segment, { count: 0, revenue: 0, totalOrders: 0 });
+    }
+    const agg = segmentAgg.get(segment)!;
+    agg.count++;
+    agg.revenue += monetaries[i];
+    agg.totalOrders += frequencies[i];
+    totalRevenue += monetaries[i];
+  }
+
+  const totalCustomers = customerIds.length;
+  const segmentOrder: RFMSegment[] = ['champions', 'loyal', 'promising', 'at_risk', 'lost'];
+
+  const segments: RFMSegmentData[] = segmentOrder
+    .filter((s) => segmentAgg.has(s))
+    .map((segment) => {
+      const agg = segmentAgg.get(segment)!;
+      return {
+        segment,
+        count: agg.count,
+        revenue: agg.revenue,
+        avgTicket: agg.totalOrders > 0 ? agg.revenue / agg.totalOrders : 0,
+        pctCustomers: totalCustomers > 0 ? (agg.count / totalCustomers) * 100 : 0,
+        pctRevenue: totalRevenue > 0 ? (agg.revenue / totalRevenue) * 100 : 0,
+      };
+    });
+
+  return { segments, totalCustomers, totalRevenue };
+}
+
+// ============================================
+// REPEAT RATE
+// ============================================
+
+export interface RepeatRateData {
+  rate30d: number;
+  rate60d: number;
+  rate90d: number;
+  total30d: number;
+  repeat30d: number;
+  total60d: number;
+  repeat60d: number;
+  total90d: number;
+  repeat90d: number;
+}
+
+/**
+ * Fetches repeat rate at 30/60/90 day windows.
+ *
+ * For each window N: count customers whose first order was >= N days before endDate,
+ * then check how many have a subsequent order.
+ */
+export async function fetchRepeatRate(params: FetchCustomerDataParams): Promise<RepeatRateData> {
+  const orders = await fetchCustomerOrders(params);
+
+  if (orders.length === 0) {
+    return { rate30d: 0, rate60d: 0, rate90d: 0, total30d: 0, repeat30d: 0, total60d: 0, repeat60d: 0, total90d: 0, repeat90d: 0 };
+  }
+
+  const endDate = new Date(params.endDate);
+
+  // Group by customer with sorted orders
+  const customerOrders = new Map<string, Date[]>();
+  for (const order of orders) {
+    if (!customerOrders.has(order.customerId)) {
+      customerOrders.set(order.customerId, []);
+    }
+    customerOrders.get(order.customerId)!.push(order.orderDate);
+  }
+
+  // Sort each customer's orders
+  for (const dates of customerOrders.values()) {
+    dates.sort((a, b) => a.getTime() - b.getTime());
+  }
+
+  function calcWindow(windowDays: number): { total: number; repeat: number; rate: number } {
+    const cutoff = new Date(endDate);
+    cutoff.setDate(cutoff.getDate() - windowDays);
+
+    let total = 0;
+    let repeat = 0;
+
+    for (const dates of customerOrders.values()) {
+      // First order must be at or before the cutoff
+      if (dates[0] <= cutoff) {
+        total++;
+        // Check if they have any order after their first one
+        if (dates.length > 1) {
+          repeat++;
+        }
+      }
+    }
+
+    return { total, repeat, rate: total > 0 ? (repeat / total) * 100 : 0 };
+  }
+
+  const w30 = calcWindow(30);
+  const w60 = calcWindow(60);
+  const w90 = calcWindow(90);
+
+  return {
+    rate30d: w30.rate,
+    rate60d: w60.rate,
+    rate90d: w90.rate,
+    total30d: w30.total,
+    repeat30d: w30.repeat,
+    total60d: w60.total,
+    repeat60d: w60.repeat,
+    total90d: w90.total,
+    repeat90d: w90.repeat,
+  };
+}
+
+// ============================================
+// CUSTOMER BASE TREND
+// ============================================
+
+export interface CustomerBaseTrendWeek {
+  weekLabel: string;
+  nuevos: number;
+  recurrentes: number;
+  frecuentes: number;
+  vip: number;
+  total: number;
+}
+
+/**
+ * Fetches customer base trend for the last 8 weeks.
+ *
+ * For each week, classifies each unique customer by their order history
+ * in the 183 days prior to that week:
+ * - Nuevo: 0 prior orders
+ * - Recurrente: 1-3 prior orders
+ * - Frecuente: 4-9 prior orders
+ * - VIP: 10+ prior orders
+ */
+export async function fetchCustomerBaseTrend(
+  params: FetchCustomerDataParams,
+  weeks: { start: string; end: string; label: string }[]
+): Promise<CustomerBaseTrendWeek[]> {
+  // Fetch a broader range to cover 183-day lookback from the earliest week
+  const earliestWeek = weeks[0]?.start;
+  if (!earliestWeek) return [];
+
+  const lookbackStart = new Date(earliestWeek);
+  lookbackStart.setDate(lookbackStart.getDate() - 183);
+
+  const latestEnd = weeks[weeks.length - 1]?.end ?? params.endDate;
+
+  const extendedParams: FetchCustomerDataParams = {
+    ...params,
+    startDate: lookbackStart.toISOString().split('T')[0],
+    endDate: latestEnd,
+  };
+
+  const orders = await fetchCustomerOrders(extendedParams);
+
+  if (orders.length === 0) {
+    return weeks.map((w) => ({ weekLabel: w.label, nuevos: 0, recurrentes: 0, frecuentes: 0, vip: 0, total: 0 }));
+  }
+
+  const result: CustomerBaseTrendWeek[] = [];
+
+  for (const week of weeks) {
+    const weekStart = new Date(`${week.start}T00:00:00`);
+    const weekEnd = new Date(`${week.end}T23:59:59`);
+    const lookbackDate = new Date(weekStart);
+    lookbackDate.setDate(lookbackDate.getDate() - 183);
+
+    // Find customers who ordered in this week
+    const weekCustomers = new Set<string>();
+    for (const order of orders) {
+      if (order.orderDate >= weekStart && order.orderDate <= weekEnd) {
+        weekCustomers.add(order.customerId);
+      }
+    }
+
+    // For each week customer, count their prior orders in the 183-day lookback
+    let nuevos = 0;
+    let recurrentes = 0;
+    let frecuentes = 0;
+    let vip = 0;
+
+    for (const customerId of weekCustomers) {
+      let priorOrders = 0;
+      for (const order of orders) {
+        if (
+          order.customerId === customerId &&
+          order.orderDate >= lookbackDate &&
+          order.orderDate < weekStart
+        ) {
+          priorOrders++;
+        }
+      }
+
+      if (priorOrders === 0) nuevos++;
+      else if (priorOrders <= 3) recurrentes++;
+      else if (priorOrders <= 9) frecuentes++;
+      else vip++;
+    }
+
+    result.push({
+      weekLabel: week.label,
+      nuevos,
+      recurrentes,
+      frecuentes,
+      vip,
+      total: weekCustomers.size,
+    });
+  }
+
+  return result;
 }
 
 // ============================================

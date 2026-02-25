@@ -1,4 +1,5 @@
 import { Info } from 'lucide-react';
+import { MetricTooltip, tooltipContent } from '@/components/common';
 import { cn } from '@/utils/cn';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { CHANNELS } from '@/constants/channels';
@@ -59,12 +60,15 @@ export function ChannelCustomerCard({
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider">Nuevos</p>
-            <span
-              className="cursor-help text-gray-300"
-              title="Clientes que hacen su primer pedido en este canal durante el período seleccionado"
+            <MetricTooltip
+              content={tooltipContent(
+                'Clientes que hacen su primer pedido en este canal durante el período seleccionado.',
+                'COUNT(DISTINCT customer_id) WHERE flg_customer_new = true',
+                'Mide la capacidad de captación del canal. Un % alto indica buen alcance de nuevos usuarios.'
+              )}
             >
               <Info className="w-3 h-3" />
-            </span>
+            </MetricTooltip>
           </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatNumber(newCustomers)}</p>
           <p className="text-[10px] text-gray-400 tabular-nums">{newCustomersPercentage.toFixed(1)}%</p>
@@ -72,12 +76,15 @@ export function ChannelCustomerCard({
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider">Repetidores</p>
-            <span
-              className="cursor-help text-gray-300"
-              title="% de clientes que han hecho más de 1 pedido"
+            <MetricTooltip
+              content={tooltipContent(
+                'Clientes que han hecho más de 1 pedido en este canal.',
+                'Clientes con >1 pedido / Total clientes × 100',
+                'Una tasa alta indica buena fidelización en el canal. Comparar entre canales revela cuál retiene mejor.'
+              )}
             >
               <Info className="w-3 h-3" />
-            </span>
+            </MetricTooltip>
           </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatNumber(returningCustomers)}</p>
           <p className="text-[10px] text-gray-400 tabular-nums">{repetitionRate.toFixed(1)}%</p>
@@ -88,24 +95,30 @@ export function ChannelCustomerCard({
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider">Net Rev/Cli</p>
-            <span
-              className="cursor-help text-gray-300"
-              title="Ingreso neto por cliente: (Ventas - Reembolsos) / Clientes"
+            <MetricTooltip
+              content={tooltipContent(
+                'Ingreso neto medio por cliente en este canal.',
+                '(Ventas totales - Reembolsos) / Clientes únicos',
+                'Mide el valor real que aporta cada cliente descontando devoluciones. Más fiable que el ticket medio.'
+              )}
             >
               <Info className="w-3 h-3" />
-            </span>
+            </MetricTooltip>
           </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(netRevenuePerCustomer)}</p>
         </div>
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider">Ticket</p>
-            <span
-              className="cursor-help text-gray-300"
-              title="Importe medio por pedido en este canal"
+            <MetricTooltip
+              content={tooltipContent(
+                'Importe medio por pedido en este canal.',
+                'Ingresos totales del canal / Número total de pedidos',
+                'Palanca de precio directa. Comparar entre canales revela dónde los clientes gastan más por pedido.'
+              )}
             >
               <Info className="w-3 h-3" />
-            </span>
+            </MetricTooltip>
           </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{formatCurrency(avgTicket)}</p>
         </div>
@@ -115,24 +128,30 @@ export function ChannelCustomerCard({
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider">Ped./Cliente</p>
-            <span
-              className="cursor-help text-gray-300"
-              title="Media de pedidos por cliente en este canal durante el período seleccionado"
+            <MetricTooltip
+              content={tooltipContent(
+                'Media de pedidos por cliente en este canal durante el período.',
+                'Total pedidos / Total clientes únicos',
+                'A mayor frecuencia, mayor LTV del canal. Útil para priorizar inversión en retención.'
+              )}
             >
               <Info className="w-3 h-3" />
-            </span>
+            </MetricTooltip>
           </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{avgOrdersPerCustomer.toFixed(1)}</p>
         </div>
         <div>
           <div className="flex items-center gap-1 mb-0.5">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider">% con Promo</p>
-            <span
-              className="cursor-help text-gray-300"
-              title="Porcentaje de pedidos que usaron promociones"
+            <MetricTooltip
+              content={tooltipContent(
+                'Porcentaje de pedidos que usaron alguna promoción.',
+                'Pedidos con amt_promotions > 0 / Total pedidos × 100',
+                'Un % alto puede indicar dependencia de promos. Comparar con la tasa de repetición para evaluar calidad.'
+              )}
             >
               <Info className="w-3 h-3" />
-            </span>
+            </MetricTooltip>
           </div>
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{promoOrdersPercentage.toFixed(1)}%</p>
         </div>

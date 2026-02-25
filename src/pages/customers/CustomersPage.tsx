@@ -9,24 +9,31 @@ import {
   Receipt,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
+import { tooltipContent } from '@/components/common';
 import { DashboardFilters } from '@/features/dashboard';
 import {
   CustomerScorecard,
   ChannelCustomerCard,
   CohortHeatmap,
-  ChurnRiskTable,
-  PlatformAnalysis,
+  // ChurnRiskTable,    // OCULTO — mantener import comentado
+  // PlatformAnalysis,  // OCULTO — mantener import comentado
   RevenueConcentration,
   PostPromoHealth,
+  RFMSegmentation,
+  CustomerBaseTrend,
+  RepeatRateCards,
 } from '@/features/customers/components';
 import {
   useCustomerMetrics,
   useChannelCustomerMetrics,
   useCustomerCohorts,
-  useChurnRisk,
-  useMultiPlatform,
+  // useChurnRisk,       // OCULTO
+  // useMultiPlatform,   // OCULTO
   useRevenueConcentration,
   usePostPromoHealth,
+  useRFMAnalysis,
+  useRepeatRate,
+  useCustomerBaseTrend,
 } from '@/features/customers/hooks';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
@@ -43,10 +50,13 @@ export function CustomersPage() {
   const metricsQuery = useCustomerMetrics();
   const channelMetricsQuery = useChannelCustomerMetrics();
   const cohortsQuery = useCustomerCohorts({ granularity: cohortGranularity });
-  const churnRiskQuery = useChurnRisk({ limit: 20 });
-  const multiPlatformQuery = useMultiPlatform();
+  // const churnRiskQuery = useChurnRisk({ limit: 20 });  // OCULTO
+  // const multiPlatformQuery = useMultiPlatform();         // OCULTO
   const concentrationQuery = useRevenueConcentration();
   const postPromoQuery = usePostPromoHealth();
+  const rfmQuery = useRFMAnalysis();
+  const repeatRateQuery = useRepeatRate();
+  const baseTrendQuery = useCustomerBaseTrend();
 
   // Period labels
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
@@ -57,12 +67,11 @@ export function CustomersPage() {
       ? '1 compañía'
       : `${companyIds.length} compañías`;
 
+  // Core sections block loading together
   const isLoading =
     metricsQuery.isLoading ||
     channelMetricsQuery.isLoading ||
     cohortsQuery.isLoading ||
-    churnRiskQuery.isLoading ||
-    multiPlatformQuery.isLoading ||
     concentrationQuery.isLoading ||
     postPromoQuery.isLoading;
 
@@ -70,8 +79,6 @@ export function CustomersPage() {
     metricsQuery.error ||
     channelMetricsQuery.error ||
     cohortsQuery.error ||
-    churnRiskQuery.error ||
-    multiPlatformQuery.error ||
     concentrationQuery.error ||
     postPromoQuery.error;
 
@@ -94,8 +101,8 @@ export function CustomersPage() {
   const metrics = metricsQuery.data;
   const channelMetrics = channelMetricsQuery.data || [];
   const cohorts = cohortsQuery.data || [];
-  const churnRisk = churnRiskQuery.data || [];
-  const multiPlatform = multiPlatformQuery.data;
+  // const churnRisk = churnRiskQuery.data || [];       // OCULTO
+  // const multiPlatform = multiPlatformQuery.data;      // OCULTO
   const concentration = concentrationQuery.data;
   const postPromo = postPromoQuery.data;
 
@@ -120,7 +127,7 @@ export function CustomersPage() {
       {/* Filters - exclude Just Eat since no data available */}
       <DashboardFilters excludeChannels={['justeat']} />
 
-      {/* Scorecards */}
+      {/* 1. Scorecards */}
       {metrics && (
         <section>
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Resumen de Clientes</h2>
@@ -130,49 +137,97 @@ export function CustomersPage() {
               value={formatNumber(metrics.totalCustomers)}
               change={metrics.totalCustomersChange}
               icon={Users}
-              tooltip="Total de clientes únicos en el período"
+              tooltip={tooltipContent(
+                'Total de clientes únicos que han realizado al menos un pedido en el período seleccionado.',
+                'COUNT(DISTINCT customer_id)',
+                'Mide el tamaño de tu base activa. Un crecimiento constante indica buena captación.'
+              )}
             />
             <CustomerScorecard
               title="Nuevos"
               value={formatNumber(metrics.newCustomers)}
               change={metrics.newCustomersChange}
               icon={UserPlus}
-              tooltip="Clientes que hacen su primer pedido en el período"
+              tooltip={tooltipContent(
+                'Clientes con primer pedido en el período seleccionado.',
+                'Clientes sin pedidos previos en los últimos 183 días.',
+                'Mide la captación de nuevos usuarios. Clave para el crecimiento de la base.'
+              )}
             />
             <CustomerScorecard
               title="Repetidores"
               value={`${metrics.retentionRate.toFixed(1)}%`}
               change={metrics.retentionRateChange}
               icon={RefreshCcw}
-              tooltip="% de clientes con más de 1 pedido / total clientes"
+              tooltip={tooltipContent(
+                'Porcentaje de clientes con más de 1 pedido en el período.',
+                'Clientes con >1 pedido / Total clientes × 100',
+                'Indicador clave de fidelización. Un % creciente reduce el coste de adquisición efectivo.'
+              )}
             />
             <CustomerScorecard
               title="Ped./Cliente"
               value={metrics.avgOrdersPerCustomer.toFixed(1)}
               change={metrics.avgOrdersPerCustomerChange}
               icon={ShoppingCart}
-              tooltip="Pedidos promedio por cliente en el período"
+              tooltip={tooltipContent(
+                'Frecuencia media de pedidos por cliente.',
+                'Total pedidos / Total clientes únicos',
+                'A mayor frecuencia, mayor LTV. Es más rentable aumentar frecuencia que captar nuevos clientes.'
+              )}
             />
             <CustomerScorecard
-              title="Gasto Medio"
+              title="Valor por Cliente"
               value={formatCurrency(metrics.avgSpendPerCustomer)}
               change={metrics.avgSpendPerCustomerChange}
               icon={Wallet}
               subtitle="por cliente"
-              tooltip="Gasto total acumulado / número de clientes"
+              tooltip={tooltipContent(
+                'Ingreso medio generado por cada cliente único.',
+                'Ingresos totales / Clientes únicos',
+                'Mide el valor unitario del cliente. Combina frecuencia y ticket medio en una sola métrica.'
+              )}
             />
             <CustomerScorecard
               title="Ticket"
               value={formatCurrency(metrics.avgTicket)}
               change={metrics.avgTicketChange}
               icon={Receipt}
-              tooltip="Valor promedio por pedido"
+              tooltip={tooltipContent(
+                'Valor medio por pedido.',
+                'Ingresos totales / Total pedidos',
+                'Palanca de precio directa. Subir ticket vía upsell o cross-sell mejora márgenes sin más pedidos.'
+              )}
             />
           </div>
         </section>
       )}
 
-      {/* Channel breakdown */}
+      {/* 2. Segmentación RFM */}
+      {rfmQuery.data && rfmQuery.data.segments.length > 0 && (
+        <section>
+          <RFMSegmentation data={rfmQuery.data} />
+        </section>
+      )}
+      {rfmQuery.isLoading && (
+        <section className="flex justify-center py-8">
+          <Spinner size="md" />
+        </section>
+      )}
+
+      {/* 3. Tendencia Base de Clientes */}
+      {baseTrendQuery.data && baseTrendQuery.data.length > 0 && (
+        <section>
+          <CustomerBaseTrend data={baseTrendQuery.data} />
+        </section>
+      )}
+      {baseTrendQuery.isLoading && (
+        <section className="flex justify-center py-8">
+          <Spinner size="md" />
+        </section>
+      )}
+
+      {/* 4. Por Canal */}
       {activeChannelMetrics.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Por Canal</h2>
@@ -200,21 +255,33 @@ export function CustomersPage() {
         </section>
       )}
 
-      {/* Post-Promo Health */}
-      {postPromo && postPromo.total > 0 && (
+      {/* 5. Tasa de Repetición */}
+      {repeatRateQuery.data && (
         <section>
-          <PostPromoHealth data={postPromo} />
+          <RepeatRateCards data={repeatRateQuery.data} />
+        </section>
+      )}
+      {repeatRateQuery.isLoading && (
+        <section className="flex justify-center py-8">
+          <Spinner size="md" />
         </section>
       )}
 
-      {/* Revenue Concentration */}
+      {/* 6. Concentración de Ingresos */}
       {concentration && (concentration.top10Pct > 0 || concentration.top20Pct > 0) && (
         <section>
           <RevenueConcentration data={concentration} />
         </section>
       )}
 
-      {/* Cohort Retention */}
+      {/* 7. Salud Post-Promo */}
+      {postPromo && postPromo.total > 0 && (
+        <section>
+          <PostPromoHealth data={postPromo} />
+        </section>
+      )}
+
+      {/* 8. Retención por Cohortes */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-900">Retención por Cohortes</h2>
@@ -246,19 +313,19 @@ export function CustomersPage() {
         <CohortHeatmap data={cohorts} granularity={cohortGranularity} />
       </section>
 
-      {/* Churn Risk */}
-      {churnRisk.length > 0 && (
+      {/* 9. Clientes en Riesgo — OCULTO (mantener código) */}
+      {/* {churnRisk.length > 0 && (
         <section>
           <ChurnRiskTable data={churnRisk} />
         </section>
-      )}
+      )} */}
 
-      {/* Multi-platform Analysis */}
-      {multiPlatform && (multiPlatform.glovoOnly > 0 || multiPlatform.ubereatsOnly > 0 || multiPlatform.multiPlatform > 0) && (
+      {/* 10. Multi-Plataforma — OCULTO (mantener código) */}
+      {/* {multiPlatform && (multiPlatform.glovoOnly > 0 || multiPlatform.ubereatsOnly > 0 || multiPlatform.multiPlatform > 0) && (
         <section>
           <PlatformAnalysis data={multiPlatform} />
         </section>
-      )}
+      )} */}
     </div>
   );
 }

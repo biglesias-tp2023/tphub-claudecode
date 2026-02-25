@@ -15,3 +15,12 @@ export type { UseRevenueConcentrationResult } from './useRevenueConcentration';
 
 export { usePostPromoHealth } from './usePostPromoHealth';
 export type { UsePostPromoHealthResult } from './usePostPromoHealth';
+
+export { useRFMAnalysis } from './useRFMAnalysis';
+export type { UseRFMAnalysisResult } from './useRFMAnalysis';
+
+export { useRepeatRate } from './useRepeatRate';
+export type { UseRepeatRateResult } from './useRepeatRate';
+
+export { useCustomerBaseTrend } from './useCustomerBaseTrend';
+export type { UseCustomerBaseTrendResult } from './useCustomerBaseTrend';
