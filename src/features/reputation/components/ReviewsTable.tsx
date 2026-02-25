@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/utils/cn';
-import { ThumbsUp, ThumbsDown, Star, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, X } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, X } from 'lucide-react';
+import { StarRating } from '@/components/common';
 import { CHANNELS } from '@/constants/channels';
 import { getTagClasses, getTagCategory, type TagCategory } from '../utils/tagCategories';
 import type { Review } from '../hooks/useReputationData';
@@ -40,21 +41,7 @@ function RatingDisplay({ rating, channel }: { rating: number; channel: ChannelId
     return <ThumbsDown className="w-5 h-5 text-red-500" />;
   }
 
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={cn(
-            'w-4 h-4',
-            star <= rating
-              ? 'fill-yellow-400 text-yellow-400'
-              : 'fill-gray-200 text-gray-200'
-          )}
-        />
-      ))}
-    </div>
-  );
+  return <StarRating rating={rating} size={16} />;
 }
 
 function truncateId(id: string, maxLen = 12): string {

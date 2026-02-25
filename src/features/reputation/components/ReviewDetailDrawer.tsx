@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { ThumbsUp, ThumbsDown, Star, Package, MapPin, Copy, Check } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Package, MapPin, Copy, Check } from 'lucide-react';
+import { StarRating } from '@/components/common';
 import { cn } from '@/utils/cn';
 import { Drawer } from '@/components/ui';
 import { Button } from '@/components/ui';
@@ -22,21 +23,7 @@ function RatingDisplay({ rating, channel }: { rating: number; channel: ChannelId
     return <ThumbsDown className="w-6 h-6 text-red-500" />;
   }
 
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={cn(
-            'w-5 h-5',
-            star <= rating
-              ? 'fill-yellow-400 text-yellow-400'
-              : 'fill-gray-200 text-gray-200'
-          )}
-        />
-      ))}
-    </div>
-  );
+  return <StarRating rating={rating} />;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {

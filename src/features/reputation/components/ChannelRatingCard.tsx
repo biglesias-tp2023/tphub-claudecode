@@ -1,7 +1,8 @@
 import { cn } from '@/utils/cn';
 import type { ChannelRating } from '../hooks/useReputationData';
-import { ThumbsUp, ThumbsDown, Star } from 'lucide-react';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { CHANNELS } from '@/constants/channels';
+import { StarRating } from '@/components/common';
 
 interface ChannelRatingCardProps {
   data: ChannelRating;
@@ -70,21 +71,7 @@ export function ChannelRatingCard({ data, className }: ChannelRatingCardProps) {
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-center gap-0.5">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Star
-              key={star}
-              className={cn(
-                'w-5 h-5',
-                star <= Math.floor(data.rating)
-                  ? 'fill-yellow-400 text-yellow-400'
-                  : star - 0.5 <= data.rating
-                    ? 'fill-yellow-400/50 text-yellow-400'
-                    : 'fill-gray-200 text-gray-200'
-              )}
-            />
-          ))}
-        </div>
+        <StarRating rating={data.rating} className="flex items-center justify-center gap-0.5" />
       )}
     </div>
   );
