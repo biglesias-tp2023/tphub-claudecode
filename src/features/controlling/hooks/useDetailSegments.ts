@@ -2,8 +2,9 @@
  * useDetailSegments Hook
  *
  * Lazy-loads customer segments for a specific hierarchy row when the
- * detail panel opens. This avoids fetching segments for ALL entities
- * upfront (which caused Supabase's default 1000-row limit to truncate data).
+ * detail panel opens. Uses 8 sequential calls to the single-week RPC
+ * (get_customer_segments) which is reliable and avoids the batch RPC
+ * row-limit issues.
  *
  * @module features/controlling/hooks/useDetailSegments
  */
@@ -11,7 +12,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useCompanyIds } from '@/stores/filtersStore';
-import { fetchWeeklyCustomerSegmentsBatch } from '@/services/crp-portal';
+import { fetchWeeklyCustomerSegments } from '@/services/crp-portal';
 import type { CustomerSegmentRow } from '@/services/crp-portal';
 import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { getLastNWeeks } from '@/utils/dateUtils';
@@ -62,6 +63,8 @@ function aggregateSegmentsByRowId(rows: CustomerSegmentRow[]) {
 /**
  * Fetches customer segments on-demand for a specific row when the detail panel opens.
  *
+ * Uses 8 sequential calls to the single-week RPC to avoid batch RPC issues.
+ *
  * @param rowId - The hierarchy row ID to fetch segments for (null = disabled)
  * @returns segments - WeekSegmentData[] for 8 weeks, or null if not ready
  * @returns isLoading - Whether segments are still loading
@@ -73,15 +76,20 @@ export function useDetailSegments(rowId: string | null) {
   const query = useQuery<WeekSegmentData[]>({
     queryKey: ['detail-segments', rowId, [...companyIds].sort().join(',')],
     queryFn: async () => {
-      const results = await fetchWeeklyCustomerSegmentsBatch(
-        companyIds,
-        weeks.map((w) => `${w.start}T00:00:00`),
-        weeks.map((w) => `${w.end}T23:59:59`),
-      );
+      // Fetch 8 weeks sequentially to avoid parallel timeout issues
+      const weekResults: CustomerSegmentRow[][] = [];
+      for (const week of weeks) {
+        const rows = await fetchWeeklyCustomerSegments(
+          companyIds,
+          week.start,
+          week.end,
+        );
+        weekResults.push(rows);
+      }
 
       // Aggregate each week and extract data for the target row
       return weeks.map((w, i) => {
-        const weekAgg = aggregateSegmentsByRowId(results[i] ?? []);
+        const weekAgg = aggregateSegmentsByRowId(weekResults[i] ?? []);
         const s = weekAgg.get(rowId!) ?? emptySegments();
         return { weekLabel: w.label, ...s };
       });

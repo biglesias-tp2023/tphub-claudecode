@@ -27,6 +27,8 @@ export function mapDbCompanyToCompany(db: DbCompany): Company {
     name: db.name,
     slug: db.slug,
     logoUrl: db.logo_url,
+    commissionGlovo: null,
+    commissionUbereats: null,
     isActive: db.is_active,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
