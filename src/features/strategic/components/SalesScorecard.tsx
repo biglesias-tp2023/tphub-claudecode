@@ -39,25 +39,31 @@ export function Scorecard({
     ? (isPositive ? 'text-red-500' : 'text-emerald-600')
     : (isPositive ? 'text-emerald-600' : 'text-amber-600');
 
+  const hasActual = showActual && actual > 0;
+
   return (
     <div>
       <div className="flex items-center gap-1.5">
         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-        {isRealData && (
+        {isRealData && hasActual && (
           <span className="text-[9px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
             Real
           </span>
         )}
       </div>
       <div className="flex items-baseline gap-2">
-        <p className={cn('text-xl font-bold tabular-nums', color)}>{fmtK(value)}€</p>
         {isLoading ? (
-          <span className="text-sm text-gray-400 animate-pulse">cargando...</span>
-        ) : showActual && actual > 0 && (
-          <p className={cn('text-sm font-medium tabular-nums', color.replace('600', '500'))}>/ {fmtK(actual)}€</p>
+          <span className="text-xl text-gray-400 animate-pulse">cargando...</span>
+        ) : hasActual ? (
+          <>
+            <p className={cn('text-xl font-bold tabular-nums', color)}>{fmtK(actual)}€</p>
+            <p className="text-sm font-medium tabular-nums text-gray-400">/ {fmtK(value)}€</p>
+          </>
+        ) : (
+          <p className={cn('text-xl font-bold tabular-nums', color)}>{fmtK(value)}€</p>
         )}
       </div>
-      {!isLoading && showActual && actual > 0 && diff && (
+      {!isLoading && hasActual && diff && (
         <p className={cn('text-[10px] mt-0.5', diffColor)}>{diffText}</p>
       )}
     </div>

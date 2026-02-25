@@ -18,6 +18,8 @@ export interface Company {
   logoUrl?: string | null;
   status?: CompanyStatus | null;    // Status del cliente
   keyAccountManager?: string | null; // Assigned Key Account Manager
+  commissionGlovo: number | null;    // 0.28 = 28%
+  commissionUbereats: number | null; // 0.30 = 30%
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

@@ -61,6 +61,10 @@ export interface DbCrpCompany {
   flg_deleted?: number;
   /** Month of the snapshot (e.g., '2026-01-01') */
   pk_ts_month: string;
+  /** Glovo commission rate (e.g. 0.28 = 28%) */
+  pct_commission_glovo: number | null;
+  /** UberEats commission rate (e.g. 0.30 = 30%) */
+  pct_commission_uber_eats: number | null;
 }
 
 /**

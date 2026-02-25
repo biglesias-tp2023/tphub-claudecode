@@ -46,6 +46,7 @@ export function SalesProjection({
   realRevenueByMonth,
   realPromosByMonth,
   realAdsByMonth,
+  commissions,
 }: SalesProjectionProps) {
   const [showActual, setShowActual] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
@@ -98,12 +99,32 @@ export function SalesProjection({
     const currentTargetPromos = activeChannels.reduce((sum, ch) => sum + calcTargetPromos(currentKey, ch), 0);
     const currentActualPromos = getMonthTotal(effectiveActualPromos, currentKey);
 
+    // Rentabilidad: 100% - ADS% - Promos% - weighted commission%
+    const currentAdsPercent = currentActual > 0 ? (currentActualAds / currentActual) * 100 : 0;
+    const currentPromosPercent = currentActual > 0 ? (currentActualPromos / currentActual) * 100 : 0;
+
+    const defaultFee = 30;
+    const weightedCommission = (() => {
+      if (!commissions || currentActual <= 0) return defaultFee;
+      const glovoRev = effectiveActualRevenue[currentKey]?.glovo || 0;
+      const uberRev = effectiveActualRevenue[currentKey]?.ubereats || 0;
+      const justeatRev = effectiveActualRevenue[currentKey]?.justeat || 0;
+      const totalRev = glovoRev + uberRev + justeatRev;
+      if (totalRev <= 0) return defaultFee;
+      return (glovoRev * commissions.glovo + uberRev * commissions.ubereats + justeatRev * commissions.justeat) / totalRev;
+    })();
+
+    const currentRentabilidad = currentActual > 0
+      ? 100 - currentAdsPercent - currentPromosPercent - weightedCommission
+      : null;
+
     return {
       getMonthTotal, getChannelTotal, grandTarget, grandActual,
       calcTargetAds, calcTargetPromos, totalTargetAds, totalTargetPromos, totalActualAds, totalActualPromos,
       currentTarget, currentActual, currentTargetAds, currentActualAds, currentTargetPromos, currentActualPromos,
+      currentAdsPercent, currentPromosPercent, weightedCommission, currentRentabilidad,
     };
-  }, [months, activeChannels, targetRevenue, effectiveActualRevenue, effectiveActualAds, effectiveActualPromos, config]);
+  }, [months, activeChannels, targetRevenue, effectiveActualRevenue, effectiveActualAds, effectiveActualPromos, config, commissions]);
 
   // Chart data
   const chartData = useMemo(() => months.map((m) => ({
@@ -268,7 +289,7 @@ export function SalesProjection({
       </div>
 
       {/* Scorecards - Use real data when available, fallback to manual entry */}
-      <div className="grid grid-cols-3 gap-4 px-5 py-4 bg-gray-50 border-b border-gray-100">
+      <div className="grid grid-cols-4 gap-4 px-5 py-4 bg-gray-50 border-b border-gray-100">
         <Scorecard
           label="Ventas"
           value={calculations.currentTarget}
@@ -296,6 +317,20 @@ export function SalesProjection({
           isRealData={hasRealPromos}
           isInvestment
         />
+        {showActual && calculations.currentRentabilidad !== null && (
+          <div>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Rentabilidad</p>
+            <p className={cn(
+              'text-xl font-bold tabular-nums',
+              calculations.currentRentabilidad >= 0 ? 'text-emerald-600' : 'text-red-500'
+            )}>
+              {calculations.currentRentabilidad.toFixed(1)}%
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              ADS {calculations.currentAdsPercent.toFixed(1)}% · Promos {calculations.currentPromosPercent.toFixed(1)}% · Fee {calculations.weightedCommission.toFixed(0)}%
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Chart */}

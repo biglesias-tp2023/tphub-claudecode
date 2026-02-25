@@ -120,6 +120,7 @@ export function StrategicPage() {
               realRevenueByMonth={state.realRevenueByMonth}
               realPromosByMonth={state.realPromosByMonth}
               realAdsByMonth={state.realAdsByMonth}
+              commissions={state.commissions}
             />
           )}
 

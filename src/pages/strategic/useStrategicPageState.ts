@@ -5,6 +5,7 @@ import { useSessionState } from '@/features/controlling/hooks';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
+import { useCompanies } from '@/features/clients/hooks/useCompanies';
 import { fetchCrpCompanyById } from '@/services/crp-portal';
 import {
   useStrategicObjectives,
@@ -165,6 +166,17 @@ export function useStrategicPageState() {
     () => expandRestaurantIds(filterRestaurantIds, allRestaurants),
     [filterRestaurantIds, allRestaurants]
   );
+
+  // Commissions from CRP Portal (for rentabilidad scorecard)
+  const { data: allCompanies = [] } = useCompanies();
+  const commissions = useMemo(() => {
+    const company = allCompanies.find(c => effectiveCompanyIds.includes(c.id));
+    return {
+      glovo: (company?.commissionGlovo ?? 0.30) * 100,
+      ubereats: (company?.commissionUbereats ?? 0.30) * 100,
+      justeat: 30,
+    };
+  }, [allCompanies, effectiveCompanyIds]);
 
   // Real revenue, promos, and ads by month for the SalesProjection grid rows and scorecards
   const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth({
@@ -549,6 +561,7 @@ export function useStrategicPageState() {
     realRevenueByMonth,
     realPromosByMonth,
     realAdsByMonth,
+    commissions,
     salesProjection,
     defaultRestaurantId,
 

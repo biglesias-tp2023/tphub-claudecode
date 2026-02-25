@@ -44,7 +44,7 @@ const TABLE_NAME = 'crp_portal__dt_company';
 export async function fetchCompanies(): Promise<Company[]> {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month')
+    .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month, pct_commission_glovo, pct_commission_uber_eats')
     .eq('pk_ts_month', getCurrentMonthFilter())
     .in('des_status', VALID_COMPANY_STATUSES)
     .order('des_company_name');
@@ -79,7 +79,7 @@ export async function fetchCompanies(): Promise<Company[]> {
 export async function fetchCompanyById(companyId: string): Promise<Company | null> {
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month')
+    .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month, pct_commission_glovo, pct_commission_uber_eats')
     .eq('pk_id_company', parseInt(companyId, 10))
     .eq('pk_ts_month', getCurrentMonthFilter())
     .in('des_status', VALID_COMPANY_STATUSES)

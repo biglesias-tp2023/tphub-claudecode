@@ -45,6 +45,8 @@ export function mapCompany(db: DbCrpCompany): Company {
     logoUrl: null,
     status: db.des_status as Company['status'],
     keyAccountManager: db.des_key_account_manager,
+    commissionGlovo: db.pct_commission_glovo ?? null,
+    commissionUbereats: db.pct_commission_uber_eats ?? null,
     isActive: true,
     createdAt: db.td_firma_contrato || new Date().toISOString(),
     updatedAt: new Date().toISOString(),

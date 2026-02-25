@@ -32,6 +32,8 @@ export interface SalesProjectionProps {
   realPromosByMonth?: GridChannelMonthData;
   /** Real ads (ad spend) by month×channel from CRP Portal for grid rows */
   realAdsByMonth?: GridChannelMonthData;
+  /** Commission rates per channel (as %, e.g. 28, 30) from crp_portal__dt_company */
+  commissions?: { glovo: number; ubereats: number; justeat: number };
 }
 
 export interface MonthInfo {
