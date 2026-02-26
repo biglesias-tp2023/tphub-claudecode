@@ -191,6 +191,9 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
               )}
             </>
           )}
+          <span className="text-[10px] text-gray-300 font-mono">
+            ({row.id.split('::').pop() || row.id.replace('company-', '')})
+          </span>
         </div>
       </td>
       <td className="text-right py-2.5 px-2 font-medium text-gray-900 text-sm tabular-nums">
@@ -244,7 +247,7 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
       )}
       {activeTabs.has('operaciones') && (
         <>
-          <td className="text-right py-2.5 px-2 text-gray-400 text-sm">-</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.avgDeliveryTime ? `${row.avgDeliveryTime.toFixed(2)}` : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${row.ratingGlovo.toFixed(1)}%` : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsGlovo ? formatNumber(row.reviewsGlovo) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingUber ? row.ratingUber.toFixed(1) : '-'}</td>
@@ -671,8 +674,8 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
               )}
               {activeTabs.has('operaciones') && (
                 <>
-                  <th className="py-2.5 px-2 font-medium text-gray-500 text-xs text-right" title="Tiempo de entrega">
-                    ETA
+                  <th className="py-2.5 px-2 font-medium text-gray-500 text-xs text-right" title="Delivery Time">
+                    DT
                   </th>
                   <SortableHeader
                     column="ratingGlovo"

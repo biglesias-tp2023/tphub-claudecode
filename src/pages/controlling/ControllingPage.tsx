@@ -3,7 +3,6 @@ import {
   Euro,
   ShoppingBag,
   Receipt,
-  Timer,
   Megaphone,
   Tag,
   RotateCcw,
@@ -13,7 +12,7 @@ import { ErrorAlert, ExportButtons, DataFreshnessIndicator, type ExportFormat, t
 import { DashboardFilters } from '@/features/dashboard';
 import { useControllingData, useWeeklyRevenue } from '@/features/controlling';
 import type { HierarchyRow } from '@/features/controlling';
-import { PortfolioCard, ChannelCard, HierarchyTable, DetailPanel } from '@/features/controlling/components';
+import { PortfolioCard, ChannelCard, HierarchyTable, DetailPanel, DeliveryBikeIcon } from '@/features/controlling/components';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useSessionState } from '@/hooks/useSessionState';
 import { formatCurrency, formatNumber, getPeriodLabelsFromRange } from '@/utils/formatters';
@@ -221,7 +220,7 @@ export function ControllingPage() {
             title="T. Entrega"
             value={portfolio.avgDeliveryTime > 0 ? `${portfolio.avgDeliveryTime.toFixed(1)} min` : '—'}
             change={portfolio.avgDeliveryTimeChange}
-            icon={Timer}
+            icon={DeliveryBikeIcon}
           />
           <PortfolioCard
             title="Inversión Ads"
