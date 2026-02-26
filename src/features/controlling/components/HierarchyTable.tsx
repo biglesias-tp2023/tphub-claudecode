@@ -41,6 +41,7 @@ type SortColumn =
   | 'promosPercentage'
   | 'promosRoas'
   | 'organicOrders'
+  | 'avgDeliveryTime'
   | 'ratingGlovo'
   | 'reviewsGlovo'
   | 'ratingUber'
@@ -713,9 +714,14 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
               {/* Operaciones: DT | Rat. G | Reviews G | Rat. UE | Reviews UE */}
               {activeTabs.has('operaciones') && (
                 <>
-                  <th className="py-2.5 px-2 font-semibold text-primary-700 text-xs text-right" title="Delivery Time">
-                    DT
-                  </th>
+                  <SortableHeader
+                    column="avgDeliveryTime"
+                    label="DT"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    highlighted
+                  />
                   <SortableHeader
                     column="ratingGlovo"
                     label="Rat. G"
