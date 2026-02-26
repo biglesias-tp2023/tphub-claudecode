@@ -191,6 +191,7 @@ export function buildHierarchyFromDimensions(
     promotedOrders: 0, adSpent: 0, adRevenue: 0, roas: 0,
     impressions: 0, clicks: 0, adOrders: 0,
     ratingGlovo: 0, reviewsGlovo: 0, ratingUber: 0, reviewsUber: 0,
+    avgDeliveryTime: 0,
   };
 
   // STEP 1: Build address -> store mapping from orders
@@ -328,6 +329,7 @@ export function buildHierarchyFromDimensions(
       descuentos: 0, promotedOrders: 0, adSpent: 0, adRevenue: 0, roas: 0,
       impressions: 0, clicks: 0, adOrders: 0,
       ratingGlovo: 0, reviewsGlovo: 0, ratingUber: 0, reviewsUber: 0,
+      avgDeliveryTime: 0,
     };
   };
 

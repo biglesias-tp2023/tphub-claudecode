@@ -173,6 +173,8 @@ function transformHierarchyDataRow(row: HierarchyDataRow): HierarchyRow {
     // Organico = % of orders without promotion
     organicOrders: row.metrics.pedidos > 0
       ? ((row.metrics.pedidos - row.metrics.promotedOrders) / row.metrics.pedidos) * 100 : 0,
+    // Delivery time from order timestamps
+    avgDeliveryTime: row.metrics.avgDeliveryTime,
     // Reviews
     ratingGlovo: row.metrics.ratingGlovo,
     reviewsGlovo: row.metrics.reviewsGlovo,

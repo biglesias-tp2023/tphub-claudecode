@@ -32,6 +32,8 @@ export interface RPCBaseMetrics {
   glovoReviews: number;
   uberRatingSum: number;
   uberReviews: number;
+  deliveryTimeSum: number;
+  deliveryTimeCount: number;
 }
 
 function createEmptyRPCBase(): RPCBaseMetrics {
@@ -40,6 +42,7 @@ function createEmptyRPCBase(): RPCBaseMetrics {
     promotedOrders: 0, adSpent: 0, adRevenue: 0,
     impressions: 0, clicks: 0, adOrders: 0,
     glovoRatingSum: 0, glovoReviews: 0, uberRatingSum: 0, uberReviews: 0,
+    deliveryTimeSum: 0, deliveryTimeCount: 0,
   };
 }
 
@@ -59,6 +62,8 @@ function addMetrics(target: RPCBaseMetrics, source: RPCBaseMetrics) {
   target.glovoReviews += source.glovoReviews;
   target.uberRatingSum += source.uberRatingSum;
   target.uberReviews += source.uberReviews;
+  target.deliveryTimeSum += source.deliveryTimeSum;
+  target.deliveryTimeCount += source.deliveryTimeCount;
 }
 
 export interface AggregatedRPCMetrics {
@@ -113,6 +118,11 @@ export function aggregateRPCMetrics(rows: ControllingMetricsRow[]): AggregatedRP
       agg.uberRatingSum += avgRating * totalReviews;
       agg.uberReviews += totalReviews;
     }
+
+    const avgDeliveryTime = row.avg_delivery_time || 0;
+    const deliveryTimeCount = row.delivery_time_count || 0;
+    agg.deliveryTimeSum += avgDeliveryTime * deliveryTimeCount;
+    agg.deliveryTimeCount += deliveryTimeCount;
   }
 
   // Step 2: Address level from portals
@@ -167,6 +177,7 @@ export function buildHierarchyFromRPCMetrics(
       promotedOrders: 0, adSpent: 0, adRevenue: 0, roas: 0,
       impressions: 0, clicks: 0, adOrders: 0,
       ratingGlovo: 0, reviewsGlovo: 0, ratingUber: 0, reviewsUber: 0,
+      avgDeliveryTime: 0,
     };
     if (!base) return emptyMetrics;
     const prevVentas = prevBase?.ventas || 0;
@@ -189,6 +200,7 @@ export function buildHierarchyFromRPCMetrics(
       reviewsGlovo: base.glovoReviews,
       ratingUber: base.uberReviews > 0 ? base.uberRatingSum / base.uberReviews : 0,
       reviewsUber: base.uberReviews,
+      avgDeliveryTime: base.deliveryTimeCount > 0 ? base.deliveryTimeSum / base.deliveryTimeCount : 0,
     };
   };
 

@@ -49,6 +49,7 @@ export interface HierarchyMetrics {
   reviewsGlovo: number;
   ratingUber: number;
   reviewsUber: number;
+  avgDeliveryTime: number;
 }
 
 export interface HierarchyDataRow {

@@ -594,6 +594,8 @@ export interface ControllingMetricsRow {
   ad_orders: number;
   avg_rating: number;
   total_reviews: number;
+  avg_delivery_time: number;
+  delivery_time_count: number;
 }
 
 /**
