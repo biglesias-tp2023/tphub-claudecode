@@ -288,13 +288,13 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
       {activeTabs.has('operaciones') && (
         <>
           <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            {row.avgDeliveryTime ? (
-              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-100 text-primary-900 font-medium text-xs">{row.avgDeliveryTime.toFixed(2)}</span>
+            {row.avgDeliveryTime && row.avgDeliveryTime > 0 ? (
+              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-100 text-primary-900 font-medium text-xs">{row.avgDeliveryTime.toFixed(1)} min</span>
             ) : '-'}
           </td>
-          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${row.ratingGlovo.toFixed(1)}%` : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${(row.ratingGlovo * 20).toFixed(0)}%` : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsGlovo ? formatNumber(row.reviewsGlovo) : '-'}</td>
-          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingUber ? row.ratingUber.toFixed(1) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingUber ? `${row.ratingUber.toFixed(1)} ★` : '-'}</td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.reviewsUber ? formatNumber(row.reviewsUber) : '-'}</td>
         </>
       )}
