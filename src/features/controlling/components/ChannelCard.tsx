@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { Sparkline } from '@/components/charts/Sparkline';
+import type { SparklineLabel } from '@/components/charts/Sparkline';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
 import { cn } from '@/utils/cn';
 import type { ChannelId } from '@/types';
 import type { ChannelMetrics } from '@/features/controlling';
+import type { WeekRange } from '@/utils/dateUtils';
 
 export const CHANNEL_STYLES: Record<ChannelId, { bg: string; border: string; sparkline: string }> = {
   glovo: { bg: 'bg-amber-50/50', border: 'border-amber-100', sparkline: '#d97706' },
@@ -16,15 +19,30 @@ export const CHANNEL_LOGOS: Record<ChannelId, string> = {
   justeat: '/images/platforms/justeat.webp',
 };
 
+/** Format a YYYY-MM-DD date as DD/MM */
+function shortDate(ymd: string): string {
+  const parts = ymd.split('-');
+  return `${parts[2]}/${parts[1]}`;
+}
+
 interface ChannelCardProps {
   data: ChannelMetrics;
   weeklyData?: number[];
   weeklyLoading?: boolean;
+  weeks?: WeekRange[];
 }
 
-export function ChannelCard({ data, weeklyData, weeklyLoading }: ChannelCardProps) {
+export function ChannelCard({ data, weeklyData, weeklyLoading, weeks }: ChannelCardProps) {
   const isPositive = data.revenueChange >= 0;
   const styles = CHANNEL_STYLES[data.channel];
+
+  const sparklineLabels = useMemo<SparklineLabel[] | undefined>(() => {
+    if (!weeks || !weeklyData || weeks.length === 0) return undefined;
+    return weeks.map((w, i) => ({
+      value: formatCurrency(weeklyData[i] ?? 0),
+      sub: `${shortDate(w.start)} - ${shortDate(w.end)}`,
+    }));
+  }, [weeks, weeklyData]);
 
   return (
     <div className={cn('rounded-xl border p-5', styles.bg, styles.border)}>
@@ -62,6 +80,7 @@ export function ChannelCard({ data, weeklyData, weeklyLoading }: ChannelCardProp
               height={36}
               color={styles.sparkline}
               areaOpacity={0.12}
+              labels={sparklineLabels}
             />
           )}
         </div>

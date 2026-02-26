@@ -256,6 +256,7 @@ export function ControllingPage() {
               data={channel}
               weeklyData={channelWeeklyRevenue.get(channel.channel)}
               weeklyLoading={weeklyRevenueLoading}
+              weeks={weeks}
             />
           ))}
         </div>
