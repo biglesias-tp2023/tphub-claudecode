@@ -23,6 +23,7 @@ export interface StoreDim {
   id: string;
   name: string;
   companyId: string;
+  deleted?: boolean;
 }
 
 export interface AddressDim {
@@ -31,6 +32,7 @@ export interface AddressDim {
   companyId: string;
   allIds: string[];
   storeId?: string;
+  deleted?: boolean;
 }
 
 export interface PortalDim {
@@ -121,6 +123,7 @@ export async function fetchAllDimensions(
     id: String(s.pk_id_store),
     name: s.des_store,
     companyId: String(s.pfk_id_company),
+    deleted: s.flg_deleted === 1,
   }));
 
   const uniqueAddresses = deduplicateBy(
@@ -133,6 +136,7 @@ export async function fetchAllDimensions(
     companyId: String(a.pfk_id_company),
     allIds: [String(a.pk_id_address)],
     storeId: undefined,
+    deleted: a.flg_deleted === 1,
   }));
 
   const uniquePortals = deduplicateBy(

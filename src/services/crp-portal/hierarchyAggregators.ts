@@ -225,9 +225,13 @@ export function buildHierarchyFromRPCMetrics(
     });
   }
 
-  // 2. STORE rows
+  // 2. STORE rows — skip deleted with no data
   for (const store of stores) {
     const storeKey = `${store.companyId}::${store.id}`;
+    const currentStoreMetrics = currentAgg.byStore.get(storeKey);
+    const previousStoreMetrics = previousAgg.byStore.get(storeKey);
+    if (store.deleted && !currentStoreMetrics && !previousStoreMetrics) continue;
+
     rows.push({
       id: `brand::${store.companyId}::${store.id}`,
       level: 'brand',
@@ -235,7 +239,7 @@ export function buildHierarchyFromRPCMetrics(
       parentId: `company-${store.companyId}`,
       companyId: String(store.companyId),
       brandId: store.id,
-      metrics: toFinalMetrics(currentAgg.byStore.get(storeKey), previousAgg.byStore.get(storeKey)),
+      metrics: toFinalMetrics(currentStoreMetrics, previousStoreMetrics),
     });
   }
 
@@ -270,7 +274,7 @@ export function buildHierarchyFromRPCMetrics(
     return result;
   };
 
-  // 3. ADDRESS rows
+  // 3. ADDRESS rows — skip deleted with no data
   for (const address of addresses) {
     // Try all allIds to find mapped store
     let mappedStoreId: string | undefined;
@@ -288,6 +292,8 @@ export function buildHierarchyFromRPCMetrics(
 
       const currentAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, currentAgg);
       const previousAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, previousAgg);
+
+      if (address.deleted && !currentAddrMetrics && !previousAddrMetrics) continue;
 
       rows.push({
         id: `address::${address.companyId}::${address.id}`,
@@ -319,6 +325,9 @@ export function buildHierarchyFromRPCMetrics(
         }
       }
     } else {
+      // No mapped store — skip deleted addresses entirely (they have no data)
+      if (address.deleted) continue;
+
       const companyStores = stores.filter(s => s.companyId === address.companyId);
       const firstStore = companyStores.length > 0 ? companyStores[0] : undefined;
       const parentId = firstStore
