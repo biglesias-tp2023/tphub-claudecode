@@ -59,7 +59,7 @@ export function parseNumericIds(ids: string[]): number[] {
     .filter((id) => !isNaN(id) && id > 0);
 }
 
-interface WeekRange {
+export interface WeekRange {
   start: string; // YYYY-MM-DD
   end: string;   // YYYY-MM-DD
   label: string; // Short label like "03/02"

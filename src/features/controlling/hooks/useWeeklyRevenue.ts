@@ -264,6 +264,7 @@ export function useWeeklyRevenue() {
     channelWeeklyRevenue: query.data?.byChannel || emptyChannelMap,
     weeklyMetrics: query.data?.metricsByRowId || emptyMetricsMap,
     weekLabels: weeks.map((w) => w.label),
+    weeks,
     isLoading: query.isLoading,
   };
 }
