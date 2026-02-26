@@ -31,12 +31,14 @@ type SortColumn =
   | 'porcentajeRecurrentes'
   | 'inversionAds'
   | 'ventasAds'
+  | 'adsPercentage'
   | 'roas'
   | 'impressions'
   | 'clicks'
   | 'adOrders'
   | 'inversionPromos'
   | 'ventasPromos'
+  | 'promosPercentage'
   | 'promosRoas'
   | 'organicOrders'
   | 'ratingGlovo'
@@ -85,7 +87,7 @@ function SortableHeader({ column, label, currentSort, currentDirection, onSort, 
     <th
       className={cn(
         'py-2.5 px-2 font-medium text-xs cursor-pointer hover:bg-gray-100 select-none transition-colors',
-        highlighted ? 'text-primary-700 font-semibold' : 'text-gray-500',
+        highlighted ? 'text-primary-800 font-semibold' : 'text-gray-500',
         align === 'left' ? 'text-left' : 'text-right',
         align === 'left' && 'px-4 w-64'
       )}
@@ -242,25 +244,20 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
         <>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.nuevosClientes)}</td>
           <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{row.porcentajeNuevos.toFixed(1)}%</span>
+            <span className="inline-block px-1.5 py-0.5 rounded bg-primary-100 text-primary-900 font-medium text-xs">{row.porcentajeNuevos.toFixed(1)}%</span>
           </td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{formatNumber(row.recurrentesClientes)}</td>
-          <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{row.porcentajeRecurrentes.toFixed(1)}%</span>
-          </td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.porcentajeRecurrentes.toFixed(1)}%</td>
         </>
       )}
       {/* Publicidad */}
       {activeTabs.has('publicidad') && (
         <>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionAds != null ? formatCurrency(row.inversionAds) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ventasAds != null ? formatCurrency(row.ventasAds) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            {row.inversionAds != null ? (
-              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{formatCurrency(row.inversionAds)}</span>
-            ) : '-'}
-          </td>
-          <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            {row.ventasAds != null ? (
-              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{formatCurrency(row.ventasAds)}</span>
+            {row.adsPercentage != null ? (
+              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-100 text-primary-900 font-medium text-xs">{row.adsPercentage.toFixed(1)}%</span>
             ) : '-'}
           </td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">
@@ -274,14 +271,11 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
       {/* Promociones */}
       {activeTabs.has('promociones') && (
         <>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.inversionPromos != null ? formatCurrency(row.inversionPromos) : '-'}</td>
+          <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ventasPromos != null ? formatCurrency(row.ventasPromos) : '-'}</td>
           <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            {row.inversionPromos != null ? (
-              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{formatCurrency(row.inversionPromos)}</span>
-            ) : '-'}
-          </td>
-          <td className="text-right py-2.5 px-2 text-sm tabular-nums">
-            {row.ventasPromos != null ? (
-              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{formatCurrency(row.ventasPromos)}</span>
+            {row.promosPercentage != null ? (
+              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-100 text-primary-900 font-medium text-xs">{row.promosPercentage.toFixed(1)}%</span>
             ) : '-'}
           </td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">
@@ -295,7 +289,7 @@ const HierarchyTableRow = React.memo(function HierarchyTableRow({
         <>
           <td className="text-right py-2.5 px-2 text-sm tabular-nums">
             {row.avgDeliveryTime ? (
-              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-50/60 text-primary-800 font-medium text-xs">{row.avgDeliveryTime.toFixed(2)}</span>
+              <span className="inline-block px-1.5 py-0.5 rounded bg-primary-100 text-primary-900 font-medium text-xs">{row.avgDeliveryTime.toFixed(2)}</span>
             ) : '-'}
           </td>
           <td className="text-right py-2.5 px-2 text-gray-600 text-sm tabular-nums">{row.ratingGlovo ? `${row.ratingGlovo.toFixed(1)}%` : '-'}</td>
@@ -586,7 +580,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
               <th className="py-2.5 px-2 font-medium text-gray-500 text-xs text-center w-[98px]">
                 Evolucion
               </th>
-              {/* Rendimiento: Nuevos | % Nuevos (highlighted) | Recurrentes | % Recurrentes (highlighted) */}
+              {/* Rendimiento: Nuevos | % Nuevos (highlighted) | Recurrentes | % Recurrentes */}
               {activeTabs.has('rendimiento') && (
                 <>
                   <SortableHeader
@@ -617,11 +611,10 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
-                    highlighted
                   />
                 </>
               )}
-              {/* Publicidad: Inv. ADS (highlighted) | Ventas ADS (highlighted) | ROAS | Impresiones | Clicks | Pedidos */}
+              {/* Publicidad: Inv. ADS | Ventas ADS | % ADS (highlighted) | ROAS | Impresiones | Clicks | Pedidos */}
               {activeTabs.has('publicidad') && (
                 <>
                   <SortableHeader
@@ -630,11 +623,17 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
-                    highlighted
                   />
                   <SortableHeader
                     column="ventasAds"
                     label="Ventas Ads"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="adsPercentage"
+                    label="% ADS"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
@@ -670,7 +669,7 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                   />
                 </>
               )}
-              {/* Promociones: Inv. Promo (highlighted) | Ventas Promo (highlighted) | ROAS | Organico */}
+              {/* Promociones: Inv. Promo | Ventas Promo | % Inv. Promos (highlighted) | ROAS | Organico */}
               {activeTabs.has('promociones') && (
                 <>
                   <SortableHeader
@@ -679,11 +678,17 @@ export function HierarchyTable({ data, periodLabels, weeklyRevenue, weeklyRevenu
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
-                    highlighted
                   />
                   <SortableHeader
                     column="ventasPromos"
                     label="Ventas Promos"
+                    currentSort={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    column="promosPercentage"
+                    label="% Inv. Promos"
                     currentSort={sortColumn}
                     currentDirection={sortDirection}
                     onSort={handleSort}
