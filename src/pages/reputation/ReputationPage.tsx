@@ -197,11 +197,6 @@ export function ReputationPage() {
               className="flex-1 min-w-0"
             />
             <SummaryCard
-              type="avgDeliveryTime"
-              value={data.summary.avgDeliveryTime ?? 0}
-              className="flex-1 min-w-0"
-            />
-            <SummaryCard
               type="refunds"
               value={data.summary.totalRefunds}
               change={data.summary.totalRefundsChange}

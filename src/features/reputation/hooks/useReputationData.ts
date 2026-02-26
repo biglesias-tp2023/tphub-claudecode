@@ -31,6 +31,7 @@ export interface ChannelRating {
   totalReviews: number;
   positivePercent: number;
   negativePercent: number;
+  avgDeliveryTime?: number;
 }
 
 export interface ReputationSummary {
@@ -132,6 +133,7 @@ function buildChannelRating(
       positivePercent,
       negativePercent: 100 - positivePercent,
       ratingType: 'percent',
+      avgDeliveryTime: agg.avgDeliveryTime,
     };
   }
 
@@ -145,6 +147,7 @@ function buildChannelRating(
     positivePercent: Math.round(agg.positivePercent),
     negativePercent: Math.round(agg.negativePercent),
     ratingType: 'stars',
+    avgDeliveryTime: agg.avgDeliveryTime,
   };
 }
 

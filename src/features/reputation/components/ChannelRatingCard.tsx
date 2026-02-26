@@ -1,6 +1,6 @@
 import { cn } from '@/utils/cn';
 import type { ChannelRating } from '../hooks/useReputationData';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Clock } from 'lucide-react';
 import { CHANNELS } from '@/constants/channels';
 import { StarRating } from '@/components/common';
 
@@ -19,14 +19,22 @@ export function ChannelRatingCard({ data, className }: ChannelRatingCardProps) {
         className
       )}
     >
-      {/* Header with channel logo */}
-      <div className="flex items-center gap-2.5 mb-4">
-        <img
-          src={CHANNELS[data.channel].logoUrl}
-          alt={data.name}
-          className="w-7 h-7 rounded-full object-cover"
-        />
-        <span className="font-medium text-gray-900">{data.name}</span>
+      {/* Header with channel logo and delivery time */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <img
+            src={CHANNELS[data.channel].logoUrl}
+            alt={data.name}
+            className="w-7 h-7 rounded-full object-cover"
+          />
+          <span className="font-medium text-gray-900">{data.name}</span>
+        </div>
+        {data.avgDeliveryTime != null && data.avgDeliveryTime > 0 && (
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{data.avgDeliveryTime.toFixed(1)} min</span>
+          </div>
+        )}
       </div>
 
       {/* Main rating */}
