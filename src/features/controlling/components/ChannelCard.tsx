@@ -79,8 +79,8 @@ export function ChannelCard({ data, weeklyData, weeklyLoading }: ChannelCardProp
           <p className="text-sm font-semibold text-gray-900 tabular-nums">{data.ticketMedio.toFixed(1)} €</p>
         </div>
         <div className="text-center">
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Open</p>
-          <p className="text-sm font-semibold text-gray-900 tabular-nums">{data.openTime.toFixed(0)}%</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Entrega</p>
+          <p className="text-sm font-semibold text-gray-900 tabular-nums">{data.avgDeliveryTime > 0 ? `${data.avgDeliveryTime.toFixed(0)} min` : '—'}</p>
         </div>
       </div>
 

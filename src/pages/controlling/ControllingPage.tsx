@@ -3,7 +3,7 @@ import {
   Euro,
   ShoppingBag,
   Receipt,
-  Clock,
+  Timer,
   Megaphone,
   Tag,
   RotateCcw,
@@ -60,7 +60,7 @@ export function ControllingPage() {
     if (!data) return { headers: [], rows: [] };
 
     return {
-      headers: ['Nombre', 'Nivel', 'Ventas', 'Var. %', 'Pedidos', 'Ticket', 'Open Time'],
+      headers: ['Nombre', 'Nivel', 'Ventas', 'Var. %', 'Pedidos', 'Ticket', 'T. Entrega'],
       rows: data.hierarchy.slice(0, 15).map((row) => [
         row.name,
         row.level,
@@ -68,7 +68,7 @@ export function ControllingPage() {
         `${row.ventasChange >= 0 ? '+' : ''}${row.ventasChange.toFixed(1)}%`,
         formatNumber(row.pedidos),
         `${row.ticketMedio.toFixed(1)}€`,
-        `${(row.openTime ?? 0).toFixed(0)}%`,
+        row.avgDeliveryTime ? `${row.avgDeliveryTime.toFixed(0)} min` : '—',
       ]),
       totalRows: data.hierarchy.length,
     };
@@ -89,7 +89,7 @@ export function ControllingPage() {
         pedidos: ch.pedidos,
         pedidosPercentage: ch.pedidosPercentage,
         ticketMedio: ch.ticketMedio,
-        openTime: ch.openTime,
+        avgDeliveryTime: ch.avgDeliveryTime,
         ads: ch.ads,
         adsPercentage: ch.adsPercentage,
         promos: ch.promos,
@@ -106,7 +106,7 @@ export function ControllingPage() {
         ticketMedio: row.ticketMedio,
         nuevosClientes: row.nuevosClientes,
         porcentajeNuevos: row.porcentajeNuevos,
-        openTime: row.openTime ?? 0,
+        avgDeliveryTime: row.avgDeliveryTime ?? 0,
         ratioConversion: row.ratioConversion ?? 0,
         tiempoEspera: row.tiempoEspera ?? '-',
         valoraciones: row.valoraciones ?? 0,
@@ -218,10 +218,10 @@ export function ControllingPage() {
             icon={Receipt}
           />
           <PortfolioCard
-            title="Open Time"
-            value={`${portfolio.openTime.toFixed(1)}%`}
-            change={portfolio.openTimeChange}
-            icon={Clock}
+            title="T. Entrega"
+            value={portfolio.avgDeliveryTime > 0 ? `${portfolio.avgDeliveryTime.toFixed(1)} min` : '—'}
+            change={portfolio.avgDeliveryTimeChange}
+            icon={Timer}
           />
           <PortfolioCard
             title="Inversión Ads"

@@ -109,7 +109,7 @@ export async function exportControllingToExcel(data: ControllingExportData): Pro
     ['Ventas', data.portfolio.ventas, data.portfolio.ventasChange],
     ['Pedidos', data.portfolio.pedidos, data.portfolio.pedidosChange],
     ['Ticket Medio', data.portfolio.ticketMedio, data.portfolio.ticketMedioChange],
-    ['Open Time (%)', data.portfolio.openTime, data.portfolio.openTimeChange],
+    ['T. Entrega (min)', data.portfolio.avgDeliveryTime, data.portfolio.avgDeliveryTimeChange],
     ['Inversion Ads', data.portfolio.inversionAds, data.portfolio.inversionAdsChange],
     ['Inversion Promos', data.portfolio.inversionPromos, data.portfolio.inversionPromosChange],
     ['Reembolsos', data.portfolio.reembolsos, data.portfolio.reembolsosChange],
@@ -118,15 +118,15 @@ export async function exportControllingToExcel(data: ControllingExportData): Pro
 
   const channelsData: (string | number)[][] = [
     ['RENDIMIENTO POR CANAL'], [''],
-    ['Canal', 'Ventas', 'Var. %', '% Total', 'Pedidos', 'Ticket', 'Open Time', 'Ads', 'Ads %', 'Promos', 'Promos %', 'Reembolsos', 'Reemb. %'],
-    ...data.channels.map((ch) => [ch.name, ch.revenue, ch.revenueChange, ch.percentage, ch.pedidos, ch.ticketMedio, ch.openTime, ch.ads, ch.adsPercentage, ch.promos, ch.promosPercentage, ch.reembolsos, ch.reembolsosPercentage])
+    ['Canal', 'Ventas', 'Var. %', '% Total', 'Pedidos', 'Ticket', 'T. Entrega', 'Ads', 'Ads %', 'Promos', 'Promos %', 'Reembolsos', 'Reemb. %'],
+    ...data.channels.map((ch) => [ch.name, ch.revenue, ch.revenueChange, ch.percentage, ch.pedidos, ch.ticketMedio, ch.avgDeliveryTime, ch.ads, ch.adsPercentage, ch.promos, ch.promosPercentage, ch.reembolsos, ch.reembolsosPercentage])
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(channelsData), 'Canales');
 
   const hierarchyData: (string | number)[][] = [
     ['DETALLE JERARQUIA'], [''],
-    ['Nombre', 'Nivel', 'Ventas', 'Var. %', 'Pedidos', 'Ticket', 'Nuevos', '% Nuevos', 'Open Time', 'Conversion', 'T. Espera', 'Rating', 'Ads', 'Ads %', 'ROAS', 'Promos', 'Promos %', 'ROAS P.'],
-    ...data.hierarchy.map((row) => [row.name, row.level, row.ventas, row.ventasChange, row.pedidos, row.ticketMedio, row.nuevosClientes, row.porcentajeNuevos, row.openTime, row.ratioConversion, row.tiempoEspera, row.valoraciones, row.inversionAds, row.adsPercentage, row.roas, row.inversionPromos, row.promosPercentage, row.promosRoas])
+    ['Nombre', 'Nivel', 'Ventas', 'Var. %', 'Pedidos', 'Ticket', 'Nuevos', '% Nuevos', 'T. Entrega', 'Conversion', 'T. Espera', 'Rating', 'Ads', 'Ads %', 'ROAS', 'Promos', 'Promos %', 'ROAS P.'],
+    ...data.hierarchy.map((row) => [row.name, row.level, row.ventas, row.ventasChange, row.pedidos, row.ticketMedio, row.nuevosClientes, row.porcentajeNuevos, row.avgDeliveryTime, row.ratioConversion, row.tiempoEspera, row.valoraciones, row.inversionAds, row.adsPercentage, row.roas, row.inversionPromos, row.promosPercentage, row.promosRoas])
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hierarchyData), 'Detalle');
 

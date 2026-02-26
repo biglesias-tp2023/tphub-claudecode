@@ -121,7 +121,7 @@ export function exportControllingToCSV(data: ControllingExportData) {
     { metrica: 'Ventas', valor: data.portfolio.ventas, variacion: `${data.portfolio.ventasChange.toFixed(1)}%` },
     { metrica: 'Pedidos', valor: data.portfolio.pedidos, variacion: `${data.portfolio.pedidosChange.toFixed(1)}%` },
     { metrica: 'Ticket Medio', valor: data.portfolio.ticketMedio.toFixed(2), variacion: `${data.portfolio.ticketMedioChange.toFixed(1)}%` },
-    { metrica: 'Open Time', valor: `${data.portfolio.openTime.toFixed(1)}%`, variacion: `${data.portfolio.openTimeChange.toFixed(1)}%` },
+    { metrica: 'T. Entrega', valor: `${data.portfolio.avgDeliveryTime.toFixed(1)} min`, variacion: `${data.portfolio.avgDeliveryTimeChange.toFixed(1)}%` },
     { metrica: 'Inversion Ads', valor: data.portfolio.inversionAds, variacion: `${data.portfolio.inversionAdsChange.toFixed(1)}%` },
     { metrica: 'Inversion Promos', valor: data.portfolio.inversionPromos, variacion: `${data.portfolio.inversionPromosChange.toFixed(1)}%` },
     { metrica: 'Reembolsos', valor: data.portfolio.reembolsos, variacion: `${data.portfolio.reembolsosChange.toFixed(1)}%` },
@@ -130,14 +130,14 @@ export function exportControllingToCSV(data: ControllingExportData) {
   const channelRows = data.channels.map((ch) => ({
     canal: ch.name, ventas: ch.revenue, variacion: `${ch.revenueChange.toFixed(1)}%`,
     porcentaje: `${ch.percentage.toFixed(1)}%`, pedidos: ch.pedidos, ticket_medio: ch.ticketMedio.toFixed(2),
-    open_time: `${ch.openTime.toFixed(1)}%`, ads: ch.ads, ads_pct: `${ch.adsPercentage.toFixed(1)}%`,
+    t_entrega: `${ch.avgDeliveryTime.toFixed(1)} min`, ads: ch.ads, ads_pct: `${ch.adsPercentage.toFixed(1)}%`,
     promos: ch.promos, promos_pct: `${ch.promosPercentage.toFixed(1)}%`,
   }));
 
   const hierarchyRows = data.hierarchy.map((row) => ({
     nombre: row.name, nivel: row.level, ventas: row.ventas, variacion: `${row.ventasChange.toFixed(1)}%`,
     pedidos: row.pedidos, ticket_medio: row.ticketMedio.toFixed(2), nuevos_clientes: row.nuevosClientes,
-    pct_nuevos: `${row.porcentajeNuevos.toFixed(1)}%`, open_time: `${row.openTime.toFixed(1)}%`,
+    pct_nuevos: `${row.porcentajeNuevos.toFixed(1)}%`, t_entrega: `${row.avgDeliveryTime.toFixed(1)} min`,
     conversion: `${row.ratioConversion.toFixed(1)}%`, t_espera: row.tiempoEspera, rating: row.valoraciones.toFixed(1),
     ads: row.inversionAds, ads_pct: `${row.adsPercentage.toFixed(1)}%`, roas: row.roas.toFixed(2),
     promos: row.inversionPromos, promos_pct: `${row.promosPercentage.toFixed(1)}%`,
@@ -147,10 +147,10 @@ export function exportControllingToCSV(data: ControllingExportData) {
     `CONTROLLING - ${data.dateRange}`, '',
     'RESUMEN CARTERA', 'Metrica;Valor;Variacion',
     ...portfolioRows.map((r) => `${r.metrica};${r.valor};${r.variacion}`), '',
-    'RENDIMIENTO POR CANAL', 'Canal;Ventas;Variacion;% Total;Pedidos;Ticket;Open Time;Ads;Ads %;Promos;Promos %',
-    ...channelRows.map((r) => `${r.canal};${r.ventas};${r.variacion};${r.porcentaje};${r.pedidos};${r.ticket_medio};${r.open_time};${r.ads};${r.ads_pct};${r.promos};${r.promos_pct}`), '',
-    'DETALLE JERARQUIA', 'Nombre;Nivel;Ventas;Var.;Pedidos;Ticket;Nuevos;% Nuevos;Open;Conv.;T.Espera;Rating;Ads;Ads %;ROAS;Promos;Promos %',
-    ...hierarchyRows.map((r) => `${r.nombre};${r.nivel};${r.ventas};${r.variacion};${r.pedidos};${r.ticket_medio};${r.nuevos_clientes};${r.pct_nuevos};${r.open_time};${r.conversion};${r.t_espera};${r.rating};${r.ads};${r.ads_pct};${r.roas};${r.promos};${r.promos_pct}`),
+    'RENDIMIENTO POR CANAL', 'Canal;Ventas;Variacion;% Total;Pedidos;Ticket;T. Entrega;Ads;Ads %;Promos;Promos %',
+    ...channelRows.map((r) => `${r.canal};${r.ventas};${r.variacion};${r.porcentaje};${r.pedidos};${r.ticket_medio};${r.t_entrega};${r.ads};${r.ads_pct};${r.promos};${r.promos_pct}`), '',
+    'DETALLE JERARQUIA', 'Nombre;Nivel;Ventas;Var.;Pedidos;Ticket;Nuevos;% Nuevos;T. Entrega;Conv.;T.Espera;Rating;Ads;Ads %;ROAS;Promos;Promos %',
+    ...hierarchyRows.map((r) => `${r.nombre};${r.nivel};${r.ventas};${r.variacion};${r.pedidos};${r.ticket_medio};${r.nuevos_clientes};${r.pct_nuevos};${r.t_entrega};${r.conversion};${r.t_espera};${r.rating};${r.ads};${r.ads_pct};${r.roas};${r.promos};${r.promos_pct}`),
   ].join('\n');
 
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });

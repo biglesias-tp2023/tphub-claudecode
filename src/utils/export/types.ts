@@ -53,8 +53,8 @@ export interface ControllingExportData {
     pedidosChange: number;
     ticketMedio: number;
     ticketMedioChange: number;
-    openTime: number;
-    openTimeChange: number;
+    avgDeliveryTime: number;
+    avgDeliveryTimeChange: number;
     inversionAds: number;
     inversionAdsChange: number;
     adsPercentage: number;
@@ -74,7 +74,7 @@ export interface ControllingExportData {
     pedidos: number;
     pedidosPercentage: number;
     ticketMedio: number;
-    openTime: number;
+    avgDeliveryTime: number;
     ads: number;
     adsPercentage: number;
     promos: number;
@@ -91,7 +91,7 @@ export interface ControllingExportData {
     ticketMedio: number;
     nuevosClientes: number;
     porcentajeNuevos: number;
-    openTime: number;
+    avgDeliveryTime: number;
     ratioConversion: number;
     tiempoEspera: string;
     valoraciones: number;

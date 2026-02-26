@@ -141,7 +141,7 @@ export async function exportControllingToPDF(data: ControllingExportData): Promi
       ['Ventas', formatNumber(data.portfolio.ventas) + '\u20AC', `${data.portfolio.ventasChange >= 0 ? '+' : ''}${data.portfolio.ventasChange.toFixed(1)}%`],
       ['Pedidos', formatNumber(data.portfolio.pedidos), `${data.portfolio.pedidosChange >= 0 ? '+' : ''}${data.portfolio.pedidosChange.toFixed(1)}%`],
       ['Ticket Medio', `${data.portfolio.ticketMedio.toFixed(2)}\u20AC`, `${data.portfolio.ticketMedioChange >= 0 ? '+' : ''}${data.portfolio.ticketMedioChange.toFixed(1)}%`],
-      ['Open Time', `${data.portfolio.openTime.toFixed(1)}%`, `${data.portfolio.openTimeChange >= 0 ? '+' : ''}${data.portfolio.openTimeChange.toFixed(1)}%`],
+      ['T. Entrega', `${data.portfolio.avgDeliveryTime.toFixed(1)} min`, `${data.portfolio.avgDeliveryTimeChange >= 0 ? '+' : ''}${data.portfolio.avgDeliveryTimeChange.toFixed(1)}%`],
       ['Inversion Ads', formatNumber(data.portfolio.inversionAds) + '\u20AC', `${data.portfolio.inversionAdsChange >= 0 ? '+' : ''}${data.portfolio.inversionAdsChange.toFixed(1)}%`],
       ['Inversion Promos', formatNumber(data.portfolio.inversionPromos) + '\u20AC', `${data.portfolio.inversionPromosChange >= 0 ? '+' : ''}${data.portfolio.inversionPromosChange.toFixed(1)}%`],
       ['Reembolsos', formatNumber(data.portfolio.reembolsos) + '\u20AC', `${data.portfolio.reembolsosChange >= 0 ? '+' : ''}${data.portfolio.reembolsosChange.toFixed(1)}%`],

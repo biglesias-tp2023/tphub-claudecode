@@ -105,7 +105,7 @@ interface HierarchyRow {
   nuevosClientes: number;
   porcentajeNuevos: number;
   // Métricas adicionales (opcionales)
-  openTime?: number;
+  avgDeliveryTime?: number;
   ratioConversion?: number;
   tiempoEspera?: string;
   valoraciones?: number;

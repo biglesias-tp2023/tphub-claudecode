@@ -9,9 +9,7 @@ import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from './idExpansion';
 import { CHANNELS } from '@/constants/channels';
 import type { HierarchyDataRow } from '@/services/crp-portal';
-
-/** Default open time percentage when CRP Portal data is not available */
-const DEFAULT_OPEN_TIME_PERCENT = 80;
+import { useReviewsAggregation } from '@/features/reputation/hooks/useReviewsData';
 
 // ============================================
 // TYPES
@@ -24,8 +22,8 @@ export interface PortfolioMetrics {
   pedidosChange: number;
   ticketMedio: number;
   ticketMedioChange: number;
-  openTime: number;
-  openTimeChange: number;
+  avgDeliveryTime: number;
+  avgDeliveryTimeChange: number;
   inversionAds: number;
   inversionAdsChange: number;
   adsPercentage: number;
@@ -55,7 +53,7 @@ export interface ChannelMetrics {
   pedidos: number;
   pedidosPercentage: number;
   ticketMedio: number;
-  openTime: number;
+  avgDeliveryTime: number;
   ads: number;
   adsPercentage: number;
   promos: number;
@@ -86,8 +84,8 @@ export interface HierarchyRow {
   recurrentesClientes: number;
   porcentajeRecurrentes: number;
 
-  // Operaciones (phase 2 - optional)
-  openTime?: number;
+  // Operaciones
+  avgDeliveryTime?: number;
   ratioConversion?: number;
   tiempoEspera?: string;
   valoraciones?: number;
@@ -194,8 +192,8 @@ function createDefaultPortfolio(): PortfolioMetrics {
     pedidosChange: 0,
     ticketMedio: 0,
     ticketMedioChange: 0,
-    openTime: 0,
-    openTimeChange: 0,
+    avgDeliveryTime: 0,
+    avgDeliveryTimeChange: 0,
     inversionAds: 0,
     inversionAdsChange: 0,
     adsPercentage: 0,
@@ -236,7 +234,7 @@ function createDefaultChannels(): ChannelMetrics[] {
     pedidos: 0,
     pedidosPercentage: 0,
     ticketMedio: 0,
-    openTime: 0,
+    avgDeliveryTime: 0,
     ads: 0,
     adsPercentage: 0,
     promos: 0,
@@ -284,15 +282,20 @@ export function useControllingData() {
   // Fetch REAL hierarchy data (4 levels: Company → Brand → Address → Channel)
   const hierarchyQuery = useHierarchyData();
 
-  // Fetch REAL order data for portfolio and channel metrics
-  const ordersQuery = useOrdersData({
+  const filterParams = useMemo(() => ({
     companyIds,
     brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
     addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
     channelIds: channelIds.length > 0 ? channelIds : undefined,
     dateRange,
     datePreset,
-  });
+  }), [companyIds, expandedBrandIds, expandedRestaurantIds, channelIds, dateRange, datePreset]);
+
+  // Fetch REAL order data for portfolio and channel metrics
+  const ordersQuery = useOrdersData(filterParams);
+
+  // Fetch reviews aggregation for avgDeliveryTime per channel
+  const reviewsAggQuery = useReviewsAggregation(filterParams);
 
   // Compute final data
   const data = useMemo<ControllingData | undefined>(() => {
@@ -313,9 +316,12 @@ export function useControllingData() {
         pedidosChange: changes.ordersChange,
         ticketMedio: current.avgTicket,
         ticketMedioChange: changes.avgTicketChange,
-        // Open time not yet available from CRP Portal
-        openTime: DEFAULT_OPEN_TIME_PERCENT,
-        openTimeChange: 0,
+        avgDeliveryTime: reviewsAggQuery.data?.current.avgDeliveryTime ?? 0,
+        avgDeliveryTimeChange: (() => {
+          const curr = reviewsAggQuery.data?.current.avgDeliveryTime ?? 0;
+          const prev = reviewsAggQuery.data?.previous.avgDeliveryTime ?? 0;
+          return prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+        })(),
         // Ads from CRP Portal advertising table
         inversionAds: current.totalAdSpent,
         inversionAdsChange: changes.adSpentChange,
@@ -374,7 +380,7 @@ export function useControllingData() {
           pedidos: channelData.orders,
           pedidosPercentage: totalChannelOrders > 0 ? (channelData.orders / totalChannelOrders) * 100 : 0,
           ticketMedio: channelData.orders > 0 ? channelData.revenue / channelData.orders : 0,
-          openTime: DEFAULT_OPEN_TIME_PERCENT,
+          avgDeliveryTime: reviewsAggQuery.data?.current.byChannel[cfg.id]?.avgDeliveryTime ?? 0,
           ads: channelData.adSpent,
           adsPercentage: channelData.revenue > 0
             ? (channelData.adSpent / channelData.revenue) * 100 : 0,
@@ -408,7 +414,7 @@ export function useControllingData() {
       channels,
       hierarchy: hierarchyRows,
     };
-  }, [hierarchyQuery.data, ordersQuery.data, companyIds, channelIds]);
+  }, [hierarchyQuery.data, ordersQuery.data, reviewsAggQuery.data, companyIds, channelIds]);
 
   return {
     data,
