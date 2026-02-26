@@ -139,8 +139,6 @@ export {
   fetchCrpReviewsHeatmap,
   fetchCrpReviewsComparison,
   fetchCrpReviewsRaw,
-  fetchOrderRefunds,
-  fetchOrderDetails,
   fetchReviewTags,
 } from './reviews';
 
@@ -151,7 +149,6 @@ export type {
   ReviewsChanges,
   ReviewsHeatmapCell,
   RawReview,
-  OrderDetails,
 } from './reviews';
 
 // Hierarchy (Company → Brand → Address → Channel)

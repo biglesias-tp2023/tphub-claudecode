@@ -15,11 +15,10 @@ import {
   fetchCrpReviewsComparison,
   fetchCrpReviewsHeatmap,
   fetchCrpReviewsRaw,
-  fetchOrderDetails,
   fetchCrpOrdersComparison,
   fetchReviewTags,
 } from '@/services/crp-portal';
-import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams, OrderDetails } from '@/services/crp-portal';
+import type { ReviewsAggregation, ReviewsChanges, ReviewsHeatmapCell, RawReview, FetchOrdersParams } from '@/services/crp-portal';
 import type { ChannelId, DateRange, DatePreset } from '@/types';
 import { formatDate, getPreviousPeriodRange } from '@/utils/dateUtils';
 
@@ -155,16 +154,6 @@ export function useReviewTags(reviewIds: string[]) {
     queryKey: ['review-tags', [...reviewIds].sort().join(',')],
     queryFn: () => fetchReviewTags(reviewIds),
     enabled: reviewIds.length > 0,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-}
-
-export function useOrderRefunds(orderIds: string[]) {
-  return useQuery<OrderDetails>({
-    queryKey: ['order-details', [...orderIds].sort().join(',')],
-    queryFn: () => fetchOrderDetails(orderIds),
-    enabled: orderIds.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

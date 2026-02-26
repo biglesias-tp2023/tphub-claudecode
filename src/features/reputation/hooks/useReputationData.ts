@@ -13,7 +13,7 @@ import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters, useDashboard
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
-import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw, useOrderRefunds, useReviewTags, useRefundsSummary } from './useReviewsData';
+import { useReviewsAggregation, useReviewsHeatmap, useReviewsRaw, useReviewTags, useRefundsSummary } from './useReviewsData';
 import { portalIdToChannelId } from '@/services/crp-portal/reviews';
 import type { ChannelId } from '@/types';
 import type { ChannelReviewAggregation } from '@/services/crp-portal';
@@ -187,13 +187,6 @@ export function useReputationData() {
   const rawQuery = useReviewsRaw(reviewParams);
   const refundsSummaryQuery = useRefundsSummary(reviewParams);
 
-  // Extract order IDs from raw reviews for per-review refund lookup
-  const orderIds = useMemo(
-    () => (rawQuery.data || []).map((r) => r.fk_id_order),
-    [rawQuery.data]
-  );
-  const refundsQuery = useOrderRefunds(orderIds);
-
   // Extract review IDs for tags lookup
   const reviewIds = useMemo(
     () => (rawQuery.data || []).map((r) => r.pk_id_review),
@@ -204,8 +197,8 @@ export function useReputationData() {
   const isLoading = aggQuery.isLoading || heatmapQuery.isLoading || rawQuery.isLoading;
   const error = aggQuery.error || heatmapQuery.error || rawQuery.error;
 
-  // Transform data into component-ready format
-  const data = useMemo<ReputationData | undefined>(() => {
+  // FAST PATH: Build summary + scorecards from aggQuery alone (no waiting for raw/tags)
+  const summaryData = useMemo(() => {
     if (!aggQuery.data) return undefined;
 
     const { current, changes } = aggQuery.data;
@@ -219,7 +212,7 @@ export function useReputationData() {
     const justeatRating = buildChannelRating('justeat', current.byChannel.justeat);
     if (justeatRating) channelRatings.push(justeatRating);
 
-    // Build summary (refund KPIs from orders aggregation)
+    // Build summary — avgDeliveryTime comes from aggregation RPC (fast path)
     const refundData = refundsSummaryQuery.data;
     const summary: ReputationSummary = {
       totalReviews: current.totalReviews,
@@ -229,6 +222,7 @@ export function useReputationData() {
       totalRefunds: refundData?.totalRefunds ?? 0,
       totalRefundsChange: refundData?.totalRefundsChange ?? 0,
       refundRate: refundData?.refundRate ?? 0,
+      avgDeliveryTime: current.avgDeliveryTime,
     };
 
     // Build heatmap from RPC data
@@ -249,15 +243,20 @@ export function useReputationData() {
       };
     });
 
-    // Build reviews from raw data, merging per-order refund amounts, order amounts, delivery times and tags
-    const orderDetails = refundsQuery.data;
+    return { channelRatings, summary, heatmap, ratingDistribution, totalReviewsInPeriod: current.totalReviews };
+  }, [aggQuery.data, heatmapQuery.data, refundsSummaryQuery.data]);
+
+  // DETAIL PATH: Build reviews list (depends on raw + tags, can arrive later)
+  const reviews = useMemo<Review[]>(() => {
+    if (!rawQuery.data) return [];
+
     const tagMap = tagsQuery.data;
-    const reviews: Review[] = (rawQuery.data || []).map((raw) => {
+    return rawQuery.data.map((raw) => {
       const channel = portalIdToChannelId(raw.pfk_id_portal) || 'glovo';
       const ts = new Date(raw.ts_creation_time);
-      const refundAmount = orderDetails?.refunds.get(raw.fk_id_order) ?? null;
-      const orderAmount = orderDetails?.amounts.get(raw.fk_id_order) ?? null;
-      const deliveryTime = orderDetails?.deliveryTimes.get(raw.fk_id_order) ?? null;
+      const refundAmount = raw.amt_refunds != null && Number(raw.amt_refunds) > 0 ? Number(raw.amt_refunds) : null;
+      const orderAmount = raw.amt_total_price != null && Number(raw.amt_total_price) > 0 ? Number(raw.amt_total_price) : null;
+      const deliveryTime = raw.delivery_time_minutes != null ? Number(raw.delivery_time_minutes) : null;
       const tags = tagMap?.get(raw.pk_id_review) ?? null;
       const comment = raw.txt_comment && raw.txt_comment.trim() !== '' ? raw.txt_comment.trim() : null;
       return {
@@ -274,25 +273,13 @@ export function useReputationData() {
         tags,
       };
     });
+  }, [rawQuery.data, tagsQuery.data]);
 
-    // Calculate average delivery time for the scorecard
-    const deliveryTimes = reviews.map((r) => r.deliveryTime).filter((t): t is number => t != null);
-    const avgDeliveryTime = deliveryTimes.length > 0
-      ? deliveryTimes.reduce((sum, t) => sum + t, 0) / deliveryTimes.length
-      : undefined;
-
-    // Add avgDeliveryTime to summary
-    summary.avgDeliveryTime = avgDeliveryTime;
-
-    return {
-      channelRatings,
-      summary,
-      heatmap,
-      ratingDistribution,
-      reviews,
-      totalReviewsInPeriod: current.totalReviews,
-    };
-  }, [aggQuery.data, heatmapQuery.data, rawQuery.data, refundsQuery.data, refundsSummaryQuery.data, tagsQuery.data]);
+  // Combine into final shape
+  const data = useMemo<ReputationData | undefined>(() => {
+    if (!summaryData) return undefined;
+    return { ...summaryData, reviews };
+  }, [summaryData, reviews]);
 
   return {
     data,

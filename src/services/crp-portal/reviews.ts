@@ -39,6 +39,7 @@ export interface ChannelReviewAggregation {
   negativeReviews: number;
   positivePercent: number;
   negativePercent: number;
+  avgDeliveryTime?: number;
   ratingDistribution: {
     rating1: number;
     rating2: number;
@@ -55,6 +56,7 @@ export interface ReviewsAggregation {
   totalNegative: number;
   positivePercent: number;
   negativePercent: number;
+  avgDeliveryTime?: number;
   ratingDistribution: {
     rating1: number;
     rating2: number;
@@ -85,6 +87,9 @@ export interface RawReview {
   ts_creation_time: string;
   val_rating: number;
   txt_comment: string | null;
+  delivery_time_minutes: number | null;
+  amt_refunds: number | null;
+  amt_total_price: number | null;
 }
 
 export interface ReviewsChanges {
@@ -152,6 +157,7 @@ interface ReviewsAggregationRPCRow {
   rating_3: number;
   rating_4: number;
   rating_5: number;
+  avg_delivery_time_minutes: number | null;
 }
 
 interface ReviewsHeatmapRPCRow {
@@ -208,6 +214,8 @@ export async function fetchCrpReviewsAggregated(
   };
 
   let totalWeightedRating = 0;
+  let totalDeliveryTimeSum = 0;
+  let totalDeliveryTimeCount = 0;
 
   for (const row of rows) {
     const total = Number(row.total_reviews) || 0;
@@ -219,6 +227,7 @@ export async function fetchCrpReviewsAggregated(
     const r3 = Number(row.rating_3) || 0;
     const r4 = Number(row.rating_4) || 0;
     const r5 = Number(row.rating_5) || 0;
+    const avgDelivery = row.avg_delivery_time_minutes != null ? Number(row.avg_delivery_time_minutes) : null;
 
     result.totalReviews += total;
     result.totalPositive += positive;
@@ -230,6 +239,11 @@ export async function fetchCrpReviewsAggregated(
     result.ratingDistribution.rating5 += r5;
     totalWeightedRating += avg * total;
 
+    if (avgDelivery != null && avgDelivery > 0) {
+      totalDeliveryTimeSum += avgDelivery * total;
+      totalDeliveryTimeCount += total;
+    }
+
     const channelKey = row.channel as ChannelId;
     if (channelKey === 'glovo' || channelKey === 'ubereats') {
       const channelAgg = createEmptyChannelAggregation(channelKey);
@@ -240,6 +254,9 @@ export async function fetchCrpReviewsAggregated(
       channelAgg.positivePercent = total > 0 ? (positive / total) * 100 : 0;
       channelAgg.negativePercent = total > 0 ? (negative / total) * 100 : 0;
       channelAgg.ratingDistribution = { rating1: r1, rating2: r2, rating3: r3, rating4: r4, rating5: r5 };
+      if (avgDelivery != null && avgDelivery > 0) {
+        channelAgg.avgDeliveryTime = Math.round(avgDelivery * 10) / 10;
+      }
       result.byChannel[channelKey] = channelAgg;
     }
   }
@@ -248,6 +265,9 @@ export async function fetchCrpReviewsAggregated(
   result.avgRating = result.totalReviews > 0 ? totalWeightedRating / result.totalReviews : 0;
   result.positivePercent = result.totalReviews > 0 ? (result.totalPositive / result.totalReviews) * 100 : 0;
   result.negativePercent = result.totalReviews > 0 ? (result.totalNegative / result.totalReviews) * 100 : 0;
+  if (totalDeliveryTimeCount > 0) {
+    result.avgDeliveryTime = Math.round((totalDeliveryTimeSum / totalDeliveryTimeCount) * 10) / 10;
+  }
 
   return result;
 }
@@ -318,71 +338,6 @@ export async function fetchCrpReviewsComparison(
   };
 }
 
-/**
- * Fetches raw review records for the detail table.
- * Returns most recent reviews first, limited to `limit` rows.
- */
-/**
- * Fetches refund amounts for a batch of order IDs from ft_order_head.
- * Returns a Map of orderId → refundAmount (EUR).
- */
-export interface OrderDetails {
-  refunds: Map<string, number>;
-  amounts: Map<string, number>;
-  deliveryTimes: Map<string, number>; // orderId → minutes
-}
-
-export async function fetchOrderRefunds(
-  orderIds: string[]
-): Promise<Map<string, number>> {
-  const details = await fetchOrderDetails(orderIds);
-  return details.refunds;
-}
-
-export async function fetchOrderDetails(
-  orderIds: string[]
-): Promise<OrderDetails> {
-  const refunds = new Map<string, number>();
-  const amounts = new Map<string, number>();
-  const deliveryTimes = new Map<string, number>();
-  if (orderIds.length === 0) return { refunds, amounts, deliveryTimes };
-
-  // Supabase IN filter has a practical limit; batch in chunks of 200
-  const CHUNK_SIZE = 200;
-  for (let i = 0; i < orderIds.length; i += CHUNK_SIZE) {
-    const chunk = orderIds.slice(i, i + CHUNK_SIZE);
-    const { data, error } = await supabase
-      .from('crp_portal__ft_order_head')
-      .select('pk_uuid_order, amt_refunds, amt_total_price, ts_accepted, ts_delivered')
-      .in('pk_uuid_order', chunk);
-
-    if (error) {
-      handleCrpError('fetchOrderDetails', error);
-    }
-
-    for (const row of data || []) {
-      const refundAmount = Number(row.amt_refunds) || 0;
-      if (refundAmount > 0) {
-        refunds.set(row.pk_uuid_order, refundAmount);
-      }
-      const totalPrice = Number(row.amt_total_price) || 0;
-      if (totalPrice > 0) {
-        amounts.set(row.pk_uuid_order, totalPrice);
-      }
-      if (row.ts_accepted && row.ts_delivered) {
-        const diffMinutes = Math.round(
-          (new Date(row.ts_delivered).getTime() - new Date(row.ts_accepted).getTime()) / 60000
-        );
-        if (diffMinutes > 0 && diffMinutes < 180) {
-          deliveryTimes.set(row.pk_uuid_order, diffMinutes);
-        }
-      }
-    }
-  }
-
-  return { refunds, amounts, deliveryTimes };
-}
-
 // ============================================
 // REVIEW TAGS
 // ============================================
@@ -451,28 +406,15 @@ export async function fetchCrpReviewsRaw(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  let query = supabase
-    .from('crp_portal__ft_review')
-    .select('pk_id_review, fk_id_order, pfk_id_company, pfk_id_store, pfk_id_store_address, pfk_id_portal, ts_creation_time, val_rating, txt_comment')
-    .gte('ts_creation_time', `${startDate}T00:00:00`)
-    .lte('ts_creation_time', `${endDate}T23:59:59`)
-    .order('ts_creation_time', { ascending: false })
-    .limit(limit);
-
-  if (companyIds && companyIds.length > 0) {
-    query = query.in('pfk_id_company', companyIds);
-  }
-  if (brandIds && brandIds.length > 0) {
-    query = query.in('pfk_id_store', brandIds);
-  }
-  if (addressIds && addressIds.length > 0) {
-    query = query.in('pfk_id_store_address', addressIds);
-  }
-  if (portalIdsToFilter && portalIdsToFilter.length > 0) {
-    query = query.in('pfk_id_portal', portalIdsToFilter);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_reviews_raw', {
+    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+    p_start_date: `${startDate}T00:00:00`,
+    p_end_date: `${endDate}T23:59:59`,
+    p_limit: limit,
+  });
 
   if (error) {
     handleCrpError('fetchCrpReviewsRaw', error);
