@@ -13,6 +13,8 @@ import type {
   ReputationExportData,
   ObjectivesTableExportData,
   AuditExportData,
+  CalculatorDeliveryExportData,
+  CalculatorPhotoExportData,
 } from './types';
 import { formatDate, downloadBlob, formatFieldValue } from './helpers';
 
@@ -210,4 +212,74 @@ export function exportAuditToCSV(data: AuditExportData) {
   ];
 
   exportToCSV(rows, `auditoria_${data.auditNumber}`, columns);
+}
+
+const promoLabel = (tipo: string, val: number) => {
+  if (tipo === 'pct') return `-${val}%`;
+  if (tipo === '2x1') return '2x1';
+  return 'Sin promo';
+};
+
+export function exportCalculatorDeliveryToCSV(data: CalculatorDeliveryExportData) {
+  if (!data.products.length) return;
+
+  const rows = data.products.map((p) => ({
+    producto: p.producto,
+    pvp_eff: p.pvpEff.toFixed(2),
+    base_sin_iva: p.baseSinIva.toFixed(2),
+    plataforma: p.totalPlataforma.toFixed(2),
+    fee_promo: p.feeAplicado.toFixed(2),
+    neto: p.neto.toFixed(2),
+    coste: p.costeTotal.toFixed(2),
+    beneficio: p.beneficio.toFixed(2),
+    margen: `${p.margenPct.toFixed(1)}%`,
+    promo: promoLabel(p.promoTipo, p.promoValor),
+  }));
+
+  const columns: ExportColumn[] = [
+    { header: 'Producto', key: 'producto' },
+    { header: 'PVP Eff.', key: 'pvp_eff' },
+    { header: 'Base sin IVA', key: 'base_sin_iva' },
+    { header: 'Plataforma', key: 'plataforma' },
+    { header: 'Fee Promo', key: 'fee_promo' },
+    { header: 'Neto', key: 'neto' },
+    { header: 'Coste', key: 'coste' },
+    { header: 'Beneficio', key: 'beneficio' },
+    { header: 'Margen', key: 'margen' },
+    { header: 'Promo', key: 'promo' },
+  ];
+
+  exportToCSV(rows, 'calculadora_delivery', columns);
+}
+
+export function exportCalculatorPhotoToCSV(data: CalculatorPhotoExportData) {
+  const { inputs, monthly, projection } = data;
+  const csvContent = [
+    'CALCULADORA SESION DE FOTOS', '',
+    'DATOS DE ENTRADA',
+    `Visitas mensuales;${inputs.visitas}`,
+    `CR pre-sesion;${inputs.crPre}%`,
+    `CR post-sesion;${inputs.crPost}%`,
+    `Ticket medio;${inputs.ticketMedio}`,
+    `Margen;${inputs.margen}%`,
+    `Coste sesion;${inputs.costeSesion}`,
+    `Horizonte;${inputs.horizonte} meses`,
+    '',
+    'COMPARATIVA MENSUAL',
+    'Metrica;Pre;Post;Variacion',
+    `Pedidos;${Math.round(monthly.pedidosPre)};${Math.round(monthly.pedidosPost)};${Math.round(monthly.pedidosPost - monthly.pedidosPre)}`,
+    `Venta bruta;${monthly.ventaPre.toFixed(2)};${monthly.ventaPost.toFixed(2)};${(monthly.ventaPost - monthly.ventaPre).toFixed(2)}`,
+    `Margen;${monthly.margenPre.toFixed(2)};${monthly.margenPost.toFixed(2)};${(monthly.margenPost - monthly.margenPre).toFixed(2)}`,
+    '',
+    `PROYECCION A ${inputs.horizonte} MESES`,
+    'Concepto;Sin sesion;Con sesion;Diferencia',
+    `Venta bruta;${projection.ventaPreN.toFixed(2)};${projection.ventaPostN.toFixed(2)};${(projection.ventaPostN - projection.ventaPreN).toFixed(2)}`,
+    `Margen;${projection.margenPreN.toFixed(2)};${projection.margenPostN.toFixed(2)};${(projection.margenPostN - projection.margenPreN).toFixed(2)}`,
+    `Coste sesion;;${inputs.costeSesion}`,
+    `Beneficio neto;;${projection.beneficioNeto.toFixed(2)}`,
+    `ROI;;${projection.roi.toFixed(1)}%`,
+  ].join('\n');
+
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `calculadora_fotos_${formatDate()}.csv`);
 }

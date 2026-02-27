@@ -188,3 +188,49 @@ export interface AuditExportData {
     percentage: number;
   };
 }
+
+export interface CalculatorDeliveryProduct {
+  producto: string;
+  pvpEff: number;
+  baseSinIva: number;
+  totalPlataforma: number;
+  feeAplicado: number;
+  neto: number;
+  costeTotal: number;
+  beneficio: number;
+  margenPct: number;
+  promoTipo: string;
+  promoValor: number;
+}
+
+export interface CalculatorDeliveryExportData {
+  products: CalculatorDeliveryProduct[];
+}
+
+export interface CalculatorPhotoExportData {
+  inputs: {
+    visitas: number;
+    crPre: number;
+    crPost: number;
+    ticketMedio: number;
+    margen: number;
+    costeSesion: number;
+    horizonte: number;
+  };
+  monthly: {
+    pedidosPre: number;
+    pedidosPost: number;
+    ventaPre: number;
+    ventaPost: number;
+    margenPre: number;
+    margenPost: number;
+  };
+  projection: {
+    ventaPreN: number;
+    ventaPostN: number;
+    margenPreN: number;
+    margenPostN: number;
+    beneficioNeto: number;
+    roi: number;
+  };
+}

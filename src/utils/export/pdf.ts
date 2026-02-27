@@ -14,6 +14,8 @@ import type {
   ObjectivesTableExportData,
   AuditExportData,
   AuditExportField,
+  CalculatorDeliveryExportData,
+  CalculatorPhotoExportData,
 } from './types';
 import { formatDate, formatNumber, formatFieldValue } from './helpers';
 import { loadPdfLibraries, loadLogoImage, BRAND, addBrandedHeader, addBrandedFooter, BRANDED_TABLE_STYLES } from './brand';
@@ -494,5 +496,144 @@ export async function generateObjectivesPdfBlob(data: ObjectivesTableExportData)
 
 export async function generateAuditPdfBlob(data: AuditExportData): Promise<Blob> {
   const doc = await buildAuditPdfDoc(data);
+  return doc.output('blob');
+}
+
+// ============================================
+// CALCULATOR EXPORTS
+// ============================================
+
+const promoLabel = (tipo: string, val: number) => {
+  if (tipo === 'pct') return `-${val}%`;
+  if (tipo === '2x1') return '2x1';
+  return 'Sin promo';
+};
+
+async function buildCalculatorDeliveryPdfDoc(data: CalculatorDeliveryExportData): Promise<jsPDF> {
+  const [{ jsPDF: JsPDF, autoTable }, logoDataUrl] = await Promise.all([
+    loadPdfLibraries(),
+    loadLogoImage().catch(() => undefined),
+  ]);
+  const doc = new JsPDF();
+
+  const startY = addBrandedHeader(doc, 'Calculadora Delivery', `${data.products.length} productos`, logoDataUrl);
+
+  autoTable(doc, {
+    startY,
+    head: [['Producto', 'PVP Eff.', 'Plataf.', 'Neto', 'Coste', 'Benef.', 'Margen', 'Promo']],
+    body: data.products.map((p) => [
+      p.producto.substring(0, 30),
+      `${p.pvpEff.toFixed(2)} \u20AC`,
+      `${p.totalPlataforma.toFixed(2)} \u20AC`,
+      `${p.neto.toFixed(2)} \u20AC`,
+      `${p.costeTotal.toFixed(2)} \u20AC`,
+      `${p.beneficio.toFixed(2)} \u20AC`,
+      `${p.margenPct.toFixed(1)}%`,
+      promoLabel(p.promoTipo, p.promoValor),
+    ]),
+    ...BRANDED_TABLE_STYLES,
+    bodyStyles: { ...BRANDED_TABLE_STYLES.bodyStyles, fontSize: 7 },
+    columnStyles: { 0: { cellWidth: 40 } },
+  });
+
+  if (data.products.length > 0) {
+    const avg = (fn: (p: CalculatorDeliveryExportData['products'][0]) => number) =>
+      data.products.reduce((s, p) => s + fn(p), 0) / data.products.length;
+
+    const summaryY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+    doc.setFontSize(11);
+    doc.setTextColor(...BRAND.colors.dark);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Resumen', 14, summaryY);
+
+    autoTable(doc, {
+      startY: summaryY + 4,
+      head: [['Metrica', 'Promedio']],
+      body: [
+        ['PVP efectivo', `${avg((p) => p.pvpEff).toFixed(2)} \u20AC`],
+        ['Total plataforma', `${avg((p) => p.totalPlataforma).toFixed(2)} \u20AC`],
+        ['Neto restaurante', `${avg((p) => p.neto).toFixed(2)} \u20AC`],
+        ['Coste total', `${avg((p) => p.costeTotal).toFixed(2)} \u20AC`],
+        ['Beneficio', `${avg((p) => p.beneficio).toFixed(2)} \u20AC`],
+        ['Margen', `${avg((p) => p.margenPct).toFixed(1)}%`],
+      ],
+      ...BRANDED_TABLE_STYLES,
+    });
+  }
+
+  addBrandedFooter(doc);
+  return doc;
+}
+
+export async function exportCalculatorDeliveryToPDF(data: CalculatorDeliveryExportData): Promise<void> {
+  const doc = await buildCalculatorDeliveryPdfDoc(data);
+  doc.save(`calculadora_delivery_${formatDate()}.pdf`);
+}
+
+export async function generateCalculatorDeliveryPdfBlob(data: CalculatorDeliveryExportData): Promise<Blob> {
+  const doc = await buildCalculatorDeliveryPdfDoc(data);
+  return doc.output('blob');
+}
+
+async function buildCalculatorPhotoPdfDoc(data: CalculatorPhotoExportData): Promise<jsPDF> {
+  const [{ jsPDF: JsPDF, autoTable }, logoDataUrl] = await Promise.all([
+    loadPdfLibraries(),
+    loadLogoImage().catch(() => undefined),
+  ]);
+  const doc = new JsPDF();
+  const { inputs, monthly, projection } = data;
+
+  const startY = addBrandedHeader(doc, 'Calculadora Sesion de Fotos', `Horizonte: ${inputs.horizonte} meses`, logoDataUrl);
+
+  // Monthly comparison
+  doc.setFontSize(11);
+  doc.setTextColor(...BRAND.colors.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Comparativa Mensual', 14, startY + 2);
+
+  autoTable(doc, {
+    startY: startY + 6,
+    head: [['Metrica', 'Pre', 'Post', 'Variacion']],
+    body: [
+      ['Visitas', formatNumber(inputs.visitas), formatNumber(inputs.visitas), '\u2014'],
+      ['CR', `${inputs.crPre}%`, `${inputs.crPost}%`, `${(inputs.crPost - inputs.crPre).toFixed(1)} pp`],
+      ['Ticket medio', `${inputs.ticketMedio.toFixed(2)} \u20AC`, `${inputs.ticketMedio.toFixed(2)} \u20AC`, '\u2014'],
+      ['Pedidos', formatNumber(Math.round(monthly.pedidosPre)), formatNumber(Math.round(monthly.pedidosPost)), formatNumber(Math.round(monthly.pedidosPost - monthly.pedidosPre))],
+      ['Venta bruta', `${monthly.ventaPre.toFixed(2)} \u20AC`, `${monthly.ventaPost.toFixed(2)} \u20AC`, `${(monthly.ventaPost - monthly.ventaPre).toFixed(2)} \u20AC`],
+      ['Margen', `${monthly.margenPre.toFixed(2)} \u20AC`, `${monthly.margenPost.toFixed(2)} \u20AC`, `${(monthly.margenPost - monthly.margenPre).toFixed(2)} \u20AC`],
+    ],
+    ...BRANDED_TABLE_STYLES,
+  });
+
+  // Projection
+  const projY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+  doc.setFontSize(11);
+  doc.setTextColor(...BRAND.colors.dark);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Proyeccion a ${inputs.horizonte} meses`, 14, projY);
+
+  autoTable(doc, {
+    startY: projY + 4,
+    head: [['Concepto', 'Sin sesion', 'Con sesion', 'Diferencia']],
+    body: [
+      ['Venta bruta', `${projection.ventaPreN.toFixed(2)} \u20AC`, `${projection.ventaPostN.toFixed(2)} \u20AC`, `${(projection.ventaPostN - projection.ventaPreN).toFixed(2)} \u20AC`],
+      ['Margen', `${projection.margenPreN.toFixed(2)} \u20AC`, `${projection.margenPostN.toFixed(2)} \u20AC`, `${(projection.margenPostN - projection.margenPreN).toFixed(2)} \u20AC`],
+      ['Coste sesion', '\u2014', `${inputs.costeSesion.toFixed(2)} \u20AC`, ''],
+      ['Beneficio neto', '', `${projection.beneficioNeto.toFixed(2)} \u20AC`, `ROI: ${projection.roi.toFixed(1)}%`],
+    ],
+    ...BRANDED_TABLE_STYLES,
+  });
+
+  addBrandedFooter(doc);
+  return doc;
+}
+
+export async function exportCalculatorPhotoToPDF(data: CalculatorPhotoExportData): Promise<void> {
+  const doc = await buildCalculatorPhotoPdfDoc(data);
+  doc.save(`calculadora_fotos_${formatDate()}.pdf`);
+}
+
+export async function generateCalculatorPhotoPdfBlob(data: CalculatorPhotoExportData): Promise<Blob> {
+  const doc = await buildCalculatorPhotoPdfDoc(data);
   return doc.output('blob');
 }

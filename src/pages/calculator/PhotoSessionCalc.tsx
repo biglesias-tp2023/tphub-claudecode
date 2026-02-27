@@ -1,6 +1,16 @@
 import { useMemo, useCallback } from 'react';
+import { Eye, ArrowRightLeft, PiggyBank } from 'lucide-react';
 import { Field, KpiCard, eur, pct, INPUT_CLASS } from './components';
 import { useSessionState } from '@/hooks/useSessionState';
+import { ExportButtons, type ExportFormat } from '@/components/common/ExportButtons';
+import type { PreviewTableData } from '@/components/common/ExportPreviewModal';
+import {
+  exportCalculatorPhotoToCSV,
+  exportCalculatorPhotoToExcel,
+  exportCalculatorPhotoToPDF,
+  generateCalculatorPhotoPdfBlob,
+} from '@/utils/export';
+import type { CalculatorPhotoExportData } from '@/utils/export';
 
 // --- Types ---
 
@@ -89,13 +99,62 @@ export function PhotoSessionCalc() {
   const varColor = (v: number) => (v > 0 ? 'text-emerald-600' : v < 0 ? 'text-red-600' : 'text-gray-500');
   const varSign = (v: number) => (v > 0 ? '+' : '');
 
+  // --- Export ---
+
+  const buildExportData = useCallback((): CalculatorPhotoExportData => ({
+    inputs: { ...form },
+    monthly: {
+      pedidosPre: calc.pedidosPre,
+      pedidosPost: calc.pedidosPost,
+      ventaPre: calc.ventaPre,
+      ventaPost: calc.ventaPost,
+      margenPre: calc.margenPre,
+      margenPost: calc.margenPost,
+    },
+    projection: {
+      ventaPreN: calc.ventaPreN,
+      ventaPostN: calc.ventaPostN,
+      margenPreN: calc.margenPreN,
+      margenPostN: calc.margenPostN,
+      beneficioNeto: calc.beneficioNeto,
+      roi: calc.roi,
+    },
+  }), [form, calc]);
+
+  const handleExport = useCallback((format: ExportFormat) => {
+    const data = buildExportData();
+    if (format === 'csv') exportCalculatorPhotoToCSV(data);
+    else if (format === 'excel') exportCalculatorPhotoToExcel(data);
+    else exportCalculatorPhotoToPDF(data);
+  }, [buildExportData]);
+
+  const getPreviewData = useCallback((): PreviewTableData => ({
+    headers: ['Metrica', 'Pre', 'Post', 'Variacion'],
+    rows: [
+      ['Visitas', form.visitas.toLocaleString('es-ES'), form.visitas.toLocaleString('es-ES'), '—'],
+      ['CR', pct(form.crPre), pct(form.crPost), `${varSign(form.crPost - form.crPre)}${(form.crPost - form.crPre).toFixed(1)} pp`],
+      ['Pedidos', Math.round(calc.pedidosPre).toLocaleString('es-ES'), Math.round(calc.pedidosPost).toLocaleString('es-ES'), `${varSign(calc.deltaPedidosPct)}${calc.deltaPedidosPct.toFixed(1)}%`],
+      ['Venta bruta', eur(calc.ventaPre), eur(calc.ventaPost), `${varSign(calc.deltaVentaPct)}${calc.deltaVentaPct.toFixed(1)}%`],
+      ['Margen', eur(calc.margenPre), eur(calc.margenPost), `${varSign(calc.deltaMargenPct)}${calc.deltaMargenPct.toFixed(1)}%`],
+      ['', '', '', ''],
+      [`Beneficio neto (${form.horizonte}m)`, '', eur(calc.beneficioNeto), `ROI: ${pct(calc.roi)}`],
+    ],
+  }), [form, calc]);
+
+  const generatePdfBlob = useCallback(() => {
+    return generateCalculatorPhotoPdfBlob(buildExportData());
+  }, [buildExportData]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
       {/* ========== LEFT COLUMN: Form ========== */}
       <div className="lg:col-span-2 space-y-4">
         {/* Datos del establecimiento */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Datos del establecimiento</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <Eye className="w-4 h-4 text-primary-500" />
+            Datos del establecimiento
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Visitas mensuales">
               <input
@@ -120,9 +179,12 @@ export function PhotoSessionCalc() {
 
         {/* Conversión */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Conversión</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-primary-500" />
+            Conversion
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="CR pre-sesión (%)">
+            <Field label="CR pre-sesion (%)">
               <input
                 type="number"
                 step="0.1"
@@ -131,7 +193,7 @@ export function PhotoSessionCalc() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="CR post-sesión (%)">
+            <Field label="CR post-sesion (%)">
               <input
                 type="number"
                 step="0.1"
@@ -145,7 +207,10 @@ export function PhotoSessionCalc() {
 
         {/* Márgenes e inversión */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Márgenes e inversión</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <PiggyBank className="w-4 h-4 text-primary-500" />
+            Margenes e inversion
+          </h2>
           <div className="grid grid-cols-1 gap-4">
             <Field label="Margen del restaurante (%)">
               <input
@@ -156,7 +221,7 @@ export function PhotoSessionCalc() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="Coste sesión de fotos (€)">
+            <Field label="Coste sesion de fotos (€)">
               <input
                 type="number"
                 step="10"
@@ -165,7 +230,7 @@ export function PhotoSessionCalc() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="Horizonte de proyección (meses)">
+            <Field label="Horizonte de proyeccion (meses)">
               <input
                 type="number"
                 step="1"
@@ -187,7 +252,7 @@ export function PhotoSessionCalc() {
           <KpiCard
             label="Beneficio neto"
             value={eur(calc.beneficioNeto)}
-            sub={`Margen adicional − ${eur(form.costeSesion)} coste sesión`}
+            sub={`Margen adicional − ${eur(form.costeSesion)} coste sesion`}
             valueClassName={benefitColor}
           />
           <KpiCard
@@ -207,10 +272,10 @@ export function PhotoSessionCalc() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="px-5 py-2.5 text-left font-medium">Métrica</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Metrica</th>
                   <th className="px-4 py-2.5 text-right font-medium">Pre</th>
                   <th className="px-4 py-2.5 text-right font-medium">Post</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Variación</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Variacion</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,7 +294,7 @@ export function PhotoSessionCalc() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-700">
-              Proyección a {form.horizonte} {form.horizonte === 1 ? 'mes' : 'meses'}
+              Proyeccion a {form.horizonte} {form.horizonte === 1 ? 'mes' : 'meses'}
             </h3>
           </div>
           <div className="overflow-x-auto">
@@ -237,8 +302,8 @@ export function PhotoSessionCalc() {
               <thead>
                 <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
                   <th className="px-5 py-2.5 text-left font-medium">Concepto</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Sin sesión</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Con sesión</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Sin sesion</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Con sesion</th>
                   <th className="px-4 py-2.5 text-right font-medium">Diferencia</th>
                 </tr>
               </thead>
@@ -246,7 +311,7 @@ export function PhotoSessionCalc() {
                 <CompRow label="Venta bruta" pre={eur(calc.ventaPreN)} post={eur(calc.ventaPostN)} variation={`${varSign(calc.ventaPostN - calc.ventaPreN)}${eur(calc.ventaPostN - calc.ventaPreN)}`} varClass={varColor(calc.ventaPostN - calc.ventaPreN)} />
                 <CompRow label="Margen" pre={eur(calc.margenPreN)} post={eur(calc.margenPostN)} variation={`${varSign(calc.margenPostN - calc.margenPreN)}${eur(calc.margenPostN - calc.margenPreN)}`} varClass={varColor(calc.margenPostN - calc.margenPreN)} />
                 <tr className="border-b border-gray-50 bg-gray-50/50">
-                  <td className="px-5 py-2.5 text-gray-700 font-medium">Coste sesión</td>
+                  <td className="px-5 py-2.5 text-gray-700 font-medium">Coste sesion</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-400">—</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-red-600 font-medium">{eur(form.costeSesion)}</td>
                   <td className="px-4 py-2.5" />
@@ -262,10 +327,21 @@ export function PhotoSessionCalc() {
           </div>
         </div>
 
-        {/* Hint */}
-        <p className="text-xs text-gray-400 px-1">
-          Todos los cálculos son estimaciones basadas en los datos introducidos. El CR post-sesión es una estimación del impacto esperado.
-        </p>
+        {/* Export + Hint */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400 px-1">
+            Todos los calculos son estimaciones basadas en los datos introducidos.
+          </p>
+          <ExportButtons
+            onExport={handleExport}
+            getPreviewData={getPreviewData}
+            generatePdfBlob={generatePdfBlob}
+            previewTitle="Calculadora Sesion de Fotos"
+            previewSubtitle={`Horizonte: ${form.horizonte} meses`}
+            variant="ghost"
+            size="sm"
+          />
+        </div>
       </div>
     </div>
   );

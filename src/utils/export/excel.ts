@@ -11,6 +11,8 @@ import type {
   ControllingExportData,
   ReputationExportData,
   ObjectivesTableExportData,
+  CalculatorDeliveryExportData,
+  CalculatorPhotoExportData,
 } from './types';
 import { formatDate, downloadBlob } from './helpers';
 import { loadXlsxLibrary } from './brand';
@@ -189,4 +191,105 @@ export async function exportObjectivesTableToExcel(data: ObjectivesTableExportDa
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), `objetivos_venta_${formatDate()}.xlsx`);
+}
+
+const promoLabel = (tipo: string, val: number) => {
+  if (tipo === 'pct') return `-${val}%`;
+  if (tipo === '2x1') return '2x1';
+  return 'Sin promo';
+};
+
+export async function exportCalculatorDeliveryToExcel(data: CalculatorDeliveryExportData): Promise<void> {
+  const XLSX = await loadXlsxLibrary();
+  const wb = XLSX.utils.book_new();
+
+  // Products sheet
+  const productsData: (string | number)[][] = [
+    ['CALCULADORA DELIVERY - PRODUCTOS'],
+    ['Generado: ' + new Date().toLocaleDateString('es-ES')],
+    [''],
+    ['Producto', 'PVP Eff.', 'Base sin IVA', 'Plataforma', 'Fee Promo', 'Neto', 'Coste', 'Beneficio', 'Margen %', 'Promo'],
+    ...data.products.map((p) => [
+      p.producto, p.pvpEff, p.baseSinIva, p.totalPlataforma, p.feeAplicado,
+      p.neto, p.costeTotal, p.beneficio, p.margenPct, promoLabel(p.promoTipo, p.promoValor),
+    ]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(productsData), 'Productos');
+
+  // Summary sheet with averages
+  if (data.products.length > 0) {
+    const avg = (fn: (p: CalculatorDeliveryExportData['products'][0]) => number) =>
+      data.products.reduce((s, p) => s + fn(p), 0) / data.products.length;
+
+    const summaryData: (string | number)[][] = [
+      ['RESUMEN'],
+      [''],
+      ['Total productos', data.products.length],
+      [''],
+      ['Metrica', 'Promedio'],
+      ['PVP efectivo', avg((p) => p.pvpEff)],
+      ['Base sin IVA', avg((p) => p.baseSinIva)],
+      ['Total plataforma', avg((p) => p.totalPlataforma)],
+      ['Fee promo', avg((p) => p.feeAplicado)],
+      ['Neto restaurante', avg((p) => p.neto)],
+      ['Coste total', avg((p) => p.costeTotal)],
+      ['Beneficio', avg((p) => p.beneficio)],
+      ['Margen %', avg((p) => p.margenPct)],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), 'Resumen');
+  }
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), `calculadora_delivery_${formatDate()}.xlsx`);
+}
+
+export async function exportCalculatorPhotoToExcel(data: CalculatorPhotoExportData): Promise<void> {
+  const XLSX = await loadXlsxLibrary();
+  const wb = XLSX.utils.book_new();
+  const { inputs, monthly, projection } = data;
+
+  // Monthly comparison sheet
+  const monthlyData: (string | number)[][] = [
+    ['COMPARATIVA MENSUAL'],
+    [''],
+    ['Metrica', 'Pre', 'Post', 'Variacion'],
+    ['Visitas', inputs.visitas, inputs.visitas, 0],
+    ['CR (%)', inputs.crPre, inputs.crPost, inputs.crPost - inputs.crPre],
+    ['Ticket medio', inputs.ticketMedio, inputs.ticketMedio, 0],
+    ['Pedidos', Math.round(monthly.pedidosPre), Math.round(monthly.pedidosPost), Math.round(monthly.pedidosPost - monthly.pedidosPre)],
+    ['Venta bruta', monthly.ventaPre, monthly.ventaPost, monthly.ventaPost - monthly.ventaPre],
+    ['Margen', monthly.margenPre, monthly.margenPost, monthly.margenPost - monthly.margenPre],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(monthlyData), 'Comparativa mensual');
+
+  // Projection sheet
+  const projData: (string | number)[][] = [
+    [`PROYECCION A ${inputs.horizonte} MESES`],
+    [''],
+    ['Concepto', 'Sin sesion', 'Con sesion', 'Diferencia'],
+    ['Venta bruta', projection.ventaPreN, projection.ventaPostN, projection.ventaPostN - projection.ventaPreN],
+    ['Margen', projection.margenPreN, projection.margenPostN, projection.margenPostN - projection.margenPreN],
+    ['Coste sesion', '', inputs.costeSesion, ''],
+    ['Beneficio neto', '', projection.beneficioNeto, ''],
+    ['ROI (%)', '', projection.roi, ''],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(projData), 'Proyeccion');
+
+  // Inputs sheet
+  const inputsData: (string | number)[][] = [
+    ['DATOS DE ENTRADA'],
+    [''],
+    ['Parametro', 'Valor'],
+    ['Visitas mensuales', inputs.visitas],
+    ['CR pre-sesion (%)', inputs.crPre],
+    ['CR post-sesion (%)', inputs.crPost],
+    ['Ticket medio (EUR)', inputs.ticketMedio],
+    ['Margen (%)', inputs.margen],
+    ['Coste sesion (EUR)', inputs.costeSesion],
+    ['Horizonte (meses)', inputs.horizonte],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(inputsData), 'Datos de entrada');
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  downloadBlob(new Blob([wbout], { type: 'application/octet-stream' }), `calculadora_fotos_${formatDate()}.xlsx`);
 }

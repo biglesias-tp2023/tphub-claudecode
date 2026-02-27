@@ -18,6 +18,9 @@ export type {
   AuditExportSection,
   AuditExportField,
   AuditExportData,
+  CalculatorDeliveryExportData,
+  CalculatorDeliveryProduct,
+  CalculatorPhotoExportData,
 } from './types';
 
 // Brand & library preloading
@@ -32,6 +35,8 @@ export {
   exportReputationToCSV,
   exportObjectivesTableToCSV,
   exportAuditToCSV,
+  exportCalculatorDeliveryToCSV,
+  exportCalculatorPhotoToCSV,
 } from './csv';
 
 // Excel exports
@@ -41,6 +46,8 @@ export {
   exportControllingToExcel,
   exportReputationToExcel,
   exportObjectivesTableToExcel,
+  exportCalculatorDeliveryToExcel,
+  exportCalculatorPhotoToExcel,
 } from './excel';
 
 // PDF exports & blob generators
@@ -55,4 +62,8 @@ export {
   generateReputationPdfBlob,
   generateObjectivesPdfBlob,
   generateAuditPdfBlob,
+  exportCalculatorDeliveryToPDF,
+  generateCalculatorDeliveryPdfBlob,
+  exportCalculatorPhotoToPDF,
+  generateCalculatorPhotoPdfBlob,
 } from './pdf';

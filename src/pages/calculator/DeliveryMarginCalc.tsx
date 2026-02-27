@@ -1,7 +1,17 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Plus, Download, Trash2, X } from 'lucide-react';
-import { Field, KpiCard, eur, INPUT_CLASS } from './components';
+import { Plus, Trash2, X, Package, Percent, Coins, ShoppingBag } from 'lucide-react';
+import { Field, HeroKpi, WaterfallBreakdown, eur, INPUT_CLASS } from './components';
+import type { WaterfallLine } from './components';
 import { useSessionState } from '@/hooks/useSessionState';
+import { ExportButtons, type ExportFormat } from '@/components/common/ExportButtons';
+import type { PreviewTableData } from '@/components/common/ExportPreviewModal';
+import {
+  exportCalculatorDeliveryToCSV,
+  exportCalculatorDeliveryToExcel,
+  exportCalculatorDeliveryToPDF,
+  generateCalculatorDeliveryPdfBlob,
+} from '@/utils/export';
+import type { CalculatorDeliveryExportData } from '@/utils/export';
 
 // --- Types ---
 
@@ -131,6 +141,9 @@ export function DeliveryMarginCalc() {
     const ivaComisionEur = comisionEur * ivaComisionPct;
     const totalPlataforma = comisionEur + ivaComisionEur;
 
+    // IVA comida amount
+    const ivaComidaEur = pvpEff - baseSinIva;
+
     // Fee aplicado
     const feeAplicado =
       form.promoTipo === '2x1'
@@ -154,8 +167,22 @@ export function DeliveryMarginCalc() {
     const beneficio = neto - costeTotal;
     const margenPct = pvpEff > 0 ? (beneficio / pvpEff) * 100 : 0;
 
-    return { pvpEff, baseSinIva, totalPlataforma, feeAplicado, neto, costeTotal, beneficio, margenPct };
+    return { pvpEff, baseSinIva, totalPlataforma, ivaComidaEur, feeAplicado, neto, costeTotal, beneficio, margenPct };
   }, [form]);
+
+  // --- Waterfall lines ---
+  const waterfallLines: WaterfallLine[] = useMemo(() => [
+    { label: 'PVP efectivo', value: calc.pvpEff, type: 'income' },
+    { label: 'IVA comida', value: calc.ivaComidaEur, type: 'deduction' },
+    { label: 'Base sin IVA', value: calc.baseSinIva, type: 'subtotal' },
+    { label: 'Comision + IVA', value: calc.totalPlataforma, type: 'deduction' },
+    { label: 'Fee promo', value: calc.feeAplicado, type: 'deduction' },
+    { label: 'Neto restaurante', value: calc.neto, type: 'subtotal' },
+    { label: 'Ingredientes', value: form.promoTipo === '2x1' ? form.ingredientes * Math.max(0, form.multIng) : form.ingredientes, type: 'deduction' },
+    { label: 'Packaging', value: form.promoTipo === '2x1' ? form.packaging * Math.max(0, form.multPack) : form.packaging, type: 'deduction' },
+    { label: 'Mano de obra', value: form.promoTipo === '2x1' ? form.mano * Math.max(0, form.multMano) : form.mano, type: 'deduction' },
+    { label: 'Beneficio real', value: calc.beneficio, type: 'result' },
+  ], [calc, form]);
 
   // --- Actions ---
 
@@ -186,45 +213,36 @@ export function DeliveryMarginCalc() {
     }
   }, []);
 
-  const handleExportCSV = useCallback(() => {
-    if (!rows.length) return;
-    const headers = ['Producto', 'PVP Eff.', 'Plataforma', 'Neto', 'Coste', 'Beneficio', 'Margen %', 'Promo'];
-    const lines = [headers.join(';')];
-    for (const r of rows) {
-      lines.push(
-        [
-          `"${r.producto.replaceAll('"', '""')}"`,
-          r.pvpEff.toFixed(2),
-          r.totalPlataforma.toFixed(2),
-          r.neto.toFixed(2),
-          r.costeTotal.toFixed(2),
-          r.beneficio.toFixed(2),
-          r.margenPct.toFixed(1),
-          promoLabel(r.promoTipo, r.promoValor),
-        ].join(';'),
-      );
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tphub_calculadora_delivery.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, [rows]);
+  // --- Export ---
 
-  // --- Margin color ---
-  const marginColor =
-    calc.margenPct >= 20
-      ? 'text-emerald-600'
-      : calc.margenPct >= 0
-        ? 'text-amber-600'
-        : 'text-red-600';
+  const buildExportData = useCallback((): CalculatorDeliveryExportData => ({
+    products: rows,
+  }), [rows]);
 
-  const benefitColor =
-    calc.beneficio >= 0 ? 'text-emerald-600' : 'text-red-600';
+  const handleExport = useCallback((format: ExportFormat) => {
+    const data = buildExportData();
+    if (format === 'csv') exportCalculatorDeliveryToCSV(data);
+    else if (format === 'excel') exportCalculatorDeliveryToExcel(data);
+    else exportCalculatorDeliveryToPDF(data);
+  }, [buildExportData]);
+
+  const getPreviewData = useCallback((): PreviewTableData => ({
+    headers: ['Producto', 'PVP Eff.', 'Plataf.', 'Neto', 'Coste', 'Benef.', 'Margen', 'Promo'],
+    rows: rows.map((r) => [
+      r.producto,
+      eur(r.pvpEff),
+      eur(r.totalPlataforma),
+      eur(r.neto),
+      eur(r.costeTotal),
+      eur(r.beneficio),
+      `${r.margenPct.toFixed(1)}%`,
+      promoLabel(r.promoTipo, r.promoValor),
+    ]),
+  }), [rows]);
+
+  const generatePdfBlob = useCallback(() => {
+    return generateCalculatorDeliveryPdfBlob(buildExportData());
+  }, [buildExportData]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -232,7 +250,10 @@ export function DeliveryMarginCalc() {
       <div className="lg:col-span-3 space-y-4">
         {/* Product & PVP */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Producto</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <Package className="w-4 h-4 text-primary-500" />
+            Producto
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nombre del producto">
               <input
@@ -257,7 +278,10 @@ export function DeliveryMarginCalc() {
 
         {/* Taxes & Commission */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Impuestos y comisión</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <Percent className="w-4 h-4 text-primary-500" />
+            Impuestos y comision
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label="IVA comida (%)">
               <input
@@ -268,7 +292,7 @@ export function DeliveryMarginCalc() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="Comisión (%)">
+            <Field label="Comision (%)">
               <input
                 type="number"
                 step="0.01"
@@ -277,7 +301,7 @@ export function DeliveryMarginCalc() {
                 className={INPUT_CLASS}
               />
             </Field>
-            <Field label="IVA sobre comisión (%)">
+            <Field label="IVA sobre comision (%)">
               <input
                 type="number"
                 step="0.01"
@@ -288,7 +312,7 @@ export function DeliveryMarginCalc() {
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Comisión calculada sobre...">
+            <Field label="Comision calculada sobre...">
               <select
                 value={form.baseComision}
                 onChange={(e) => set('baseComision', e.target.value as CommissionBase)}
@@ -298,7 +322,7 @@ export function DeliveryMarginCalc() {
                 <option value="neto">Base sin IVA comida</option>
               </select>
             </Field>
-            <Field label="Tipo de promoción">
+            <Field label="Tipo de promocion">
               <select
                 value={form.promoTipo}
                 onChange={(e) => set('promoTipo', e.target.value as PromoType)}
@@ -325,7 +349,10 @@ export function DeliveryMarginCalc() {
 
         {/* Costs */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Costes</h2>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+            <Coins className="w-4 h-4 text-primary-500" />
+            Costes
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <Field label="Ingredientes (€)">
               <input
@@ -371,11 +398,11 @@ export function DeliveryMarginCalc() {
               <p className="text-xs font-semibold text-gray-600">
                 Multiplicadores 2x1
                 <span className="ml-2 text-[10px] font-normal text-gray-400">
-                  Ej: Ingredientes ×2, Packaging ×1 = solo duplicas ingredientes
+                  Ej: Ingredientes x2, Packaging x1 = solo duplicas ingredientes
                 </span>
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <Field label="Ingredientes ×">
+                <Field label="Ingredientes x">
                   <input
                     type="number"
                     step="0.1"
@@ -384,7 +411,7 @@ export function DeliveryMarginCalc() {
                     className={INPUT_CLASS}
                   />
                 </Field>
-                <Field label="Packaging ×">
+                <Field label="Packaging x">
                   <input
                     type="number"
                     step="0.1"
@@ -393,7 +420,7 @@ export function DeliveryMarginCalc() {
                     className={INPUT_CLASS}
                   />
                 </Field>
-                <Field label="Mano de obra ×">
+                <Field label="Mano de obra x">
                   <input
                     type="number"
                     step="0.1"
@@ -402,7 +429,7 @@ export function DeliveryMarginCalc() {
                     className={INPUT_CLASS}
                   />
                 </Field>
-                <Field label="Fee promo ×">
+                <Field label="Fee promo x">
                   <input
                     type="number"
                     step="0.1"
@@ -417,7 +444,7 @@ export function DeliveryMarginCalc() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleAdd}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium text-sm transition-colors"
@@ -425,14 +452,16 @@ export function DeliveryMarginCalc() {
             <Plus className="w-4 h-4" />
             Agregar a tabla
           </button>
-          <button
-            onClick={handleExportCSV}
+          <ExportButtons
+            onExport={handleExport}
+            getPreviewData={rows.length > 0 ? getPreviewData : undefined}
+            generatePdfBlob={rows.length > 0 ? generatePdfBlob : undefined}
+            previewTitle="Calculadora Delivery"
+            previewSubtitle={`${rows.length} productos`}
             disabled={!rows.length}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Download className="w-4 h-4" />
-            Exportar CSV
-          </button>
+            variant="dropdown"
+            size="sm"
+          />
           <button
             onClick={handleClearTable}
             disabled={!rows.length}
@@ -444,31 +473,24 @@ export function DeliveryMarginCalc() {
         </div>
       </div>
 
-      {/* ========== RIGHT COLUMN: KPIs + Table ========== */}
+      {/* ========== RIGHT COLUMN: Hero KPIs + Waterfall + Table ========== */}
       <div className="lg:col-span-2 space-y-4">
-        {/* KPI cards */}
+        {/* Hero KPIs */}
         <div className="grid grid-cols-2 gap-3">
-          <KpiCard
-            label="PVP efectivo"
-            value={eur(calc.pvpEff)}
-            sub={promoLabel(form.promoTipo, form.promoValor)}
-          />
-          <KpiCard label="Base sin IVA" value={eur(calc.baseSinIva)} />
-          <KpiCard label="Total plataforma" value={eur(calc.totalPlataforma)} />
-          <KpiCard label="Fee promo" value={eur(calc.feeAplicado)} />
-          <KpiCard label="Neto restaurante" value={eur(calc.neto)} />
-          <KpiCard label="Coste total" value={eur(calc.costeTotal)} />
-          <KpiCard
+          <HeroKpi
             label="Beneficio real"
             value={eur(calc.beneficio)}
-            valueClassName={benefitColor}
+            positive={calc.beneficio >= 0}
           />
-          <KpiCard
+          <HeroKpi
             label="Margen %"
             value={`${calc.margenPct.toFixed(1)}%`}
-            valueClassName={marginColor}
+            positive={calc.margenPct >= 0}
           />
         </div>
+
+        {/* Waterfall breakdown */}
+        <WaterfallBreakdown lines={waterfallLines} />
 
         {/* Saved products table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -484,8 +506,12 @@ export function DeliveryMarginCalc() {
           </div>
 
           {rows.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-gray-400">
-              Agrega productos con el botón "Agregar a tabla"
+            <div className="px-5 py-10 text-center">
+              <ShoppingBag className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">Sin productos guardados</p>
+              <p className="text-xs text-gray-400">
+                Configura un producto y pulsa "Agregar a tabla" para comparar margenes
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
