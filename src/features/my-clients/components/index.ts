@@ -1,4 +1,5 @@
 export { CompanyAlertCard } from './CompanyAlertCard';
 export type { GlobalThresholds } from './CompanyAlertCard';
 export { AlertChannelSelector } from './AlertChannelSelector';
-export { AlertsModal } from './AlertsModal';
+export { SlackPreview } from './SlackPreview';
+export { EmailPreview } from './EmailPreview';

@@ -90,16 +90,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (channel === 'email') {
     const html = buildAlertEmailHtml(firstName, dateLabel, [
       {
-        title: 'Pedidos (ejemplo)',
-        items: [
-          '<strong>Il Capriccio Napoletano</strong> | Gran Via (Glovo) — 12 pedidos (media: 35) → -66%',
-          '<strong>Compa</strong> | Malasana (UberEats) — 8 pedidos (media: 22) → -64%',
+        name: 'Il Capriccio Napoletano',
+        severity: 'critical',
+        metrics: [
+          { label: 'Pedidos', value: '12 (media: 35) → -66%', threshold: '-20%' },
+          { label: 'Resenas', value: '2.8 (media: 4.2)', threshold: '3.5' },
         ],
       },
       {
-        title: 'Resenas (ejemplo)',
-        items: [
-          '<strong>Asi se Asa</strong> | Chamberi (Glovo) — Rating: 3.2 (media: 4.1) | 5 negativas',
+        name: 'Compa',
+        severity: 'warning',
+        metrics: [
+          { label: 'Pedidos', value: '8 (media: 22) → -64%', threshold: '-20%' },
+          { label: 'Ads ROAS', value: '1.2x (media: 3.5x)', threshold: '3.0x' },
+        ],
+      },
+      {
+        name: 'Asi se Asa',
+        severity: 'attention',
+        metrics: [
+          { label: 'Resenas', value: '3.2 (media: 4.1) | 5 negativas', threshold: '3.5' },
         ],
       },
     ]);

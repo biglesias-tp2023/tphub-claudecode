@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
-import { sendEmail, buildAlertEmailHtml } from './email.js';
+import { sendEmail, buildAlertEmailHtml, type AlertCompanyData } from './email.js';
 import { escapeHtml, verifyCronSecret } from './auth.js';
 
 // ============================================
@@ -545,48 +545,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
     if (totalAnomalies === 0) continue;
 
-    const sections = [];
-    if (group.orders.length > 0) {
-      sections.push({
-        title: 'Pedidos',
-        items: group.orders.map(
-          (a) =>
-            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — ${a.yesterday_orders} pedidos (media: ${a.avg_orders_baseline}) → ${a.orders_deviation_pct}%`
-        ),
+    // Group all anomalies by company name for card-based email
+    const companyMap = new Map<string, { metrics: AlertCompanyData['metrics']; maxDeviation: number }>();
+
+    for (const a of group.orders) {
+      const key = `${a.company_name} — ${a.store_name}`;
+      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
+      entry.metrics.push({
+        label: 'Pedidos',
+        value: `${a.yesterday_orders} (media: ${a.avg_orders_baseline}) → ${a.orders_deviation_pct}%`,
+        threshold: '-20%',
       });
+      entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.orders_deviation_pct));
+      companyMap.set(key, entry);
     }
-    if (group.reviews.length > 0) {
-      sections.push({
-        title: 'Resenas',
-        items: group.reviews.map(
-          (a) =>
-            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`
-        ),
+
+    for (const a of group.reviews) {
+      const key = `${a.company_name} — ${a.store_name}`;
+      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
+      entry.metrics.push({
+        label: 'Resenas',
+        value: `Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`,
+        threshold: '3.5',
       });
+      entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.rating_deviation_pct));
+      companyMap.set(key, entry);
     }
-    if (group.promos.length > 0) {
-      sections.push({
-        title: 'Promos',
-        items: group.promos.map(
-          (a) =>
-            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — ${a.yesterday_promos}\u20AC promos (${a.yesterday_promo_rate}% de ventas) → +${a.promo_spend_deviation_pct}%`
-        ),
+
+    for (const a of group.promos) {
+      const key = `${a.company_name} — ${a.store_name}`;
+      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
+      entry.metrics.push({
+        label: 'Promos',
+        value: `${a.yesterday_promos}\u20AC (${a.yesterday_promo_rate}% de ventas) → +${a.promo_spend_deviation_pct}%`,
+        threshold: '15%',
       });
+      entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.promo_spend_deviation_pct));
+      companyMap.set(key, entry);
     }
-    if (group.ads.length > 0) {
-      sections.push({
-        title: 'Publicidad',
-        items: group.ads.map(
-          (a) =>
-            `<strong>${escapeHtml(a.company_name)} — ${escapeHtml(a.store_name)}</strong> | ${escapeHtml(a.address_name)} (${escapeHtml(a.channel)}) — ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`
-        ),
+
+    for (const a of group.ads) {
+      const key = `${a.company_name} — ${a.store_name}`;
+      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
+      entry.metrics.push({
+        label: 'Publicidad',
+        value: `ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`,
+        threshold: '3.0x',
       });
+      entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.roas_deviation_pct));
+      companyMap.set(key, entry);
     }
+
+    const emailCompanies: AlertCompanyData[] = Array.from(companyMap.entries())
+      .map(([name, data]) => ({
+        name,
+        severity: (data.maxDeviation >= 50 ? 'critical' : data.maxDeviation >= 25 ? 'warning' : 'attention') as AlertCompanyData['severity'],
+        metrics: data.metrics,
+      }))
+      .sort((a, b) => {
+        const order = { critical: 0, warning: 1, attention: 2 };
+        return order[a.severity] - order[b.severity];
+      });
 
     const html = buildAlertEmailHtml(
       group.consultant.name,
       getYesterdayLabel(),
-      sections
+      emailCompanies
     );
 
     const sent = await sendEmail({

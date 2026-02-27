@@ -20,7 +20,6 @@ import {
   ChevronDown,
   HelpCircle,
   UserPlus,
-  Building2,
   Bell,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -29,7 +28,6 @@ import { useIsAdmin, useAuthStore } from '@/stores/authStore';
 import { ROUTES } from '@/constants/routes';
 import { CompanySelector } from '@/features/clients';
 import { InviteUserModal } from '@/features/admin/components/InviteUserModal';
-import { AlertsModal } from '@/features/my-clients/components/AlertsModal';
 import { isAlertConfigEnabled } from '@/features/my-clients/hooks/useAlertConfig';
 
 interface NavItem {
@@ -48,6 +46,7 @@ const navItems: NavItem[] = [
   { label: 'Publicidad', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'New!', color: 'green' } },
   { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Calculadora', icon: Calculator, to: ROUTES.CALCULATOR, tag: { text: 'New!', color: 'green' } },
+  { label: 'Alertas', icon: Bell, to: ROUTES.ALERTS, tag: { text: 'New!', color: 'green' } },
   { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
@@ -64,7 +63,6 @@ export function Sidebar() {
   const [isToggleHovered, setIsToggleHovered] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showAlertsModal, setShowAlertsModal] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user menu on click outside
@@ -105,7 +103,7 @@ export function Sidebar() {
 
   const handleAlerts = () => {
     setIsUserMenuOpen(false);
-    setShowAlertsModal(true);
+    navigate('/alerts');
   };
 
   return (
@@ -312,13 +310,6 @@ export function Sidebar() {
                 {/* My stuff */}
                 <div className="py-1">
                   <button
-                    onClick={() => handleNavigate('/my-clients')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Building2 className="w-4 h-4 text-gray-400" />
-                    <span>Mis clientes</span>
-                  </button>
-                  <button
                     onClick={handleAlerts}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
@@ -382,11 +373,6 @@ export function Sidebar() {
         onClose={() => setShowInviteModal(false)}
       />
 
-      {/* Alerts Modal */}
-      <AlertsModal
-        isOpen={showAlertsModal}
-        onClose={() => setShowAlertsModal(false)}
-      />
     </>
   );
 }

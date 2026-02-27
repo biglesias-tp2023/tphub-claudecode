@@ -21,7 +21,7 @@ export const ROUTES = {
   MAPS: '/maps',
   MARKET: '/market',
   MARKETING: '/marketing',
-  MY_CLIENTS: '/my-clients',
+  ALERTS: '/alerts',
   ADMIN: '/admin',
 
   // Catch-all
