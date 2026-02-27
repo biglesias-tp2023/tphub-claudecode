@@ -93,9 +93,6 @@ export function PhotoSessionCalc() {
     };
   }, [form]);
 
-  // --- Colors ---
-  const varColor = (v: number) => (v > 0 ? 'text-emerald-600' : v < 0 ? 'text-red-600' : 'text-gray-500');
-  const varSign = (v: number) => (v > 0 ? '+' : '');
 
   // --- Waterfall lines (projection breakdown) ---
   const waterfallLines: WaterfallLine[] = useMemo(() => [
@@ -136,214 +133,270 @@ export function PhotoSessionCalc() {
     else exportCalculatorPhotoToPDF(data);
   }, [buildExportData]);
 
-  const getPreviewData = useCallback((): PreviewTableData => ({
-    headers: ['Metrica', 'Pre', 'Post', 'Variacion'],
-    rows: [
-      ['Visitas', form.visitas.toLocaleString('es-ES'), form.visitas.toLocaleString('es-ES'), '—'],
-      ['CR', pct(form.crPre), pct(form.crPost), `${varSign(form.crPost - form.crPre)}${(form.crPost - form.crPre).toFixed(1)} pp`],
-      ['Pedidos', Math.round(calc.pedidosPre).toLocaleString('es-ES'), Math.round(calc.pedidosPost).toLocaleString('es-ES'), `${varSign(calc.deltaPedidosPct)}${calc.deltaPedidosPct.toFixed(1)}%`],
-      ['Venta bruta', eur(calc.ventaPre), eur(calc.ventaPost), `${varSign(calc.deltaVentaPct)}${calc.deltaVentaPct.toFixed(1)}%`],
-      ['Margen', eur(calc.margenPre), eur(calc.margenPost), `${varSign(calc.deltaMargenPct)}${calc.deltaMargenPct.toFixed(1)}%`],
-      ['', '', '', ''],
-      [`Beneficio neto (${form.horizonte}m)`, '', eur(calc.beneficioNeto), `ROI: ${pct(calc.roi)}`],
-    ],
-  }), [form, calc]);
+  const getPreviewData = useCallback((): PreviewTableData => {
+    const monthHeaders = Array.from({ length: form.horizonte }, (_, i) => `Mes ${i + 1}`);
+    const rows: string[][] = [];
+    const deltaM = calc.deltaMargen;
+    const margenRow = ['Δ Margen', ...monthHeaders.map(() => `+${eur(deltaM)}`), `+${eur(deltaM * form.horizonte)}`];
+    const costeRow = ['Coste sesion', `-${eur(form.costeSesion)}`, ...monthHeaders.slice(1).map(() => '—'), `-${eur(form.costeSesion)}`];
+    const benefRow = ['Beneficio mes'];
+    const acumRow = ['Acumulado'];
+    let acum = 0;
+    for (let i = 1; i <= form.horizonte; i++) {
+      const coste = i === 1 ? form.costeSesion : 0;
+      const ben = deltaM - coste;
+      acum += ben;
+      benefRow.push(eur(ben));
+      acumRow.push(eur(acum));
+    }
+    benefRow.push(eur(calc.beneficioNeto));
+    acumRow.push('');
+    rows.push(margenRow, costeRow, benefRow, acumRow);
+    return { headers: ['Concepto', ...monthHeaders, 'Total'], rows };
+  }, [form, calc]);
 
   const generatePdfBlob = useCallback(() => {
     return generateCalculatorPhotoPdfBlob(buildExportData());
   }, [buildExportData]);
 
+  // --- Monthly timeline data ---
+  const months = useMemo(() => {
+    const arr: { month: number; deltaMargen: number; coste: number; beneficioMes: number; acumulado: number }[] = [];
+    let acum = 0;
+    for (let i = 1; i <= form.horizonte; i++) {
+      const coste = i === 1 ? form.costeSesion : 0;
+      const beneficio = calc.deltaMargen - coste;
+      acum += beneficio;
+      arr.push({ month: i, deltaMargen: calc.deltaMargen, coste, beneficioMes: beneficio, acumulado: acum });
+    }
+    return arr;
+  }, [form.horizonte, form.costeSesion, calc.deltaMargen]);
+
+  const totals = useMemo(() => ({
+    deltaMargen: calc.deltaMargen * form.horizonte,
+    coste: form.costeSesion,
+    beneficio: calc.beneficioNeto,
+  }), [calc, form]);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      {/* ========== LEFT COLUMN: Form ========== */}
-      <div className="lg:col-span-3 space-y-4">
-        {/* Datos del establecimiento */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-            <Eye className="w-4 h-4 text-primary-500" />
-            Datos del establecimiento
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Visitas mensuales">
-              <input
-                type="number"
-                step="100"
-                value={form.visitas}
-                onChange={(e) => setNum('visitas', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
-            <Field label="Ticket medio (€)">
-              <input
-                type="number"
-                step="0.5"
-                value={form.ticketMedio}
-                onChange={(e) => setNum('ticketMedio', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ========== LEFT COLUMN: Form ========== */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Datos del establecimiento */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <Eye className="w-4 h-4 text-primary-500" />
+              Datos del establecimiento
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Visitas mensuales">
+                <input
+                  type="number"
+                  step="100"
+                  value={form.visitas}
+                  onChange={(e) => setNum('visitas', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="Ticket medio (€)">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={form.ticketMedio}
+                  onChange={(e) => setNum('ticketMedio', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* Conversión */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-primary-500" />
+              Conversion
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="CR pre-sesion (%)">
+                <input
+                  type="number"
+                  step="0.1"
+                  value={form.crPre}
+                  onChange={(e) => setNum('crPre', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="CR post-sesion (%)">
+                <input
+                  type="number"
+                  step="0.1"
+                  value={form.crPost}
+                  onChange={(e) => setNum('crPost', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* Márgenes e inversión */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <PiggyBank className="w-4 h-4 text-primary-500" />
+              Margenes e inversion
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              <Field label="Margen del restaurante (%)">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={form.margen}
+                  onChange={(e) => setNum('margen', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="Coste sesion de fotos (€)">
+                <input
+                  type="number"
+                  step="10"
+                  value={form.costeSesion}
+                  onChange={(e) => setNum('costeSesion', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+              <Field label="Horizonte de proyeccion (meses)">
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="24"
+                  value={form.horizonte}
+                  onChange={(e) => setNum('horizonte', e.target.value)}
+                  className={INPUT_CLASS}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* Export */}
+          <div className="flex items-center gap-3">
+            <ExportButtons
+              onExport={handleExport}
+              getPreviewData={getPreviewData}
+              generatePdfBlob={generatePdfBlob}
+              previewTitle="Calculadora Sesion de Fotos"
+              previewSubtitle={`Horizonte: ${form.horizonte} meses`}
+              variant="dropdown"
+              size="sm"
+            />
           </div>
         </div>
 
-        {/* Conversión */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4 text-primary-500" />
-            Conversion
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="CR pre-sesion (%)">
-              <input
-                type="number"
-                step="0.1"
-                value={form.crPre}
-                onChange={(e) => setNum('crPre', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
-            <Field label="CR post-sesion (%)">
-              <input
-                type="number"
-                step="0.1"
-                value={form.crPost}
-                onChange={(e) => setNum('crPost', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
+        {/* ========== RIGHT COLUMN: Results ========== */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Hero KPIs */}
+          <div className="grid grid-cols-2 gap-3">
+            <HeroKpi
+              label="Beneficio neto"
+              value={eur(calc.beneficioNeto)}
+              positive={calc.beneficioNeto >= 0}
+            />
+            <HeroKpi
+              label="ROI"
+              value={pct(calc.roi)}
+              positive={calc.roi >= 0}
+            />
           </div>
-        </div>
 
-        {/* Márgenes e inversión */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-            <PiggyBank className="w-4 h-4 text-primary-500" />
-            Margenes e inversion
-          </h2>
-          <div className="grid grid-cols-1 gap-4">
-            <Field label="Margen del restaurante (%)">
-              <input
-                type="number"
-                step="0.5"
-                value={form.margen}
-                onChange={(e) => setNum('margen', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
-            <Field label="Coste sesion de fotos (€)">
-              <input
-                type="number"
-                step="10"
-                value={form.costeSesion}
-                onChange={(e) => setNum('costeSesion', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
-            <Field label="Horizonte de proyeccion (meses)">
-              <input
-                type="number"
-                step="1"
-                min="1"
-                max="24"
-                value={form.horizonte}
-                onChange={(e) => setNum('horizonte', e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </Field>
-          </div>
-        </div>
+          {/* Waterfall: Projection breakdown */}
+          <WaterfallBreakdown lines={waterfallLines} pctBase={calc.ventaPostN} />
 
-        {/* Export */}
-        <div className="flex items-center gap-3">
-          <ExportButtons
-            onExport={handleExport}
-            getPreviewData={getPreviewData}
-            generatePdfBlob={generatePdfBlob}
-            previewTitle="Calculadora Sesion de Fotos"
-            previewSubtitle={`Horizonte: ${form.horizonte} meses`}
-            variant="dropdown"
-            size="sm"
-          />
+          {/* Hint */}
+          <p className="text-xs text-gray-400 px-1">
+            Todos los calculos son estimaciones basadas en los datos introducidos.
+          </p>
         </div>
       </div>
 
-      {/* ========== RIGHT COLUMN: Results ========== */}
-      <div className="lg:col-span-2 space-y-4">
-        {/* Hero KPIs */}
-        <div className="grid grid-cols-2 gap-3">
-          <HeroKpi
-            label="Beneficio neto"
-            value={eur(calc.beneficioNeto)}
-            positive={calc.beneficioNeto >= 0}
-          />
-          <HeroKpi
-            label="ROI"
-            value={pct(calc.roi)}
-            positive={calc.roi >= 0}
-          />
+      {/* ========== FULL-WIDTH: Monthly timeline ========== */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Impacto mensual
+            <span className="ml-2 text-xs font-normal text-gray-400">
+              Proyeccion a {form.horizonte} {form.horizonte === 1 ? 'mes' : 'meses'}
+            </span>
+          </h3>
         </div>
-
-        {/* Waterfall: Projection breakdown */}
-        <WaterfallBreakdown lines={waterfallLines} pctBase={calc.ventaPostN} />
-
-        {/* Comparativa mensual */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">Comparativa mensual</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="px-5 py-2.5 text-left font-medium">Metrica</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Pre</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Post</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Variacion</th>
-                </tr>
-              </thead>
-              <tbody>
-                <CompRow label="Visitas" pre={form.visitas.toLocaleString('es-ES')} post={form.visitas.toLocaleString('es-ES')} variation="—" />
-                <CompRow label="CR" pre={pct(form.crPre)} post={pct(form.crPost)} variation={`${varSign(form.crPost - form.crPre)}${(form.crPost - form.crPre).toFixed(1)} pp`} varClass={varColor(form.crPost - form.crPre)} />
-                <CompRow label="Ticket medio" pre={eur(form.ticketMedio)} post={eur(form.ticketMedio)} variation="—" />
-                <CompRow label="Pedidos" pre={Math.round(calc.pedidosPre).toLocaleString('es-ES')} post={Math.round(calc.pedidosPost).toLocaleString('es-ES')} variation={`${varSign(calc.deltaPedidosPct)}${calc.deltaPedidosPct.toFixed(1)}%`} varClass={varColor(calc.deltaPedidos)} />
-                <CompRow label="Venta bruta" pre={eur(calc.ventaPre)} post={eur(calc.ventaPost)} variation={`${varSign(calc.deltaVentaPct)}${calc.deltaVentaPct.toFixed(1)}%`} varClass={varColor(calc.deltaVenta)} />
-                <CompRow label="Margen" pre={eur(calc.margenPre)} post={eur(calc.margenPost)} variation={`${varSign(calc.deltaMargenPct)}${calc.deltaMargenPct.toFixed(1)}%`} varClass={varColor(calc.deltaMargen)} last />
-              </tbody>
-            </table>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                <th className="px-4 py-2.5 text-left font-medium sticky left-0 bg-white z-10">Concepto</th>
+                {months.map((m) => (
+                  <th key={m.month} className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                    Mes {m.month}
+                  </th>
+                ))}
+                <th className="px-4 py-2.5 text-right font-medium bg-gray-50">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Incremento margen */}
+              <tr className="border-b border-gray-50">
+                <td className="px-4 py-2.5 text-gray-700 font-medium sticky left-0 bg-white z-10">Δ Margen</td>
+                {months.map((m) => (
+                  <td key={m.month} className="px-3 py-2.5 text-right tabular-nums text-emerald-600 whitespace-nowrap">
+                    +{eur(m.deltaMargen)}
+                  </td>
+                ))}
+                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 font-semibold bg-gray-50 whitespace-nowrap">
+                  +{eur(totals.deltaMargen)}
+                </td>
+              </tr>
+              {/* Coste sesión */}
+              <tr className="border-b border-gray-50">
+                <td className="px-4 py-2.5 text-gray-700 font-medium sticky left-0 bg-white z-10">Coste sesion</td>
+                {months.map((m) => (
+                  <td key={m.month} className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                    {m.coste > 0 ? (
+                      <span className="text-red-500">−{eur(m.coste)}</span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                ))}
+                <td className="px-4 py-2.5 text-right tabular-nums text-red-500 font-semibold bg-gray-50 whitespace-nowrap">
+                  −{eur(totals.coste)}
+                </td>
+              </tr>
+              {/* Beneficio mes */}
+              <tr className="border-b border-gray-100 bg-gray-50/30">
+                <td className="px-4 py-2.5 text-gray-900 font-semibold sticky left-0 bg-gray-50/30 z-10">Beneficio mes</td>
+                {months.map((m) => (
+                  <td key={m.month} className={`px-3 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap ${m.beneficioMes >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {m.beneficioMes >= 0 ? '+' : ''}{eur(m.beneficioMes)}
+                  </td>
+                ))}
+                <td className={`px-4 py-2.5 text-right tabular-nums font-bold bg-gray-50 whitespace-nowrap ${totals.beneficio >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {totals.beneficio >= 0 ? '+' : ''}{eur(totals.beneficio)}
+                </td>
+              </tr>
+              {/* Acumulado */}
+              <tr>
+                <td className="px-4 py-2.5 text-gray-900 font-semibold sticky left-0 bg-white z-10">Acumulado</td>
+                {months.map((m) => (
+                  <td key={m.month} className={`px-3 py-2.5 text-right tabular-nums font-bold whitespace-nowrap ${m.acumulado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {m.acumulado >= 0 ? '+' : ''}{eur(m.acumulado)}
+                  </td>
+                ))}
+                <td className="px-4 py-2.5 bg-gray-50" />
+              </tr>
+            </tbody>
+          </table>
         </div>
-
-        {/* Hint */}
-        <p className="text-xs text-gray-400 px-1">
-          Todos los calculos son estimaciones basadas en los datos introducidos.
-        </p>
       </div>
     </div>
   );
 }
 
-// --- Sub-component ---
-
-function CompRow({
-  label,
-  pre,
-  post,
-  variation,
-  varClass,
-  last,
-}: {
-  label: string;
-  pre: string;
-  post: string;
-  variation: string;
-  varClass?: string;
-  last?: boolean;
-}) {
-  return (
-    <tr className={last ? '' : 'border-b border-gray-50'}>
-      <td className="px-5 py-2.5 text-gray-700 font-medium">{label}</td>
-      <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{pre}</td>
-      <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{post}</td>
-      <td className={`px-4 py-2.5 text-right tabular-nums font-semibold ${varClass ?? 'text-gray-400'}`}>{variation}</td>
-    </tr>
-  );
-}
