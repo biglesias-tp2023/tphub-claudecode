@@ -1,3 +1,4 @@
 export { CompanyAlertCard } from './CompanyAlertCard';
-export { AlertCategoryToggle } from './AlertCategoryToggle';
+export type { GlobalThresholds } from './CompanyAlertCard';
 export { AlertChannelSelector } from './AlertChannelSelector';
+export { AlertsModal } from './AlertsModal';

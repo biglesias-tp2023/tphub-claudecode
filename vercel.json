@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/alerts/daily",
-      "schedule": "30 6 * * 1-5"
+      "schedule": "30 7 * * 1-5"
     }
   ],
   "rewrites": [

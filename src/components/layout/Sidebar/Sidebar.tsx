@@ -20,6 +20,7 @@ import {
   HelpCircle,
   UserPlus,
   Building2,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useUIStore } from '@/stores/uiStore';
@@ -27,6 +28,7 @@ import { useIsAdmin, useAuthStore } from '@/stores/authStore';
 import { ROUTES } from '@/constants/routes';
 import { CompanySelector } from '@/features/clients';
 import { InviteUserModal } from '@/features/admin/components/InviteUserModal';
+import { AlertsModal } from '@/features/my-clients/components/AlertsModal';
 
 interface NavItem {
   label: string;
@@ -59,6 +61,7 @@ export function Sidebar() {
   const [isToggleHovered, setIsToggleHovered] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAlertsModal, setShowAlertsModal] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user menu on click outside
@@ -95,6 +98,11 @@ export function Sidebar() {
   const handleInvite = () => {
     setIsUserMenuOpen(false);
     setShowInviteModal(true);
+  };
+
+  const handleAlerts = () => {
+    setIsUserMenuOpen(false);
+    setShowAlertsModal(true);
   };
 
   return (
@@ -307,6 +315,13 @@ export function Sidebar() {
                     <Building2 className="w-4 h-4 text-gray-400" />
                     <span>Mis clientes</span>
                   </button>
+                  <button
+                    onClick={handleAlerts}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Bell className="w-4 h-4 text-gray-400" />
+                    <span>Alertas</span>
+                  </button>
                 </div>
 
                 {/* Admin section */}
@@ -357,6 +372,12 @@ export function Sidebar() {
       <InviteUserModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
+      />
+
+      {/* Alerts Modal */}
+      <AlertsModal
+        isOpen={showAlertsModal}
+        onClose={() => setShowAlertsModal(false)}
       />
     </>
   );

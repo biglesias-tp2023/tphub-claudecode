@@ -5,7 +5,7 @@ import { cn } from '@/utils/cn';
 import { Button } from '../Button';
 import type { ReactNode, MouseEvent } from 'react';
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
 
 export interface ModalProps {
   /** Controla si el modal está abierto */
@@ -35,6 +35,7 @@ const sizeStyles = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-xl',
+  '2xl': 'max-w-5xl',
   full: 'max-w-4xl',
 };
 
@@ -142,7 +143,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-4">{children}</div>
+        <div className="p-4 max-h-[80vh] overflow-y-auto">{children}</div>
 
         {/* Footer */}
         {footer && (
