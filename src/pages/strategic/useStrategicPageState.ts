@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/useToast';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useSessionState } from '@/features/controlling/hooks';
@@ -20,7 +21,12 @@ import {
   useGenerateTasksForObjective,
   useProfiles,
   useActualRevenueByMonth,
+  useSalesProjection,
+  useUpsertSalesProjection,
+  useUpdateSalesProjectionTargets,
 } from '@/features/strategic/hooks';
+import { upsertSalesProjection as upsertSalesProjectionService } from '@/services/supabase-data';
+import { queryKeys } from '@/constants/queryKeys';
 import {
   exportObjectivesToPDF,
   exportObjectivesToExcel,
@@ -37,7 +43,6 @@ import type {
   ObjectiveCategory,
   ObjectiveStatus,
   SalesProjectionConfig,
-  SalesProjectionData,
   GridChannelMonthData,
   ChannelMonthEntry,
 } from '@/types';
@@ -46,7 +51,7 @@ import type {
 // CONSTANTS
 // ============================================
 
-const SALES_PROJECTION_KEY = 'tphub_sales_projection';
+const LEGACY_SALES_PROJECTION_KEY = 'tphub_sales_projection';
 const WARNING_DISMISSED_KEY = 'tphub_warning_dismissed';
 
 // ============================================
@@ -56,6 +61,7 @@ const WARNING_DISMISSED_KEY = 'tphub_warning_dismissed';
 export function useStrategicPageState() {
   // Toast notifications
   const { toasts, closeToast, success, error } = useToast();
+  const queryClient = useQueryClient();
 
   // State for objective modals
   const [isObjectiveEditorOpen, setIsObjectiveEditorOpen] = useState(false);
@@ -66,10 +72,9 @@ export function useStrategicPageState() {
   const [selectedTask, setSelectedTask] = useState<StrategicTaskWithDetails | null>(null);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
 
-  // State for sales projection
+  // State for sales projection modals
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isWarningOpen, setIsWarningOpen] = useState(false);
-  const [salesProjection, setSalesProjection] = useState<SalesProjectionData | null>(null);
 
   // Persisted filter states
   const [selectedCategory, setSelectedCategory] = useSessionState<ObjectiveCategory | 'all'>('tphub-st-category', 'all');
@@ -82,46 +87,6 @@ export function useStrategicPageState() {
     medium: true,
     long: false,
   });
-
-  // Load sales projection from localStorage
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const stored = localStorage.getItem(SALES_PROJECTION_KEY);
-    if (stored) {
-      try {
-        setSalesProjection(JSON.parse(stored));
-      } catch {
-        // Invalid data, ignore
-      }
-    }
-  }, []);
-
-  // Check for 60-day warning
-  useEffect(() => {
-    if (!salesProjection) return;
-
-    const warningDismissed = localStorage.getItem(WARNING_DISMISSED_KEY);
-    const endDate = new Date(salesProjection.config.endDate);
-    const today = new Date();
-    const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (daysRemaining <= 60 && daysRemaining > 0) {
-      const dismissedDate = warningDismissed ? new Date(warningDismissed) : null;
-      const isSameDay = dismissedDate &&
-        dismissedDate.toDateString() === today.toDateString();
-
-      if (!isSameDay) {
-        setIsWarningOpen(true);
-      }
-    }
-  }, [salesProjection]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  // Save sales projection to localStorage
-  const saveSalesProjection = useCallback((data: SalesProjectionData) => {
-    setSalesProjection(data);
-    localStorage.setItem(SALES_PROJECTION_KEY, JSON.stringify(data));
-  }, []);
 
   // Data hooks - Objectives
   const {
@@ -153,6 +118,7 @@ export function useStrategicPageState() {
   } = useDashboardFiltersStore();
 
   const effectiveCompanyIds = globalCompanyIds.length > 0 ? globalCompanyIds : companyIds;
+  const primaryCompanyId = effectiveCompanyIds[0] ?? '';
 
   // Expand multi-portal IDs for brand/restaurant filters
   const { data: allBrands = [] } = useBrands();
@@ -185,6 +151,79 @@ export function useStrategicPageState() {
     addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
     monthOffsets: [-2, -1, 0, 1, 2, 3],
   });
+
+  // ============================================
+  // SALES PROJECTION (Supabase-backed)
+  // ============================================
+
+  const {
+    data: salesProjection = null,
+    isLoading: isLoadingProjection,
+  } = useSalesProjection({ companyId: primaryCompanyId });
+
+  const upsertProjection = useUpsertSalesProjection();
+  const updateProjectionTargets = useUpdateSalesProjectionTargets();
+
+  // One-time migration: localStorage → Supabase
+  const migrationDone = useRef(false);
+  useEffect(() => {
+    if (migrationDone.current || !primaryCompanyId || isLoadingProjection) return;
+    if (salesProjection) {
+      // Already has a Supabase projection — no migration needed
+      migrationDone.current = true;
+      return;
+    }
+
+    const stored = localStorage.getItem(LEGACY_SALES_PROJECTION_KEY);
+    if (!stored) {
+      migrationDone.current = true;
+      return;
+    }
+
+    try {
+      const legacy = JSON.parse(stored);
+      // Migrate to Supabase (use service directly, not hook, since this is fire-and-forget in effect)
+      upsertSalesProjectionService({
+        companyId: primaryCompanyId,
+        config: legacy.config,
+        baselineRevenue: legacy.baselineRevenue ?? { glovo: 0, ubereats: 0, justeat: 0 },
+        targetRevenue: legacy.targetRevenue ?? {},
+        targetAds: legacy.targetAds ?? {},
+        targetPromos: legacy.targetPromos ?? {},
+      }).then(() => {
+        localStorage.removeItem(LEGACY_SALES_PROJECTION_KEY);
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.salesProjections.byScope(primaryCompanyId),
+        });
+        migrationDone.current = true;
+      }).catch(() => {
+        // Migration failed — keep localStorage, will retry next time
+        migrationDone.current = true;
+      });
+    } catch {
+      migrationDone.current = true;
+    }
+  }, [primaryCompanyId, salesProjection, isLoadingProjection]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check for 60-day warning
+  useEffect(() => {
+    if (!salesProjection) return;
+
+    const warningDismissed = localStorage.getItem(WARNING_DISMISSED_KEY);
+    const endDate = new Date(salesProjection.config.endDate);
+    const today = new Date();
+    const remaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (remaining <= 60 && remaining > 0) {
+      const dismissedDate = warningDismissed ? new Date(warningDismissed) : null;
+      const isSameDay = dismissedDate &&
+        dismissedDate.toDateString() === today.toDateString();
+
+      if (!isSameDay) {
+        setIsWarningOpen(true);
+      }
+    }
+  }, [salesProjection]);
 
   // Mutations - Objectives
   const createObjective = useCreateStrategicObjective();
@@ -257,49 +296,37 @@ export function useStrategicPageState() {
   // HANDLERS - Sales Projection
   // ============================================
 
-  const handleSetupComplete = useCallback((
+  const handleSetupComplete = useCallback(async (
     config: SalesProjectionConfig,
     targetRevenue: GridChannelMonthData,
     baselineRevenue: ChannelMonthEntry
   ) => {
-    const newProjection: SalesProjectionData = {
-      id: crypto.randomUUID(),
-      restaurantId: defaultRestaurantId || '',
-      config,
-      baselineRevenue,
-      targetRevenue,
-      targetAds: {},
-      targetPromos: {},
-      actualRevenue: {},
-      actualAds: {},
-      actualPromos: {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    saveSalesProjection(newProjection);
-    setIsSetupOpen(false);
-    success('Proyección de ventas creada');
-  }, [defaultRestaurantId, saveSalesProjection, success]);
+    try {
+      await upsertProjection.mutateAsync({
+        companyId: primaryCompanyId,
+        config,
+        baselineRevenue,
+        targetRevenue,
+        targetAds: {},
+        targetPromos: {},
+      });
+      setIsSetupOpen(false);
+      success('Proyección de ventas creada');
+    } catch {
+      error('Error al crear proyección');
+    }
+  }, [primaryCompanyId, upsertProjection, success, error]);
 
   const handleUpdateTargetRevenue = useCallback((data: GridChannelMonthData) => {
     if (!salesProjection) return;
-    saveSalesProjection({ ...salesProjection, targetRevenue: data, updatedAt: new Date().toISOString() });
-  }, [salesProjection, saveSalesProjection]);
-
-  const handleUpdateActualRevenue = useCallback((data: GridChannelMonthData) => {
-    if (!salesProjection) return;
-    saveSalesProjection({ ...salesProjection, actualRevenue: data, updatedAt: new Date().toISOString() });
-  }, [salesProjection, saveSalesProjection]);
-
-  const handleUpdateActualAds = useCallback((data: GridChannelMonthData) => {
-    if (!salesProjection) return;
-    saveSalesProjection({ ...salesProjection, actualAds: data, updatedAt: new Date().toISOString() });
-  }, [salesProjection, saveSalesProjection]);
-
-  const handleUpdateActualPromos = useCallback((data: GridChannelMonthData) => {
-    if (!salesProjection) return;
-    saveSalesProjection({ ...salesProjection, actualPromos: data, updatedAt: new Date().toISOString() });
-  }, [salesProjection, saveSalesProjection]);
+    updateProjectionTargets.mutate({
+      id: salesProjection.id,
+      companyId: salesProjection.companyId,
+      brandId: salesProjection.brandId,
+      addressId: salesProjection.addressId,
+      updates: { targetRevenue: data },
+    });
+  }, [salesProjection, updateProjectionTargets]);
 
   const handleDismissWarning = useCallback(() => {
     setIsWarningOpen(false);
@@ -607,9 +634,6 @@ export function useStrategicPageState() {
     isWarningOpen,
     handleSetupComplete,
     handleUpdateTargetRevenue,
-    handleUpdateActualRevenue,
-    handleUpdateActualAds,
-    handleUpdateActualPromos,
     handleDismissWarning,
     handleCreateNewFromWarning,
 

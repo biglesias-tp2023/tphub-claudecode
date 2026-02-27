@@ -154,7 +154,10 @@ export interface SalesProjectionConfig {
  */
 export interface SalesProjectionData {
   id: string;
-  restaurantId: string;
+  // Scope jerárquico (CRP Portal references)
+  companyId: string;
+  brandId: string | null;
+  addressId: string | null;
   config: SalesProjectionConfig;
   // Punto de partida (mes anterior)
   baselineRevenue: ChannelMonthEntry;                // Ventas del mes anterior
@@ -162,21 +165,41 @@ export interface SalesProjectionData {
   targetRevenue: GridChannelMonthData;               // Ventas objetivo por canal/mes
   targetAds: GridChannelMonthData;                   // ADS objetivo (€) por canal/mes
   targetPromos: GridChannelMonthData;                // Promos objetivo (€) por canal/mes
-  // Datos reales (acumulados en el mes)
-  actualRevenue: GridChannelMonthData;               // Ventas reales
-  actualAds: GridChannelMonthData;                   // Gasto ADS real
-  actualPromos: GridChannelMonthData;                // Gasto promos real
   // Metadata
+  createdBy: string | null;
+  updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Database row type for sales_projections
+ */
+export interface DbSalesProjection {
+  id: string;
+  company_id: string;
+  brand_id: string | null;
+  address_id: string | null;
+  config: string;                // JSONB string
+  baseline_revenue: string;      // JSONB string
+  target_revenue: string;        // JSONB string
+  target_ads: string;            // JSONB string
+  target_promos: string;         // JSONB string
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
  * Input para crear/actualizar proyección de ventas
  */
 export interface SalesProjectionInput {
-  restaurantId: string;
+  companyId: string;
+  brandId?: string | null;
+  addressId?: string | null;
   config: SalesProjectionConfig;
+  baselineRevenue: ChannelMonthEntry;
   targetRevenue: GridChannelMonthData;
   targetAds?: GridChannelMonthData;
   targetPromos?: GridChannelMonthData;

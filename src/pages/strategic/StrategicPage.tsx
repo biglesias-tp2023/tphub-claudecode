@@ -108,13 +108,7 @@ export function StrategicPage() {
             <SalesProjection
               config={state.salesProjection.config}
               targetRevenue={state.salesProjection.targetRevenue}
-              actualRevenue={state.salesProjection.actualRevenue}
-              actualAds={state.salesProjection.actualAds}
-              actualPromos={state.salesProjection.actualPromos}
               onTargetChange={state.handleUpdateTargetRevenue}
-              onActualRevenueChange={state.handleUpdateActualRevenue}
-              onActualAdsChange={state.handleUpdateActualAds}
-              onActualPromosChange={state.handleUpdateActualPromos}
               onEditConfig={() => state.setIsSetupOpen(true)}
               realRevenueByMonth={state.realRevenueByMonth}
               realPromosByMonth={state.realPromosByMonth}

@@ -79,6 +79,15 @@ export {
   deleteTasksForObjective,
 } from './strategic-tasks';
 
+// Sales Projections
+export {
+  mapDbSalesProjection,
+  fetchSalesProjection,
+  upsertSalesProjection,
+  updateSalesProjectionTargets,
+  deleteSalesProjection,
+} from './sales-projections';
+
 // Audits
 export {
   _mapDbAuditResponseToAuditResponse,

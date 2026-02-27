@@ -17,13 +17,10 @@ import type {
 export interface SalesProjectionProps {
   config: SalesProjectionConfig;
   targetRevenue: GridChannelMonthData;
-  actualRevenue: GridChannelMonthData;
-  actualAds: GridChannelMonthData;
-  actualPromos: GridChannelMonthData;
+  actualRevenue?: GridChannelMonthData;
+  actualAds?: GridChannelMonthData;
+  actualPromos?: GridChannelMonthData;
   onTargetChange?: (data: GridChannelMonthData) => void;
-  onActualRevenueChange?: (data: GridChannelMonthData) => void;
-  onActualAdsChange?: (data: GridChannelMonthData) => void;
-  onActualPromosChange?: (data: GridChannelMonthData) => void;
   onEditConfig?: () => void;
   restaurantName?: string;
   /** Real revenue by month×channel from CRP Portal for grid rows */

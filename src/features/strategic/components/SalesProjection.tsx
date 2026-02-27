@@ -40,8 +40,8 @@ import { SalesTableRow } from './SalesTableRow';
 // ============================================
 
 export function SalesProjection({
-  config, targetRevenue, actualRevenue, actualAds, actualPromos,
-  onTargetChange, onActualRevenueChange, onActualAdsChange, onActualPromosChange, onEditConfig,
+  config, targetRevenue, actualRevenue = {}, actualAds = {}, actualPromos = {},
+  onTargetChange, onEditConfig,
   restaurantName = 'Restaurante',
   realRevenueByMonth,
   realPromosByMonth,
@@ -160,9 +160,10 @@ export function SalesProjection({
   }, []);
 
   const updateTarget = (m: string, ch: SalesChannel, v: string) => updateData(targetRevenue, onTargetChange, m, ch, v);
-  const updateActualRevenue = (m: string, ch: SalesChannel, v: string) => updateData(actualRevenue, onActualRevenueChange, m, ch, v);
-  const updateActualAds = (m: string, ch: SalesChannel, v: string) => updateData(actualAds, onActualAdsChange, m, ch, v);
-  const updateActualPromos = (m: string, ch: SalesChannel, v: string) => updateData(actualPromos, onActualPromosChange, m, ch, v);
+  // Actual data is read-only (comes from CRP Portal), no setter needed
+  const updateActualRevenue = (_m: string, _ch: SalesChannel, _v: string) => {};
+  const updateActualAds = (_m: string, _ch: SalesChannel, _v: string) => {};
+  const updateActualPromos = (_m: string, _ch: SalesChannel, _v: string) => {};
 
   // Export handler
   const handleExport = useCallback((format: ExportFormat) => {

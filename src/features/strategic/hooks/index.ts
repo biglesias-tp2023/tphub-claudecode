@@ -41,6 +41,14 @@ export { useObjectiveProgress } from './useObjectiveProgress';
 // Actual revenue by month (auto-populate financial objectives)
 export { useActualRevenueByMonth } from './useActualRevenueByMonth';
 
+// Sales Projections (Supabase-backed)
+export {
+  useSalesProjection,
+  useUpsertSalesProjection,
+  useUpdateSalesProjectionTargets,
+  useDeleteSalesProjection,
+} from './useSalesProjectionHooks';
+
 // Share links for objectives
 export {
   useShareLink,

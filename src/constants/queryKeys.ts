@@ -226,4 +226,9 @@ export const queryKeys = {
     byLocation: (lat: number, lng: number) => ['weather', lat, lng] as const,
     byRestaurant: (restaurantId: string) => ['weather', 'restaurant', restaurantId] as const,
   },
+  /** Sales Projections */
+  salesProjections: {
+    byScope: (companyId: string, brandId?: string | null, addressId?: string | null) =>
+      ['sales-projections', companyId, brandId ?? '__NULL__', addressId ?? '__NULL__'] as const,
+  },
 } as const;
