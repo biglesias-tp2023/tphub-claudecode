@@ -18,7 +18,6 @@ import { ExportButtons } from '@/components/common';
 import { DashboardFilters } from '@/features/dashboard';
 import {
   StrategicObjectiveEditor,
-  StrategicTaskCalendar,
   StrategicTaskDetailModal,
   StrategicTaskEditor,
   SalesProjection,
@@ -203,12 +202,9 @@ export function StrategicPage() {
             )}
           </div>
 
-          {/* Main Content: Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left: Objectives */}
-            <div className="lg:col-span-8">
-              <Card padding="none" className="border-gray-100">
-                {/* Header */}
+          {/* Objectives */}
+          <Card padding="none" className="border-gray-100">
+            {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-gray-900">Objetivos</h2>
                   <div className="flex items-center gap-2">
@@ -343,22 +339,7 @@ export function StrategicPage() {
                     </div>
                   )}
                 </div>
-              </Card>
-            </div>
-
-            {/* Right: Task Calendar */}
-            <div className="lg:col-span-4">
-              <StrategicTaskCalendar
-                tasksByDate={state.tasksByDate}
-                sortedDates={state.sortedDates}
-                stats={state.taskStats}
-                onTaskClick={state.handleTaskClick}
-                onToggleTaskComplete={state.handleToggleTaskComplete}
-                onAddTask={state.handleOpenTaskEditor}
-                isLoading={false}
-              />
-            </div>
-          </div>
+          </Card>
         </>
       )}
 
