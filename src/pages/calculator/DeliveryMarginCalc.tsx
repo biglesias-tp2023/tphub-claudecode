@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Plus, Download, Trash2, X } from 'lucide-react';
 import { Field, KpiCard, eur, INPUT_CLASS } from './components';
+import { useSessionState } from '@/hooks/useSessionState';
 
 // --- Types ---
 
@@ -84,7 +85,7 @@ function saveRows(rows: CalculatedRow[]) {
 // --- Component ---
 
 export function DeliveryMarginCalc() {
-  const [form, setForm] = useState<FormState>(defaultForm);
+  const [form, setForm] = useSessionState<FormState>('tphub-calc-delivery', defaultForm);
   const [rows, setRows] = useState<CalculatedRow[]>(loadRows);
 
   // Persist rows to localStorage

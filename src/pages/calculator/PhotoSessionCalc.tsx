@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Field, KpiCard, eur, pct, INPUT_CLASS } from './components';
+import { useSessionState } from '@/hooks/useSessionState';
 
 // --- Types ---
 
@@ -28,7 +29,7 @@ const defaultForm: FormState = {
 // --- Component ---
 
 export function PhotoSessionCalc() {
-  const [form, setForm] = useState<FormState>(defaultForm);
+  const [form, setForm] = useSessionState<FormState>('tphub-calc-photo', defaultForm);
 
   const setNum = useCallback(
     (key: keyof FormState, raw: string) => {
