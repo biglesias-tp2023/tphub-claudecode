@@ -462,14 +462,6 @@ export function DeliveryMarginCalc() {
             variant="dropdown"
             size="sm"
           />
-          <button
-            onClick={handleClearTable}
-            disabled={!rows.length}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 rounded-lg font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Trash2 className="w-4 h-4" />
-            Borrar tabla
-          </button>
         </div>
       </div>
 
@@ -490,11 +482,11 @@ export function DeliveryMarginCalc() {
         </div>
 
         {/* Waterfall breakdown */}
-        <WaterfallBreakdown lines={waterfallLines} />
+        <WaterfallBreakdown lines={waterfallLines} pctBase={calc.pvpEff} />
 
         {/* Saved products table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700">
               Productos guardados
               {rows.length > 0 && (
@@ -503,6 +495,15 @@ export function DeliveryMarginCalc() {
                 </span>
               )}
             </h3>
+            {rows.length > 0 && (
+              <button
+                onClick={handleClearTable}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Borrar todo
+              </button>
+            )}
           </div>
 
           {rows.length === 0 ? (

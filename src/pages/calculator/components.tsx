@@ -71,7 +71,9 @@ export interface WaterfallLine {
   type: 'income' | 'deduction' | 'subtotal' | 'result';
 }
 
-export function WaterfallBreakdown({ lines }: { lines: WaterfallLine[] }) {
+export function WaterfallBreakdown({ lines, pctBase }: { lines: WaterfallLine[]; pctBase?: number }) {
+  const base = pctBase && pctBase > 0 ? pctBase : undefined;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
@@ -101,6 +103,13 @@ export function WaterfallBreakdown({ lines }: { lines: WaterfallLine[] }) {
 
           const prefix = isDeduction ? '− ' : isSubtotal ? '= ' : isResult ? '= ' : '';
 
+          const pctVal = base ? (line.value / base) * 100 : undefined;
+          const pctDisplay = pctVal !== undefined
+            ? isDeduction
+              ? `${Math.abs(pctVal).toFixed(1)}%`
+              : `${pctVal.toFixed(1)}%`
+            : undefined;
+
           return (
             <div key={idx}>
               {isResult && (
@@ -115,8 +124,15 @@ export function WaterfallBreakdown({ lines }: { lines: WaterfallLine[] }) {
                 <span className={cn('text-sm', labelColor)}>
                   {prefix}{line.label}
                 </span>
-                <span className={cn('text-sm tabular-nums', valueColor)}>
-                  {isDeduction && line.value !== 0 ? `−${eur(Math.abs(line.value))}` : eur(line.value)}
+                <span className="flex items-center gap-3">
+                  {pctDisplay && (
+                    <span className="text-[11px] tabular-nums text-gray-400 min-w-[40px] text-right">
+                      {pctDisplay}
+                    </span>
+                  )}
+                  <span className={cn('text-sm tabular-nums', valueColor)}>
+                    {isDeduction && line.value !== 0 ? `−${eur(Math.abs(line.value))}` : eur(line.value)}
+                  </span>
                 </span>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { Eye, ArrowRightLeft, PiggyBank } from 'lucide-react';
-import { Field, KpiCard, eur, pct, INPUT_CLASS } from './components';
+import { Field, HeroKpi, WaterfallBreakdown, eur, pct, INPUT_CLASS } from './components';
+import type { WaterfallLine } from './components';
 import { useSessionState } from '@/hooks/useSessionState';
 import { ExportButtons, type ExportFormat } from '@/components/common/ExportButtons';
 import type { PreviewTableData } from '@/components/common/ExportPreviewModal';
@@ -93,11 +94,18 @@ export function PhotoSessionCalc() {
   }, [form]);
 
   // --- Colors ---
-  const roiColor = calc.roi >= 100 ? 'text-emerald-600' : calc.roi >= 0 ? 'text-amber-600' : 'text-red-600';
-  const benefitColor = calc.beneficioNeto >= 0 ? 'text-emerald-600' : 'text-red-600';
-
   const varColor = (v: number) => (v > 0 ? 'text-emerald-600' : v < 0 ? 'text-red-600' : 'text-gray-500');
   const varSign = (v: number) => (v > 0 ? '+' : '');
+
+  // --- Waterfall lines (projection breakdown) ---
+  const waterfallLines: WaterfallLine[] = useMemo(() => [
+    { label: `Venta post (${form.horizonte}m)`, value: calc.ventaPostN, type: 'income' },
+    { label: `Venta pre (${form.horizonte}m)`, value: calc.ventaPreN, type: 'deduction' },
+    { label: 'Incremento ventas', value: calc.ventaPostN - calc.ventaPreN, type: 'subtotal' },
+    { label: `Margen (${form.margen}%)`, value: (calc.ventaPostN - calc.ventaPreN) * (form.margen / 100), type: 'subtotal' },
+    { label: 'Coste sesion', value: form.costeSesion, type: 'deduction' },
+    { label: 'Beneficio neto', value: calc.beneficioNeto, type: 'result' },
+  ], [calc, form]);
 
   // --- Export ---
 
@@ -148,7 +156,7 @@ export function PhotoSessionCalc() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
       {/* ========== LEFT COLUMN: Form ========== */}
-      <div className="lg:col-span-2 space-y-4">
+      <div className="lg:col-span-3 space-y-4">
         {/* Datos del establecimiento */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
@@ -243,25 +251,39 @@ export function PhotoSessionCalc() {
             </Field>
           </div>
         </div>
+
+        {/* Export */}
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            onExport={handleExport}
+            getPreviewData={getPreviewData}
+            generatePdfBlob={generatePdfBlob}
+            previewTitle="Calculadora Sesion de Fotos"
+            previewSubtitle={`Horizonte: ${form.horizonte} meses`}
+            variant="dropdown"
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* ========== RIGHT COLUMN: Results ========== */}
-      <div className="lg:col-span-3 space-y-4">
-        {/* KPI cards destacados */}
+      <div className="lg:col-span-2 space-y-4">
+        {/* Hero KPIs */}
         <div className="grid grid-cols-2 gap-3">
-          <KpiCard
+          <HeroKpi
             label="Beneficio neto"
             value={eur(calc.beneficioNeto)}
-            sub={`Margen adicional − ${eur(form.costeSesion)} coste sesion`}
-            valueClassName={benefitColor}
+            positive={calc.beneficioNeto >= 0}
           />
-          <KpiCard
+          <HeroKpi
             label="ROI"
             value={pct(calc.roi)}
-            sub={`Retorno sobre ${eur(form.costeSesion)} invertidos`}
-            valueClassName={roiColor}
+            positive={calc.roi >= 0}
           />
         </div>
+
+        {/* Waterfall: Projection breakdown */}
+        <WaterfallBreakdown lines={waterfallLines} pctBase={calc.ventaPostN} />
 
         {/* Comparativa mensual */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -290,58 +312,10 @@ export function PhotoSessionCalc() {
           </div>
         </div>
 
-        {/* Proyección a N meses */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">
-              Proyeccion a {form.horizonte} {form.horizonte === 1 ? 'mes' : 'meses'}
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="px-5 py-2.5 text-left font-medium">Concepto</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Sin sesion</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Con sesion</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Diferencia</th>
-                </tr>
-              </thead>
-              <tbody>
-                <CompRow label="Venta bruta" pre={eur(calc.ventaPreN)} post={eur(calc.ventaPostN)} variation={`${varSign(calc.ventaPostN - calc.ventaPreN)}${eur(calc.ventaPostN - calc.ventaPreN)}`} varClass={varColor(calc.ventaPostN - calc.ventaPreN)} />
-                <CompRow label="Margen" pre={eur(calc.margenPreN)} post={eur(calc.margenPostN)} variation={`${varSign(calc.margenPostN - calc.margenPreN)}${eur(calc.margenPostN - calc.margenPreN)}`} varClass={varColor(calc.margenPostN - calc.margenPreN)} />
-                <tr className="border-b border-gray-50 bg-gray-50/50">
-                  <td className="px-5 py-2.5 text-gray-700 font-medium">Coste sesion</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-400">—</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-red-600 font-medium">{eur(form.costeSesion)}</td>
-                  <td className="px-4 py-2.5" />
-                </tr>
-                <tr className="bg-primary-50/50">
-                  <td className="px-5 py-2.5 text-gray-900 font-semibold">Beneficio neto</td>
-                  <td className="px-4 py-2.5" />
-                  <td className={`px-4 py-2.5 text-right tabular-nums font-bold ${benefitColor}`}>{eur(calc.beneficioNeto)}</td>
-                  <td className={`px-4 py-2.5 text-right tabular-nums font-bold ${roiColor}`}>ROI: {pct(calc.roi)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Export + Hint */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-400 px-1">
-            Todos los calculos son estimaciones basadas en los datos introducidos.
-          </p>
-          <ExportButtons
-            onExport={handleExport}
-            getPreviewData={getPreviewData}
-            generatePdfBlob={generatePdfBlob}
-            previewTitle="Calculadora Sesion de Fotos"
-            previewSubtitle={`Horizonte: ${form.horizonte} meses`}
-            variant="ghost"
-            size="sm"
-          />
-        </div>
+        {/* Hint */}
+        <p className="text-xs text-gray-400 px-1">
+          Todos los calculos son estimaciones basadas en los datos introducidos.
+        </p>
       </div>
     </div>
   );

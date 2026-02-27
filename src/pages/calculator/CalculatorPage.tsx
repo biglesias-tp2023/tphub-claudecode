@@ -1,4 +1,5 @@
 import { useSessionState } from '@/hooks/useSessionState';
+import { DashboardFilters } from '@/features/dashboard';
 import { DeliveryMarginCalc } from './DeliveryMarginCalc';
 import { PhotoSessionCalc } from './PhotoSessionCalc';
 
@@ -21,6 +22,9 @@ export function CalculatorPage() {
           Herramientas de cálculo para consultoría de delivery
         </p>
       </div>
+
+      {/* Filters */}
+      <DashboardFilters />
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
