@@ -14,6 +14,7 @@ export const ROUTES = {
   REPUTATION: '/reputation',
   STRATEGIC: '/strategic',
   COMPSET: '/compset',
+  CALCULATOR: '/calculator',
   CALENDAR: '/calendar',
   HEATMAP: '/heatmap',
   AUDITS: '/audits',
