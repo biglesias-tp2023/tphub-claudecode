@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail, buildAlertEmailHtml } from './email.js';
 
 /**
- * Send a test alert to Slack.
+ * Send a test alert to Slack or Email.
  * Called from the AlertsModal "Enviar prueba" button.
  *
  * Auth: Supabase JWT (same as frontend session).
@@ -86,6 +87,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, channel: 'slack' });
   }
 
-  // Email test not implemented yet
-  return res.status(200).json({ ok: true, channel, message: 'Email test not implemented yet' });
+  if (channel === 'email') {
+    const html = buildAlertEmailHtml(firstName, dateLabel, [
+      {
+        title: 'Pedidos (ejemplo)',
+        items: [
+          '<strong>Il Capriccio Napoletano</strong> | Gran Via (Glovo) — 12 pedidos (media: 35) → -66%',
+          '<strong>Compa</strong> | Malasana (UberEats) — 8 pedidos (media: 22) → -64%',
+        ],
+      },
+      {
+        title: 'Resenas (ejemplo)',
+        items: [
+          '<strong>Asi se Asa</strong> | Chamberi (Glovo) — Rating: 3.2 (media: 4.1) | 5 negativas',
+        ],
+      },
+    ]);
+
+    const sent = await sendEmail({
+      to: user.email!,
+      subject: `[PRUEBA] Alertas diarias — ${dateLabel}`,
+      html,
+    });
+
+    if (!sent) {
+      return res.status(502).json({ error: 'Failed to send email' });
+    }
+
+    return res.status(200).json({ ok: true, channel: 'email' });
+  }
+
+  return res.status(400).json({ error: 'Invalid channel' });
 }
