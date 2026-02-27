@@ -118,7 +118,9 @@ export function useStrategicPageState() {
   } = useDashboardFiltersStore();
 
   const effectiveCompanyIds = globalCompanyIds.length > 0 ? globalCompanyIds : companyIds;
-  const primaryCompanyId = effectiveCompanyIds[0] ?? '';
+  const primaryCompanyId = effectiveCompanyIds.length > 0
+    ? effectiveCompanyIds[effectiveCompanyIds.length - 1]
+    : '';
 
   // Expand multi-portal IDs for brand/restaurant filters
   const { data: allBrands = [] } = useBrands();
