@@ -1,19 +1,37 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Clock, Hash, ShieldAlert, Info } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { Check, Clock, Hash, Info, Send } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal/Modal';
+import { ToastContainer } from '@/components/ui';
 import { cn } from '@/utils/cn';
+import { useToast } from '@/hooks/useToast';
 import { useProfile } from '@/stores/authStore';
 import { useCompanies } from '@/features/clients/hooks/useCompanies';
 import {
   useAlertPreferences,
-  useBulkUpsertAlertPreferences,
 } from '@/features/my-clients/hooks/useAlertPreferences';
-import { ALERT_DEFAULTS, type AlertPreferenceInput } from '@/services/alertPreferences';
-import type { GlobalThresholds } from './CompanyAlertCard';
+import { useAlertConfig } from '@/features/my-clients/hooks/useAlertConfig';
+import type { AlertPreferenceInput } from '@/services/alertPreferences';
+import type { AlertFrequency } from '@/features/my-clients/hooks/useAlertConfig';
 
 interface AlertsModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+// ─── Deterministic hash ───
+
+function hashString(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function seededRandom(seed: number): number {
+  // Returns 0-1 from integer seed
+  const x = Math.sin(seed * 9301 + 49297) * 10000;
+  return x - Math.floor(x);
 }
 
 // ─── Urgency scoring ───
@@ -24,66 +42,48 @@ interface CompanyAlert {
   deviations: { label: string; value: string; threshold: string; deviation: string }[];
 }
 
-function computeUrgencyScore(
-  thresholds: GlobalThresholds,
-  pref: AlertPreferenceInput,
-): { score: number; deviations: CompanyAlert['deviations'] } {
-  // Mock deviations — in production these come from real data
-  const mockDeviations: Record<string, { actual: number; weight: number; format: (v: number) => string; thresholdFmt: (v: number) => string }> = {
-    orders: {
-      actual: -(Math.abs(thresholds.orders) + Math.floor(Math.random() * 20)),
-      weight: 30,
-      format: (v) => `${v}%`,
-      thresholdFmt: (v) => `${v}%`,
-    },
-    reviews: {
-      actual: thresholds.reviews - (0.3 + Math.random() * 0.8),
-      weight: 25,
-      format: (v) => v.toFixed(1),
-      thresholdFmt: (v) => v.toFixed(1),
-    },
-    adsRoas: {
-      actual: thresholds.adsRoas - (0.5 + Math.random() * 1.5),
-      weight: 25,
-      format: (v) => `${v.toFixed(1)}x`,
-      thresholdFmt: (v) => `${v.toFixed(1)}x`,
-    },
-    promos: {
-      actual: thresholds.promos + (2 + Math.floor(Math.random() * 10)),
-      weight: 20,
-      format: (v) => `${v}%`,
-      thresholdFmt: (v) => `${v}%`,
-    },
-  };
+interface Thresholds {
+  orders: number;
+  reviews: number;
+  adsRoas: number;
+  promos: number;
+}
 
+function computeUrgencyScore(
+  thresholds: Thresholds,
+  pref: AlertPreferenceInput,
+  companyName: string,
+): { score: number; deviations: CompanyAlert['deviations'] } {
   let totalScore = 0;
   const deviations: CompanyAlert['deviations'] = [];
 
   if (pref.ordersEnabled) {
     const th = pref.ordersThreshold ?? thresholds.orders;
-    const actual = mockDeviations.orders.actual;
+    const r = seededRandom(hashString(companyName + 'orders'));
+    const actual = -(Math.abs(th) + Math.floor(r * 20));
     if (actual < th) {
       const dev = Math.abs(actual - th);
-      totalScore += Math.min(dev * 1.5, mockDeviations.orders.weight);
+      totalScore += Math.min(dev * 1.5, 30);
       deviations.push({
         label: 'Pedidos',
-        value: mockDeviations.orders.format(actual),
-        threshold: mockDeviations.orders.thresholdFmt(th),
-        deviation: mockDeviations.orders.format(actual - th),
+        value: `${actual}%`,
+        threshold: `${th}%`,
+        deviation: `${actual - th}%`,
       });
     }
   }
 
   if (pref.reviewsEnabled) {
     const th = pref.reviewsThreshold ?? thresholds.reviews;
-    const actual = mockDeviations.reviews.actual;
+    const r = seededRandom(hashString(companyName + 'reviews'));
+    const actual = th - (0.3 + r * 0.8);
     if (actual < th) {
       const dev = Math.abs(actual - th);
-      totalScore += Math.min(dev * 8, mockDeviations.reviews.weight);
+      totalScore += Math.min(dev * 8, 25);
       deviations.push({
         label: 'Resenas',
-        value: mockDeviations.reviews.format(actual),
-        threshold: mockDeviations.reviews.thresholdFmt(th),
+        value: actual.toFixed(1),
+        threshold: th.toFixed(1),
         deviation: `-${(th - actual).toFixed(1)}`,
       });
     }
@@ -91,14 +91,15 @@ function computeUrgencyScore(
 
   if (pref.adsEnabled) {
     const th = pref.adsRoasThreshold ?? thresholds.adsRoas;
-    const actual = mockDeviations.adsRoas.actual;
+    const r = seededRandom(hashString(companyName + 'adsRoas'));
+    const actual = th - (0.5 + r * 1.5);
     if (actual < th) {
       const dev = Math.abs(actual - th);
-      totalScore += Math.min(dev * 10, mockDeviations.adsRoas.weight);
+      totalScore += Math.min(dev * 10, 25);
       deviations.push({
         label: 'Ads ROAS',
-        value: mockDeviations.adsRoas.format(actual),
-        threshold: mockDeviations.adsRoas.thresholdFmt(th),
+        value: `${actual.toFixed(1)}x`,
+        threshold: `${th.toFixed(1)}x`,
         deviation: `-${(th - actual).toFixed(1)}x`,
       });
     }
@@ -106,14 +107,15 @@ function computeUrgencyScore(
 
   if (pref.promosEnabled) {
     const th = pref.promosThreshold ?? thresholds.promos;
-    const actual = mockDeviations.promos.actual;
+    const r = seededRandom(hashString(companyName + 'promos'));
+    const actual = th + (2 + Math.floor(r * 10));
     if (actual > th) {
       const dev = Math.abs(actual - th);
-      totalScore += Math.min(dev * 2, mockDeviations.promos.weight);
+      totalScore += Math.min(dev * 2, 20);
       deviations.push({
         label: 'Promos',
-        value: mockDeviations.promos.format(actual),
-        threshold: mockDeviations.promos.thresholdFmt(th),
+        value: `${actual}%`,
+        threshold: `${th}%`,
         deviation: `+${actual - th}%`,
       });
     }
@@ -122,13 +124,13 @@ function computeUrgencyScore(
   return { score: Math.round(totalScore), deviations };
 }
 
-function getSeverity(score: number): { label: string; color: string; borderColor: string; dotColor: string; bgColor: string } {
+function getSeverity(score: number) {
   if (score >= 60) return { label: 'CRITICO', color: 'text-red-700', borderColor: 'border-l-red-500', dotColor: 'bg-red-500', bgColor: 'bg-red-50' };
   if (score >= 30) return { label: 'URGENTE', color: 'text-orange-700', borderColor: 'border-l-orange-500', dotColor: 'bg-orange-500', bgColor: 'bg-orange-50' };
   return { label: 'ATENCION', color: 'text-amber-700', borderColor: 'border-l-amber-500', dotColor: 'bg-amber-500', bgColor: 'bg-amber-50' };
 }
 
-// ─── Date helper ───
+// ─── Date helpers ───
 
 function getDateLabel(): string {
   const yesterday = new Date();
@@ -138,13 +140,56 @@ function getDateLabel(): string {
   return `${days[yesterday.getDay()]} ${yesterday.getDate()} ${months[yesterday.getMonth()]}`;
 }
 
+function getNextSendLabel(frequency: AlertFrequency): string {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...6=Sat
+  const days = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+  let nextDate: Date;
+
+  if (frequency === 'daily') {
+    // Tomorrow
+    nextDate = new Date(now);
+    nextDate.setDate(nextDate.getDate() + 1);
+  } else if (frequency === 'weekdays') {
+    // Next weekday (Mon-Fri)
+    nextDate = new Date(now);
+    if (dayOfWeek === 5) nextDate.setDate(nextDate.getDate() + 3); // Fri → Mon
+    else if (dayOfWeek === 6) nextDate.setDate(nextDate.getDate() + 2); // Sat → Mon
+    else nextDate.setDate(nextDate.getDate() + 1); // Next day
+  } else {
+    // Weekly: next Monday
+    nextDate = new Date(now);
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+    nextDate.setDate(nextDate.getDate() + daysUntilMonday);
+  }
+
+  return `${days[nextDate.getDay()]} ${nextDate.getDate()} ${months[nextDate.getMonth()]} · 08:30 CET`;
+}
+
 function getFirstName(fullName: string | null): string {
   if (!fullName) return 'Consultor';
   return fullName.split(' ')[0];
 }
 
-// ─── Debounce constant ───
-const DEBOUNCE_MS = 800;
+function getRelativeTime(isoDate: string | null): string | null {
+  if (!isoDate) return null;
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 10) return 'ahora';
+  if (seconds < 60) return `hace ${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `hace ${hours}h`;
+}
+
+const FREQUENCY_OPTIONS: { value: AlertFrequency; label: string }[] = [
+  { value: 'weekdays', label: 'Diaria (L-V)' },
+  { value: 'daily', label: 'Diaria (7 dias)' },
+  { value: 'weekly', label: 'Semanal (lunes)' },
+];
 
 // ─── Component ───
 
@@ -153,37 +198,16 @@ export function AlertsModal({ isOpen, onClose }: AlertsModalProps) {
   const consultantId = profile?.id ?? '';
   const consultantName = profile?.fullName ?? 'Consultor';
   const firstName = getFirstName(profile?.fullName ?? null);
+  const toast = useToast();
 
   const { data: allCompanies = [] } = useCompanies();
   const { data: savedPrefs = [] } = useAlertPreferences(consultantId);
-  const bulkUpsert = useBulkUpsertAlertPreferences();
 
-  // ─── Local state ───
-  const [globalChannel, setGlobalChannel] = useState<'slack' | 'email'>('slack');
-  const [globalThresholds, setGlobalThresholds] = useState<GlobalThresholds>({
-    orders: ALERT_DEFAULTS.ordersThreshold,
-    reviews: ALERT_DEFAULTS.reviewsThreshold,
-    adsRoas: ALERT_DEFAULTS.adsRoasThreshold,
-    promos: ALERT_DEFAULTS.promosThreshold,
-  });
+  const { config, setConfig } = useAlertConfig(consultantId);
+
   const [previewTab, setPreviewTab] = useState<'slack' | 'email'>('slack');
-
-  // Seed random once per open so urgency scores are stable
-  const [seed] = useState(() => Math.random());
-
-  // Initialize from saved prefs
-  const initialized = useRef(false);
-  useEffect(() => {
-    if (!isOpen || initialized.current || savedPrefs.length === 0) return;
-    const first = savedPrefs[0];
-    setGlobalChannel(first.slackEnabled ? 'slack' : 'email');
-    initialized.current = true;
-  }, [isOpen, savedPrefs]);
-
-  // Reset on close
-  useEffect(() => {
-    if (!isOpen) initialized.current = false;
-  }, [isOpen]);
+  const [sendingTest, setSendingTest] = useState(false);
+  const testTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // ─── Assigned companies ───
   const assignedCompanies = useMemo(() => {
@@ -214,241 +238,276 @@ export function AlertsModal({ isOpen, onClose }: AlertsModalProps) {
     return map;
   }, [savedPrefs]);
 
-  // ─── Companies under thresholds (with urgency) ───
+  // ─── Companies under thresholds (deterministic mocks) ───
   const alertCompanies = useMemo(() => {
-    // Use seed to make random deterministic per modal open
-    let rng = seed;
-    const nextRandom = () => {
-      rng = (rng * 9301 + 49297) % 233280;
-      return rng / 233280;
-    };
-
     const results: CompanyAlert[] = [];
-
     for (const company of assignedCompanies) {
       const pref = prefsMap.get(company.id);
       if (!pref) continue;
       const isTracking = !!(pref.ordersEnabled || pref.reviewsEnabled || pref.adsEnabled || pref.promosEnabled);
       if (!isTracking) continue;
 
-      // Override Math.random temporarily for deterministic scores
-      const origRandom = Math.random;
-      Math.random = nextRandom;
-      const { score, deviations } = computeUrgencyScore(globalThresholds, pref);
-      Math.random = origRandom;
-
+      const { score, deviations } = computeUrgencyScore(config.thresholds, pref, company.name);
       if (deviations.length > 0) {
         results.push({ name: company.name, score, deviations });
       }
     }
-
     return results.sort((a, b) => b.score - a.score);
-  }, [assignedCompanies, prefsMap, globalThresholds, seed]);
+  }, [assignedCompanies, prefsMap, config.thresholds]);
 
-  // ─── Auto-save thresholds ───
-  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const monitoredCount = useMemo(() => {
+    let count = 0;
+    for (const company of assignedCompanies) {
+      const pref = prefsMap.get(company.id);
+      if (pref && (pref.ordersEnabled || pref.reviewsEnabled || pref.adsEnabled || pref.promosEnabled)) {
+        count++;
+      }
+    }
+    return count;
+  }, [assignedCompanies, prefsMap]);
 
-  const saveThresholds = useCallback(async () => {
-    const edits: AlertPreferenceInput[] = [];
-    for (const [, pref] of prefsMap) {
-      // Only update channel, thresholds stay as-is (they use global fallback)
-      edits.push({
-        ...pref,
-        slackEnabled: globalChannel === 'slack',
-        emailEnabled: globalChannel === 'email',
-      });
-    }
-    if (edits.length > 0) {
-      try { await bulkUpsert.mutateAsync(edits); } catch { /* silent */ }
-    }
-  }, [prefsMap, globalChannel, bulkUpsert]);
+  // ─── Handlers ───
+
+  const handleToggleEnabled = useCallback(() => {
+    setConfig((prev) => ({ ...prev, enabled: !prev.enabled }));
+  }, [setConfig]);
 
   const handleChannelChange = useCallback((channel: 'slack' | 'email') => {
-    setGlobalChannel(channel);
-    clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(saveThresholds, DEBOUNCE_MS);
-  }, [saveThresholds]);
+    setConfig((prev) => ({ ...prev, channel }));
+  }, [setConfig]);
 
-  const handleThresholdChange = useCallback((field: keyof GlobalThresholds, value: number) => {
-    setGlobalThresholds((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const handleFrequencyChange = useCallback((frequency: AlertFrequency) => {
+    setConfig((prev) => ({ ...prev, frequency }));
+  }, [setConfig]);
+
+  const handleThresholdChange = useCallback((field: keyof typeof config.thresholds, value: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      thresholds: { ...prev.thresholds, [field]: value },
+    }));
+  }, [setConfig]);
+
+  const handleSendTest = useCallback(() => {
+    setSendingTest(true);
+    clearTimeout(testTimerRef.current);
+    testTimerRef.current = setTimeout(() => {
+      setSendingTest(false);
+      toast.success(`Prueba enviada a tu ${config.channel === 'slack' ? 'Slack' : 'Email'}`);
+    }, 1500);
+  }, [config.channel, toast]);
 
   const dateLabel = getDateLabel();
   const underThresholdCount = alertCompanies.length;
+  const savedTimeLabel = getRelativeTime(config.lastSavedAt);
+  const isDisabled = !config.enabled;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl" title="Alertas" description="Configura y previsualiza tus alertas diarias">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ─── Left Panel: Configuration ─── */}
-        <div className="space-y-5">
-          {/* Channel selector */}
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Canal de envio</h3>
-            <div className="flex gap-2">
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" title="Alertas" description="Configura tus alertas diarias">
+      {/* ─── Status Banner ─── */}
+      <div className={cn(
+        'rounded-lg border p-4 mb-6 transition-colors',
+        config.enabled
+          ? 'bg-emerald-50 border-emerald-200'
+          : 'bg-gray-50 border-gray-200'
+      )}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className={cn(
+              'relative flex h-3 w-3',
+              config.enabled && 'animate-pulse'
+            )}>
+              <span className={cn(
+                'absolute inline-flex h-full w-full rounded-full opacity-75',
+                config.enabled ? 'bg-emerald-400 animate-ping' : 'bg-gray-300'
+              )} />
+              <span className={cn(
+                'relative inline-flex rounded-full h-3 w-3',
+                config.enabled ? 'bg-emerald-500' : 'bg-gray-400'
+              )} />
+            </span>
+            <span className={cn(
+              'text-sm font-semibold',
+              config.enabled ? 'text-emerald-800' : 'text-gray-600'
+            )}>
+              {config.enabled ? 'Alertas activas' : 'Alertas desactivadas'}
+            </span>
+          </div>
+
+          {/* Toggle switch */}
+          <button
+            onClick={handleToggleEnabled}
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+              config.enabled ? 'bg-emerald-500' : 'bg-gray-300'
+            )}
+            role="switch"
+            aria-checked={config.enabled}
+          >
+            <span className={cn(
+              'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm',
+              config.enabled ? 'translate-x-6' : 'translate-x-1'
+            )} />
+          </button>
+        </div>
+
+        {config.enabled && (
+          <div className="mt-2 space-y-0.5">
+            <p className="text-xs text-emerald-700 flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              Proximo envio: {getNextSendLabel(config.frequency)}
+            </p>
+            <p className="text-xs text-emerald-600">
+              {monitoredCount} empresas monitorizadas · {underThresholdCount} bajo umbral
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Configuration + Preview ─── */}
+      <div className={cn(
+        'transition-all duration-200',
+        isDisabled && 'opacity-40 pointer-events-none select-none'
+      )}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ─── Left Panel: Configuration ─── */}
+          <div className="space-y-5">
+            {/* Channel selector */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Canal de envio</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleChannelChange('slack')}
+                  className={cn(
+                    'px-4 py-1.5 text-sm rounded-full border transition-colors',
+                    config.channel === 'slack'
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  )}
+                >
+                  Slack
+                </button>
+                <button
+                  onClick={() => handleChannelChange('email')}
+                  className={cn(
+                    'px-4 py-1.5 text-sm rounded-full border transition-colors',
+                    config.channel === 'email'
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  )}
+                >
+                  Email
+                </button>
+              </div>
+            </div>
+
+            {/* Frequency */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Frecuencia</h3>
+              <select
+                value={config.frequency}
+                onChange={(e) => handleFrequencyChange(e.target.value as AlertFrequency)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              >
+                {FREQUENCY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Thresholds */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Umbrales</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <ThresholdCard label="Pedidos" icon={<Hash className="w-4 h-4" />} value={config.thresholds.orders} suffix="%" onChange={(v) => handleThresholdChange('orders', v)} />
+                <ThresholdCard label="Resenas" icon={<span className="text-sm">&#9733;</span>} value={config.thresholds.reviews} suffix="" onChange={(v) => handleThresholdChange('reviews', v)} step={0.1} />
+                <ThresholdCard label="Ads ROAS" icon={<span className="text-sm">&#128226;</span>} value={config.thresholds.adsRoas} suffix="x" onChange={(v) => handleThresholdChange('adsRoas', v)} step={0.1} />
+                <ThresholdCard label="Promos" icon={<span className="text-sm">&#127915;</span>} value={config.thresholds.promos} suffix="%" onChange={(v) => handleThresholdChange('promos', v)} />
+              </div>
+            </div>
+          </div>
+
+          {/* ─── Right Panel: Preview ─── */}
+          <div className="space-y-3">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200">
               <button
-                onClick={() => handleChannelChange('slack')}
+                onClick={() => setPreviewTab('slack')}
                 className={cn(
-                  'px-4 py-1.5 text-sm rounded-full border transition-colors',
-                  globalChannel === 'slack'
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  'px-4 py-2 text-sm font-medium transition-colors',
+                  previewTab === 'slack'
+                    ? 'text-primary-700 border-b-2 border-primary-600'
+                    : 'text-gray-500 hover:text-gray-700'
                 )}
               >
                 Slack
               </button>
               <button
-                onClick={() => handleChannelChange('email')}
+                onClick={() => setPreviewTab('email')}
                 className={cn(
-                  'px-4 py-1.5 text-sm rounded-full border transition-colors',
-                  globalChannel === 'email'
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  'px-4 py-2 text-sm font-medium transition-colors',
+                  previewTab === 'email'
+                    ? 'text-primary-700 border-b-2 border-primary-600'
+                    : 'text-gray-500 hover:text-gray-700'
                 )}
               >
                 Email
               </button>
             </div>
-          </div>
 
-          {/* Send time */}
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Hora de envio</h3>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span>08:30 CET (lun-vie)</span>
-            </div>
-          </div>
-
-          {/* Global thresholds */}
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Umbrales globales</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <ThresholdCard label="Pedidos" icon={<Hash className="w-4 h-4" />} value={globalThresholds.orders} suffix="%" onChange={(v) => handleThresholdChange('orders', v)} />
-              <ThresholdCard label="Resenas" icon={<span className="text-sm">&#9733;</span>} value={globalThresholds.reviews} suffix="" onChange={(v) => handleThresholdChange('reviews', v)} step={0.1} />
-              <ThresholdCard label="Ads ROAS" icon={<span className="text-sm">&#128226;</span>} value={globalThresholds.adsRoas} suffix="x" onChange={(v) => handleThresholdChange('adsRoas', v)} step={0.1} />
-              <ThresholdCard label="Promos" icon={<span className="text-sm">&#127915;</span>} value={globalThresholds.promos} suffix="%" onChange={(v) => handleThresholdChange('promos', v)} />
-            </div>
-          </div>
-
-          {/* Companies under threshold */}
-          <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Empresas ({underThresholdCount} bajo umbral)
-            </h3>
-            {underThresholdCount === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center">
-                <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
-                  <ShieldAlert className="w-5 h-5 text-emerald-500" />
-                </div>
-                <p className="text-sm text-gray-500">Ningun cliente bajo umbral</p>
-                <p className="text-xs text-gray-400 mt-1">Todos tus clientes estan dentro de los parametros</p>
-              </div>
+            {/* Preview content */}
+            {previewTab === 'slack' ? (
+              <SlackPreview firstName={firstName} alertCompanies={alertCompanies} dateLabel={dateLabel} />
             ) : (
-              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                {alertCompanies.map((company, idx) => {
-                  const severity = getSeverity(company.score);
-                  return (
-                    <div
-                      key={company.name}
-                      className={cn(
-                        'border-l-4 rounded-lg bg-white border border-gray-200 p-3',
-                        severity.borderColor
-                      )}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm font-medium text-gray-900">
-                          #{idx + 1} {company.name}
-                        </span>
-                        <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', severity.bgColor, severity.color)}>
-                          {severity.label}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        {company.deviations.map((d) => (
-                          <span key={d.label} className="text-xs text-gray-500">
-                            {d.label}: <span className="font-medium text-gray-700">{d.value}</span>
-                            <span className="text-gray-400"> (umbral {d.threshold})</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <EmailPreview consultantName={consultantName} alertCompanies={alertCompanies} dateLabel={dateLabel} />
             )}
-          </div>
-        </div>
 
-        {/* ─── Right Panel: Preview ─── */}
-        <div className="space-y-3">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-gray-900">
-                Vista previa
-                <span className="text-gray-400 font-normal"> · {firstName} ({getInitials(consultantName)})</span>
-              </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {underThresholdCount} clientes bajo umbral · {globalChannel === 'slack' ? 'Slack' : 'Email'}
-              </p>
+            {/* Urgency legend */}
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /> Critico</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" /> Urgente</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Atencion</span>
             </div>
-          </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200">
-            <button
-              onClick={() => setPreviewTab('slack')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium transition-colors',
-                previewTab === 'slack'
-                  ? 'text-primary-700 border-b-2 border-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              )}
-            >
-              Slack
-            </button>
-            <button
-              onClick={() => setPreviewTab('email')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium transition-colors',
-                previewTab === 'email'
-                  ? 'text-primary-700 border-b-2 border-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              )}
-            >
-              Email
-            </button>
-          </div>
-
-          {/* Urgency legend */}
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /> Critico</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" /> Urgente</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Atencion</span>
-          </div>
-
-          {/* Preview content */}
-          {previewTab === 'slack' ? (
-            <SlackPreview
-              firstName={firstName}
-              alertCompanies={alertCompanies}
-              dateLabel={dateLabel}
-            />
-          ) : (
-            <EmailPreview
-              consultantName={consultantName}
-              alertCompanies={alertCompanies}
-              dateLabel={dateLabel}
-            />
-          )}
-
-          {/* Footer note */}
-          <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-            <Info className="w-3 h-3 shrink-0" />
-            Ejemplo con datos ficticios
+            {/* Footer note */}
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <Info className="w-3 h-3 shrink-0" />
+              Ejemplo con datos ficticios
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ─── Sticky Footer ─── */}
+      <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+        {/* Save status */}
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          {savedTimeLabel ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-gray-500">Guardado {savedTimeLabel}</span>
+            </>
+          ) : (
+            <span>&nbsp;</span>
+          )}
+        </div>
+
+        {/* Send test */}
+        <button
+          onClick={handleSendTest}
+          disabled={sendingTest || isDisabled}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+            'bg-primary-600 text-white hover:bg-primary-700',
+            'disabled:opacity-50 disabled:cursor-not-allowed'
+          )}
+        >
+          <Send className="w-4 h-4" />
+          {sendingTest ? 'Enviando...' : 'Enviar prueba'}
+        </button>
+      </div>
+
+      {/* Toast container */}
+      <ToastContainer toasts={toast.toasts} onClose={toast.closeToast} />
     </Modal>
   );
 }
@@ -488,14 +547,6 @@ function ThresholdCard({
       </div>
     </div>
   );
-}
-
-// ─── Helpers ───
-
-function getInitials(name: string): string {
-  const parts = name.split(' ');
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  return name.substring(0, 2).toUpperCase();
 }
 
 // ─── Slack Preview ───
@@ -540,8 +591,8 @@ function SlackPreview({
           Resumen de alertas del {dateLabel} · {alertCompanies.length} clientes bajo umbral
         </p>
 
-        {/* Company cards */}
-        {alertCompanies.slice(0, 5).map((company, idx) => {
+        {/* All company cards — no slice limit */}
+        {alertCompanies.map((company, idx) => {
           const severity = getSeverity(company.score);
           const slackDot = company.score >= 60 ? '\u{1F534}' : company.score >= 30 ? '\u{1F7E0}' : '\u{1F7E1}';
 
@@ -591,7 +642,7 @@ function EmailPreview({
   dateLabel: string;
 }) {
   const html = useMemo(() => {
-    const companyCards = alertCompanies.slice(0, 5).map((company, idx) => {
+    const companyCards = alertCompanies.map((company, idx) => {
       const severity = getSeverity(company.score);
       const borderColor = company.score >= 60 ? '#ef4444' : company.score >= 30 ? '#f97316' : '#f59e0b';
       const bgColor = company.score >= 60 ? '#fef2f2' : company.score >= 30 ? '#fff7ed' : '#fffbeb';

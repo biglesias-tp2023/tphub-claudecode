@@ -30,6 +30,7 @@ import { ROUTES } from '@/constants/routes';
 import { CompanySelector } from '@/features/clients';
 import { InviteUserModal } from '@/features/admin/components/InviteUserModal';
 import { AlertsModal } from '@/features/my-clients/components/AlertsModal';
+import { isAlertConfigEnabled } from '@/features/my-clients/hooks/useAlertConfig';
 
 interface NavItem {
   label: string;
@@ -321,7 +322,12 @@ export function Sidebar() {
                     onClick={handleAlerts}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
-                    <Bell className="w-4 h-4 text-gray-400" />
+                    <span className="relative">
+                      <Bell className="w-4 h-4 text-gray-400" />
+                      {isAlertConfigEnabled(user?.id) && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full" />
+                      )}
+                    </span>
                     <span>Alertas</span>
                   </button>
                 </div>

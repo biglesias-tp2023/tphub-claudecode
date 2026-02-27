@@ -8,6 +8,7 @@ import {
   useAlertPreferences,
   useBulkUpsertAlertPreferences,
 } from '@/features/my-clients/hooks/useAlertPreferences';
+import { useAlertConfig } from '@/features/my-clients/hooks/useAlertConfig';
 import { CompanyAlertCard } from '@/features/my-clients/components/CompanyAlertCard';
 import { AlertChannelSelector } from '@/features/my-clients/components/AlertChannelSelector';
 import { ALERT_DEFAULTS, type AlertPreferenceInput } from '@/services/alertPreferences';
@@ -55,14 +56,10 @@ export function MyClientsPage() {
   const [localPrefs, setLocalPrefs] = useState<Map<string, AlertPreferenceInput>>(new Map());
   const localPrefsInitialized = useRef(false);
 
-  // Global channel & thresholds
-  const [globalChannel, setGlobalChannel] = useState<'slack' | 'email'>('slack');
-  const [globalThresholds, setGlobalThresholds] = useState<GlobalThresholds>({
-    orders: ALERT_DEFAULTS.ordersThreshold,
-    reviews: ALERT_DEFAULTS.reviewsThreshold,
-    adsRoas: ALERT_DEFAULTS.adsRoasThreshold,
-    promos: ALERT_DEFAULTS.promosThreshold,
-  });
+  // Shared alert config (localStorage) — channel & thresholds shared with AlertsModal
+  const { config: alertConfig, setConfig: setAlertConfig } = useAlertConfig(consultantId);
+  const globalChannel = alertConfig.channel;
+  const globalThresholds: GlobalThresholds = alertConfig.thresholds;
 
   // Initialize localPrefs from saved data
   useEffect(() => {
@@ -87,11 +84,11 @@ export function MyClientsPage() {
     // Derive global channel from first saved pref
     if (savedPrefs.length > 0) {
       const first = savedPrefs[0];
-      setGlobalChannel(first.slackEnabled ? 'slack' : 'email');
+      setAlertConfig((prev) => ({ ...prev, channel: first.slackEnabled ? 'slack' : 'email' }));
     }
     setLocalPrefs(map);
     localPrefsInitialized.current = true;
-  }, [savedPrefs, prefsLoading]);
+  }, [savedPrefs, prefsLoading, setAlertConfig]);
 
   // Auto-save machinery
   const pendingDirtyIds = useRef<Set<string>>(new Set());
@@ -201,7 +198,7 @@ export function MyClientsPage() {
   }, []);
 
   const handleGlobalChannelChange = useCallback((channel: 'slack' | 'email') => {
-    setGlobalChannel(channel);
+    setAlertConfig((prev) => ({ ...prev, channel }));
     // Update all tracking companies
     setLocalPrefs((prev) => {
       const next = new Map(prev);
@@ -219,11 +216,14 @@ export function MyClientsPage() {
       return next;
     });
     scheduleSave();
-  }, [scheduleSave]);
+  }, [setAlertConfig, scheduleSave]);
 
   const handleGlobalThresholdChange = useCallback((field: keyof GlobalThresholds, value: number) => {
-    setGlobalThresholds((prev) => ({ ...prev, [field]: value }));
-  }, []);
+    setAlertConfig((prev) => ({
+      ...prev,
+      thresholds: { ...prev.thresholds, [field]: value },
+    }));
+  }, [setAlertConfig]);
 
   const loading = companiesLoading || prefsLoading;
 
