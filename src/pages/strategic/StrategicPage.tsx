@@ -104,7 +104,7 @@ export function StrategicPage() {
       ) : (
         <>
           {/* Sales Projection */}
-          {state.hasSalesProjection && state.salesProjection && (
+          {state.hasSalesProjection && state.salesProjection ? (
             <SalesProjection
               config={state.salesProjection.config}
               targetRevenue={state.salesProjection.targetRevenue}
@@ -121,6 +121,25 @@ export function StrategicPage() {
               realAdsByMonth={state.realAdsByMonth}
               commissions={state.commissions}
             />
+          ) : (
+            <button
+              onClick={() => state.setIsSetupOpen(true)}
+              className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-dashed border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
+                  <BarChart3 className="w-4.5 h-4.5 text-primary-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Proyeccion de ventas</p>
+                  <p className="text-xs text-gray-500">Configura objetivos de facturacion por canal</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 rounded-lg group-hover:bg-primary-100 transition-colors">
+                <Plus className="w-3.5 h-3.5" />
+                Configurar
+              </span>
+            </button>
           )}
 
           {/* Health Summary Bar */}
