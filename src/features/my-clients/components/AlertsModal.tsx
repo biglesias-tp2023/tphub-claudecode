@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Check, Clock, Hash, Info, Send } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal/Modal';
 import { ToastContainer } from '@/components/ui';
 import { cn } from '@/utils/cn';
 import { useToast } from '@/hooks/useToast';
 import { useProfile } from '@/stores/authStore';
+import { supabase } from '@/services/supabase';
 import { useCompanies } from '@/features/clients/hooks/useCompanies';
 import {
   useAlertPreferences,
@@ -207,7 +208,6 @@ export function AlertsModal({ isOpen, onClose }: AlertsModalProps) {
 
   const [previewTab, setPreviewTab] = useState<'slack' | 'email'>('slack');
   const [sendingTest, setSendingTest] = useState(false);
-  const testTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // ─── Assigned companies ───
   const assignedCompanies = useMemo(() => {
@@ -287,14 +287,36 @@ export function AlertsModal({ isOpen, onClose }: AlertsModalProps) {
     }));
   }, [setConfig]);
 
-  const handleSendTest = useCallback(() => {
+  const handleSendTest = useCallback(async () => {
     setSendingTest(true);
-    clearTimeout(testTimerRef.current);
-    testTimerRef.current = setTimeout(() => {
-      setSendingTest(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error('Sesion expirada');
+        return;
+      }
+      const resp = await fetch('/api/alerts/send-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          channel: config.channel,
+          consultantName,
+        }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.error ?? `Error ${resp.status}`);
+      }
       toast.success(`Prueba enviada a tu ${config.channel === 'slack' ? 'Slack' : 'Email'}`);
-    }, 1500);
-  }, [config.channel, toast]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al enviar prueba');
+    } finally {
+      setSendingTest(false);
+    }
+  }, [config.channel, consultantName, toast]);
 
   const dateLabel = getDateLabel();
   const underThresholdCount = alertCompanies.length;
