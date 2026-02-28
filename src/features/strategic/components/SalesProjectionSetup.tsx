@@ -9,7 +9,8 @@
  * @module features/strategic/components/SalesProjectionSetup
  */
 import { useState, useMemo, useEffect } from 'react';
-import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Sparkles, Calendar, Edit3 } from 'lucide-react';
+import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Sparkles, Calendar, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
+
 import { cn } from '@/utils/cn';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
@@ -242,7 +243,7 @@ function InvestmentCard({
 
 /** Step 3: Baseline (punto de partida) */
 function BaselineStep({
-  channels, baseline, onChange, isEditing, onToggleEdit, isLoadingRevenue, monthLabel, isPartialMonth,
+  channels, baseline, onChange, isEditing, onToggleEdit, isLoadingRevenue, isError, onRetry, monthLabel, isPartialMonth,
 }: {
   channels: SalesChannel[];
   baseline: ChannelMonthEntry;
@@ -250,6 +251,10 @@ function BaselineStep({
   isEditing: boolean;
   onToggleEdit: () => void;
   isLoadingRevenue?: boolean;
+  /** Whether fetching revenue data failed */
+  isError?: boolean;
+  /** Retry fetching revenue data */
+  onRetry?: () => void;
   /** Label for the baseline month (e.g. "Febrero 2026") */
   monthLabel: string;
   /** Whether the baseline month is partial (current month) */
@@ -323,12 +328,30 @@ function BaselineStep({
       </div>
 
       {!isEditing && total > 0 && <p className="text-center text-sm text-gray-500">¿Es correcto? Si no, pulsa <span className="font-medium text-gray-700">Editar</span>.</p>}
-      {isLoadingRevenue && total === 0 && (
+      {isError && total === 0 && (
+        <div className="text-center py-3 bg-red-50 rounded-lg border border-red-100">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <AlertTriangle className="w-4 h-4 text-red-500" />
+            <p className="text-sm font-medium text-red-700">Error al cargar datos de ventas</p>
+          </div>
+          <p className="text-xs text-red-600 mb-2">No se pudo conectar con el servicio de datos. Puedes reintentar o introducir los valores manualmente.</p>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
+      {isLoadingRevenue && !isError && total === 0 && (
         <div className="text-center py-3 bg-primary-50 rounded-lg border border-primary-100">
           <p className="text-sm text-primary-700">Cargando datos reales del CRP Portal...</p>
         </div>
       )}
-      {!isLoadingRevenue && total === 0 && (
+      {!isLoadingRevenue && !isError && total === 0 && (
         <div className="text-center py-3 bg-amber-50 rounded-lg border border-amber-100">
           <p className="text-sm text-amber-700">No tenemos datos de ventas. Puedes introducirlos manualmente.</p>
         </div>
@@ -479,6 +502,7 @@ function TargetsStep({
 // ============================================
 
 export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds }: SalesProjectionSetupProps) {
+
   const [step, setStep] = useState<Step>('channels');
   const [channels, setChannels] = useState<SalesChannel[]>(['glovo', 'ubereats', 'justeat']);
   const [mode, setMode] = useState<SalesInvestmentMode>('global');
@@ -496,12 +520,23 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   const effectiveCompanyIds = propCompanyIds?.length ? propCompanyIds : (globalCompanyIds.length > 0 ? globalCompanyIds : []);
   const effectiveBrandIds = propBrandIds?.length ? propBrandIds : (filterBrandIds.length > 0 ? filterBrandIds : undefined);
   const effectiveAddressIds = propAddressIds?.length ? propAddressIds : (filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined);
-  const { revenueByMonth: autoRevenue, lastMonthRevenue: autoLastMonthRevenue, latestMonthWithData, isLoading: isLoadingRevenue } = useActualRevenueByMonth({
+  const { revenueByMonth: autoRevenue, lastMonthRevenue: autoLastMonthRevenue, latestMonthWithData, isLoading: isLoadingRevenue, isError: isRevenueError, error: revenueError } = useActualRevenueByMonth({
     companyIds: isOpen ? effectiveCompanyIds : [],
     brandIds: effectiveBrandIds,
     addressIds: effectiveAddressIds,
     monthsCount: 6,
   });
+
+  // DEV: warn when revenue fetch fails or returns no data despite having company IDs
+  useEffect(() => {
+    if (import.meta.env.DEV && !isLoadingRevenue && isOpen && effectiveCompanyIds.length > 0) {
+      if (isRevenueError) {
+        console.warn('[SalesProjectionSetup] Revenue fetch failed:', revenueError?.message);
+      } else if (autoLastMonthRevenue === 0 && !latestMonthWithData) {
+        console.warn('[SalesProjectionSetup] No revenue data found for companies:', effectiveCompanyIds);
+      }
+    }
+  }, [isLoadingRevenue, isRevenueError, revenueError, autoLastMonthRevenue, latestMonthWithData, effectiveCompanyIds, isOpen]);
 
   // Auto-populate baseline when CRP data arrives (only once per wizard open)
   // Tries last month first; if 0, falls back to the latest month with data
