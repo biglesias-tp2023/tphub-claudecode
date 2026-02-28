@@ -46,7 +46,6 @@ const navItems: NavItem[] = [
   { label: 'Publicidad', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'New!', color: 'green' } },
   { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Calculadora', icon: Calculator, to: ROUTES.CALCULATOR, tag: { text: 'New!', color: 'green' } },
-  { label: 'Alertas', icon: Bell, to: ROUTES.ALERTS, tag: { text: 'New!', color: 'green' } },
   { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
   { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
