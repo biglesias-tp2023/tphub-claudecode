@@ -242,7 +242,7 @@ function InvestmentCard({
 
 /** Step 3: Baseline (punto de partida) */
 function BaselineStep({
-  channels, baseline, onChange, isEditing, onToggleEdit, isLoadingRevenue,
+  channels, baseline, onChange, isEditing, onToggleEdit, isLoadingRevenue, monthLabel, isPartialMonth,
 }: {
   channels: SalesChannel[];
   baseline: ChannelMonthEntry;
@@ -250,6 +250,10 @@ function BaselineStep({
   isEditing: boolean;
   onToggleEdit: () => void;
   isLoadingRevenue?: boolean;
+  /** Label for the baseline month (e.g. "Febrero 2026") */
+  monthLabel: string;
+  /** Whether the baseline month is partial (current month) */
+  isPartialMonth?: boolean;
 }) {
   const total = channels.reduce((sum, ch) => sum + (baseline[ch] || 0), 0);
 
@@ -257,14 +261,19 @@ function BaselineStep({
     <div className="space-y-6">
       <div className="text-center">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Tu punto de partida</h3>
-        <p className="text-sm text-gray-500">El mes pasado ({getLastMonthLabel()}), tu facturación fue:</p>
+        <p className="text-sm text-gray-500">
+          {isPartialMonth
+            ? <>En {monthLabel} (parcial), tu facturación es:</>
+            : <>El mes pasado ({monthLabel}), tu facturación fue:</>
+          }
+        </p>
       </div>
 
       <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-gray-400" />
-            <span className="text-sm font-medium text-gray-600">{getLastMonthLabel()}</span>
+            <span className="text-sm font-medium text-gray-600">{monthLabel}{isPartialMonth ? ' (parcial)' : ''}</span>
           </div>
           <button
             onClick={onToggleEdit}
@@ -313,7 +322,7 @@ function BaselineStep({
         </div>
       </div>
 
-      {!isEditing && <p className="text-center text-sm text-gray-500">¿Es correcto? Si no, pulsa <span className="font-medium text-gray-700">Editar</span>.</p>}
+      {!isEditing && total > 0 && <p className="text-center text-sm text-gray-500">¿Es correcto? Si no, pulsa <span className="font-medium text-gray-700">Editar</span>.</p>}
       {isLoadingRevenue && total === 0 && (
         <div className="text-center py-3 bg-primary-50 rounded-lg border border-primary-100">
           <p className="text-sm text-primary-700">Cargando datos reales del CRP Portal...</p>
@@ -321,7 +330,12 @@ function BaselineStep({
       )}
       {!isLoadingRevenue && total === 0 && (
         <div className="text-center py-3 bg-amber-50 rounded-lg border border-amber-100">
-          <p className="text-sm text-amber-700">No tenemos datos del mes pasado. Puedes introducirlos manualmente.</p>
+          <p className="text-sm text-amber-700">No tenemos datos de ventas. Puedes introducirlos manualmente.</p>
+        </div>
+      )}
+      {isPartialMonth && total > 0 && (
+        <div className="text-center py-3 bg-blue-50 rounded-lg border border-blue-100">
+          <p className="text-sm text-blue-700">Datos parciales del mes en curso. Puedes ajustarlos pulsando Editar.</p>
         </div>
       )}
     </div>
@@ -482,7 +496,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   const effectiveCompanyIds = propCompanyIds?.length ? propCompanyIds : (globalCompanyIds.length > 0 ? globalCompanyIds : []);
   const effectiveBrandIds = propBrandIds?.length ? propBrandIds : (filterBrandIds.length > 0 ? filterBrandIds : undefined);
   const effectiveAddressIds = propAddressIds?.length ? propAddressIds : (filterRestaurantIds.length > 0 ? filterRestaurantIds : undefined);
-  const { revenueByMonth: autoRevenue, lastMonthRevenue: autoLastMonthRevenue, isLoading: isLoadingRevenue } = useActualRevenueByMonth({
+  const { revenueByMonth: autoRevenue, lastMonthRevenue: autoLastMonthRevenue, latestMonthWithData, isLoading: isLoadingRevenue } = useActualRevenueByMonth({
     companyIds: isOpen ? effectiveCompanyIds : [],
     brandIds: effectiveBrandIds,
     addressIds: effectiveAddressIds,
@@ -490,9 +504,12 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   });
 
   // Auto-populate baseline when CRP data arrives (only once per wizard open)
+  // Tries last month first; if 0, falls back to the latest month with data
   useEffect(() => {
-    if (!baselineLoaded && autoLastMonthRevenue > 0 && !lastMonthRevenue) {
-      // Get last month's key to extract channel breakdown
+    if (baselineLoaded || lastMonthRevenue) return;
+
+    // Option 1: last month has data
+    if (autoLastMonthRevenue > 0) {
       const d = new Date();
       d.setMonth(d.getMonth() - 1);
       const lastMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -506,9 +523,21 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
           justeat: lastMonthData.justeat || 0,
         });
         setBaselineLoaded(true);
+        return;
       }
     }
-  }, [autoRevenue, autoLastMonthRevenue, baselineLoaded, lastMonthRevenue]);
+
+    // Option 2: fallback to most recent month with any data
+    if (latestMonthWithData && !isLoadingRevenue) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBaseline({
+        glovo: latestMonthWithData.revenue.glovo || 0,
+        ubereats: latestMonthWithData.revenue.ubereats || 0,
+        justeat: latestMonthWithData.revenue.justeat || 0,
+      });
+      setBaselineLoaded(true);
+    }
+  }, [autoRevenue, autoLastMonthRevenue, latestMonthWithData, isLoadingRevenue, baselineLoaded, lastMonthRevenue]);
 
   // Reset baselineLoaded when wizard closes/opens
   useEffect(() => {
@@ -517,6 +546,26 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       setBaselineLoaded(false);
     }
   }, [isOpen]);
+
+  // Determine which month the baseline refers to (for labels)
+  const baselineMonthInfo = useMemo(() => {
+    // If last month has data, use last month
+    if (autoLastMonthRevenue > 0) {
+      return { label: getLastMonthLabel(), isPartial: false };
+    }
+    // Fallback to latestMonthWithData
+    if (latestMonthWithData) {
+      const [yearStr, monthStr] = latestMonthWithData.key.split('-');
+      const monthIdx = parseInt(monthStr, 10) - 1;
+      const label = `${MONTH_NAMES[monthIdx]} ${yearStr}`;
+      // Check if it's the current month
+      const now = new Date();
+      const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      return { label, isPartial: latestMonthWithData.key === currentKey };
+    }
+    // No data at all — show last month label
+    return { label: getLastMonthLabel(), isPartial: false };
+  }, [autoLastMonthRevenue, latestMonthWithData]);
 
   const months = useMemo(() => getMonths(6), []);
   const steps: Step[] = ['channels', 'investment', 'baseline', 'targets'];
@@ -587,7 +636,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
             <InvestmentStep channels={channels} mode={mode} onModeChange={setMode} ads={ads} promos={promos} onAdsChange={setAds} onPromosChange={setPromos} />
           )}
           {step === 'baseline' && (
-            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} />
+            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} monthLabel={baselineMonthInfo.label} isPartialMonth={baselineMonthInfo.isPartial} />
           )}
           {step === 'targets' && <TargetsStep channels={channels} targets={targets} onChange={handleTargetChange} baseline={baseline} actualRevenue={autoRevenue} />}
         </div>

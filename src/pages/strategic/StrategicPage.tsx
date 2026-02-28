@@ -59,6 +59,15 @@ const STATUS_FILTERS: { value: ObjectiveStatus | 'all'; label: string }[] = [
 export function StrategicPage() {
   const state = useStrategicPageState();
 
+  // Breadcrumb labels
+  const companyName = state.allCompanies.find(c => c.id === state.primaryCompanyId)?.name;
+  const brandName = state.filterBrandIds.length > 0
+    ? state.allBrands.find(b => b.id === state.filterBrandIds[0])?.name
+    : null;
+  const addressName = state.filterRestaurantIds.length > 0
+    ? state.allRestaurants.find(r => r.id === state.filterRestaurantIds[0])?.name
+    : null;
+
   if (state.error) {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center">
@@ -90,7 +99,18 @@ export function StrategicPage() {
     <div className="space-y-6 pb-8">
       {/* Page Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Estrategia</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Estrategia</h1>
+          {companyName && (
+            <p className="text-sm text-gray-500 mt-0.5">
+              {companyName}
+              {' › '}
+              {brandName || 'Todas las marcas'}
+              {' › '}
+              {addressName || 'Todas las direcciones'}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Dashboard Filters */}

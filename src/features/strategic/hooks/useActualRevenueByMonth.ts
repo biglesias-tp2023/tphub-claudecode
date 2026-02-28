@@ -8,7 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { fetchMonthlyRevenueByChannel } from '@/services/crp-portal';
-import type { GridChannelMonthData } from '@/types';
+import type { GridChannelMonthData, ChannelMonthEntry } from '@/types';
 import type { ChannelId } from '@/types';
 
 interface UseActualRevenueParams {
@@ -26,6 +26,13 @@ interface UseActualRevenueParams {
   monthOffsets?: number[];
 }
 
+interface LatestMonthData {
+  /** Month key (e.g. "2026-02") */
+  key: string;
+  /** Revenue breakdown by channel */
+  revenue: ChannelMonthEntry;
+}
+
 interface ActualRevenueResult {
   /** Revenue by month×channel in GridChannelMonthData format (includes current month) */
   revenueByMonth: GridChannelMonthData;
@@ -35,6 +42,8 @@ interface ActualRevenueResult {
   adsByMonth: GridChannelMonthData;
   /** Total revenue of the last complete (closed) month (for baseline) */
   lastMonthRevenue: number;
+  /** Most recent month with actual revenue data (fallback for baseline) */
+  latestMonthWithData: LatestMonthData | null;
   /** Whether data is loading */
   isLoading: boolean;
 }
@@ -135,7 +144,36 @@ export function useActualRevenueByMonth({
       const lm = revenueByMonth[lastMonth.key];
       const lastMonthRevenue = lm ? lm.glovo + lm.ubereats + lm.justeat : 0;
 
-      return { revenueByMonth, promosByMonth, adsByMonth, lastMonthRevenue };
+      // Find the most recent month with actual data (for baseline fallback)
+      // Current month key to identify it
+      const currentMonthKey = getMonthRange(0).key;
+
+      let latestMonthWithData: LatestMonthData | null = null;
+
+      // Check past months first (most recent to oldest), excluding current month
+      const pastMonthKeys = allMonths
+        .map(m => m.key)
+        .filter(k => k !== currentMonthKey)
+        .sort()
+        .reverse();
+
+      for (const key of pastMonthKeys) {
+        const data = revenueByMonth[key];
+        if (data && (data.glovo + data.ubereats + data.justeat) > 0) {
+          latestMonthWithData = { key, revenue: data };
+          break;
+        }
+      }
+
+      // If no past month has data, try current month (partial)
+      if (!latestMonthWithData) {
+        const currentData = revenueByMonth[currentMonthKey];
+        if (currentData && (currentData.glovo + currentData.ubereats + currentData.justeat) > 0) {
+          latestMonthWithData = { key: currentMonthKey, revenue: currentData };
+        }
+      }
+
+      return { revenueByMonth, promosByMonth, adsByMonth, lastMonthRevenue, latestMonthWithData };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: QUERY_GC_MEDIUM,
@@ -146,6 +184,7 @@ export function useActualRevenueByMonth({
     promosByMonth: data?.promosByMonth ?? {},
     adsByMonth: data?.adsByMonth ?? {},
     lastMonthRevenue: data?.lastMonthRevenue ?? 0,
+    latestMonthWithData: data?.latestMonthWithData ?? null,
     isLoading,
   };
 }

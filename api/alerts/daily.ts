@@ -281,6 +281,36 @@ function groupAnomaliesByConsultant(
     }
   }
 
+  // Bruno Iglesias receives ALL anomalies (global overview)
+  const GLOBAL_ALERT_EMAIL = 'biglesias@thinkpaladar.com';
+  const brunoProfile = profiles.find((p) => p.email === GLOBAL_ALERT_EMAIL);
+  if (brunoProfile) {
+    const group = getOrCreateGroup(brunoProfile, '__global__');
+    group.wantsEmail = true;
+    // Deduplicate: collect company_ids already in his group
+    const existingOrderKeys = new Set(group.orders.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
+    const existingReviewKeys = new Set(group.reviews.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
+    const existingAdsKeys = new Set(group.ads.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
+    const existingPromoKeys = new Set(group.promos.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
+
+    for (const a of orderAnomalies) {
+      const key = `${a.company_id}:${a.store_name}:${a.channel}`;
+      if (!existingOrderKeys.has(key)) { group.orders.push(a); existingOrderKeys.add(key); }
+    }
+    for (const a of reviewAnomalies) {
+      const key = `${a.company_id}:${a.store_name}:${a.channel}`;
+      if (!existingReviewKeys.has(key)) { group.reviews.push(a); existingReviewKeys.add(key); }
+    }
+    for (const a of adsAnomalies) {
+      const key = `${a.company_id}:${a.store_name}:${a.channel}`;
+      if (!existingAdsKeys.has(key)) { group.ads.push(a); existingAdsKeys.add(key); }
+    }
+    for (const a of promoAnomalies) {
+      const key = `${a.company_id}:${a.store_name}:${a.channel}`;
+      if (!existingPromoKeys.has(key)) { group.promos.push(a); existingPromoKeys.add(key); }
+    }
+  }
+
   return groups;
 }
 

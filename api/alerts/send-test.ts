@@ -15,7 +15,7 @@ function getYesterdayLabel(): string {
   yesterday.setDate(yesterday.getDate() - 1);
   const days = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  return `${days[yesterday.getDay()]} ${yesterday.getDate()} ${months[yesterday.getMonth()]}`;
+  return `${days[yesterday.getDay()]} ${yesterday.getDate()} ${months[yesterday.getMonth()]} ${yesterday.getFullYear()}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

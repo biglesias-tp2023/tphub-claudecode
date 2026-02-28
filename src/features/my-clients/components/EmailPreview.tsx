@@ -34,10 +34,8 @@ export function EmailPreview({ consultantName, alertCompanies, dateLabel }: Emai
     <body style="margin:0;padding:0;background:#f3f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
       <div style="max-width:560px;margin:0 auto;padding:24px">
         <div style="background:#095789;border-radius:12px 12px 0 0;padding:24px;text-align:center">
-          <div style="width:48px;height:48px;border-radius:50%;background:white;margin:0 auto 12px;line-height:48px;text-align:center">
-            <span style="color:#095789;font-weight:700;font-size:18px">TP</span>
-          </div>
-          <h1 style="color:white;font-size:18px;margin:0;font-weight:600">Alertas diarias</h1>
+          <img src="/images/logo/icon.svg" alt="TPHub" width="48" height="48" style="display:block;margin:0 auto 12px" />
+          <h1 style="color:white;font-size:18px;margin:0;font-weight:600">Daily Alerts TPHub</h1>
           <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:4px 0 0">${dateLabel}</p>
         </div>
         <div style="background:white;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none">

@@ -1035,11 +1035,6 @@ import { resolveIcon } from '@/utils/iconResolver';
 - El calendario personalizado no aparece al seleccionar "Personalizar"
 - Los filtros de fecha no actualizan datos correctamente en algunos casos
 
-### Migraciones SQL Pendientes en Producción
-
-1. Ejecutar `012_user_invitations.sql` en Supabase SQL Editor
-2. Ejecutar `013_calendar_campaigns_crp_refs.sql` en Supabase SQL Editor
-
 ---
 
 ## Seguridad - Riesgos Aceptados
