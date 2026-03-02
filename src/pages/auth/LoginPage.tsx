@@ -10,7 +10,6 @@ const P600 = '#095789';
 const P700 = '#074567';
 const P800 = '#053448';
 const P900 = '#03222e';
-const A400 = '#ffa166';
 const A500 = '#ff8533';
 
 export function LoginPage() {
@@ -49,14 +48,12 @@ export function LoginPage() {
     >
       {/* Brand header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-        <img
-          src="/images/logo/icon.svg"
-          alt="ThinkPaladar"
-          style={{
-            width: 38,
-            height: 38,
-          }}
-        />
+        <svg width="38" height="38" viewBox="0 0 866 850" fill="none">
+          <path
+            d="m304.81,209.81v-104.9h-120.87v104.9H63.58v135.66h120.36v194.79c0,120.88,84.35,205.23,205.23,205.23h187.73c120.88,0,205.23-84.35,205.23-205.23V209.81h-477.32Zm356.45,316.54c0,54.78-42.61,81.74-84.36,81.74h-187.73c-41.74,0-84.36-26.95-84.36-81.74v-180.88h118.04v109.38c0,33.24,26.94,60.18,60.18,60.18h0c33.24,0,60.18-26.94,60.18-60.18v-109.38h118.04v180.88Z"
+            fill={P600}
+          />
+        </svg>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: P800, letterSpacing: '-0.025em', lineHeight: 1.2 }}>
             thinkpaladar
