@@ -25,15 +25,15 @@ function AuroraWaves({ width, height }: { width: number; height: number }) {
     let t = 0;
 
     const waves = [
-      { r: 9, g: 87, b: 137, alpha: 0.065, speed: 0.007, amp: 65, freq: 0.003, yOff: 0.45 },
-      { r: 11, g: 123, b: 184, alpha: 0.05, speed: 0.005, amp: 50, freq: 0.004, yOff: 0.52 },
-      { r: 255, g: 161, b: 102, alpha: 0.075, speed: 0.008, amp: 55, freq: 0.0028, yOff: 0.5 },
-      { r: 58, g: 159, b: 212, alpha: 0.04, speed: 0.0085, amp: 45, freq: 0.0035, yOff: 0.58 },
-      { r: 255, g: 133, b: 51, alpha: 0.07, speed: 0.009, amp: 50, freq: 0.003, yOff: 0.62 },
-      { r: 255, g: 180, b: 120, alpha: 0.055, speed: 0.006, amp: 45, freq: 0.0032, yOff: 0.68 },
-      { r: 107, g: 184, b: 224, alpha: 0.035, speed: 0.0065, amp: 35, freq: 0.005, yOff: 0.56 },
-      { r: 255, g: 145, b: 70, alpha: 0.045, speed: 0.0055, amp: 50, freq: 0.0022, yOff: 0.74 },
-      { r: 7, g: 69, b: 103, alpha: 0.04, speed: 0.004, amp: 55, freq: 0.002, yOff: 0.8 },
+      { r: 9, g: 87, b: 137, alpha: 0.45, speed: 0.007, amp: 65, freq: 0.003, yOff: 0.45 },
+      { r: 11, g: 123, b: 184, alpha: 0.35, speed: 0.005, amp: 50, freq: 0.004, yOff: 0.52 },
+      { r: 255, g: 161, b: 102, alpha: 0.4, speed: 0.008, amp: 55, freq: 0.0028, yOff: 0.5 },
+      { r: 58, g: 159, b: 212, alpha: 0.3, speed: 0.0085, amp: 45, freq: 0.0035, yOff: 0.58 },
+      { r: 255, g: 133, b: 51, alpha: 0.35, speed: 0.009, amp: 50, freq: 0.003, yOff: 0.62 },
+      { r: 255, g: 180, b: 120, alpha: 0.3, speed: 0.006, amp: 45, freq: 0.0032, yOff: 0.68 },
+      { r: 107, g: 184, b: 224, alpha: 0.25, speed: 0.0065, amp: 35, freq: 0.005, yOff: 0.56 },
+      { r: 255, g: 145, b: 70, alpha: 0.3, speed: 0.0055, amp: 50, freq: 0.0022, yOff: 0.74 },
+      { r: 7, g: 69, b: 103, alpha: 0.35, speed: 0.004, amp: 55, freq: 0.002, yOff: 0.8 },
     ];
 
     function draw() {
@@ -59,12 +59,12 @@ function AuroraWaves({ width, height }: { width: number; height: number }) {
       });
 
       const orbs = [
-        { x: 0.12 + Math.sin(t * 0.003) * 0.06, y: 0.5 + Math.cos(t * 0.002) * 0.04, rad: 240, c: 'rgba(9,87,137,0.035)' },
-        { x: 0.82 + Math.cos(t * 0.0025) * 0.05, y: 0.6 + Math.sin(t * 0.003) * 0.05, rad: 260, c: 'rgba(255,161,102,0.06)' },
-        { x: 0.48 + Math.sin(t * 0.002) * 0.04, y: 0.55 + Math.cos(t * 0.0035) * 0.03, rad: 190, c: 'rgba(11,123,184,0.025)' },
-        { x: 0.3 + Math.cos(t * 0.0018) * 0.05, y: 0.68 + Math.sin(t * 0.0025) * 0.04, rad: 220, c: 'rgba(255,133,51,0.05)' },
-        { x: 0.7 + Math.cos(t * 0.0015) * 0.05, y: 0.52 + Math.sin(t * 0.002) * 0.04, rad: 160, c: 'rgba(58,159,212,0.02)' },
-        { x: 0.6 + Math.sin(t * 0.002) * 0.04, y: 0.75 + Math.cos(t * 0.003) * 0.03, rad: 200, c: 'rgba(255,180,120,0.045)' },
+        { x: 0.12 + Math.sin(t * 0.003) * 0.06, y: 0.5 + Math.cos(t * 0.002) * 0.04, rad: 240, c: 'rgba(9,87,137,0.15)' },
+        { x: 0.82 + Math.cos(t * 0.0025) * 0.05, y: 0.6 + Math.sin(t * 0.003) * 0.05, rad: 260, c: 'rgba(255,161,102,0.2)' },
+        { x: 0.48 + Math.sin(t * 0.002) * 0.04, y: 0.55 + Math.cos(t * 0.0035) * 0.03, rad: 190, c: 'rgba(11,123,184,0.12)' },
+        { x: 0.3 + Math.cos(t * 0.0018) * 0.05, y: 0.68 + Math.sin(t * 0.0025) * 0.04, rad: 220, c: 'rgba(255,133,51,0.18)' },
+        { x: 0.7 + Math.cos(t * 0.0015) * 0.05, y: 0.52 + Math.sin(t * 0.002) * 0.04, rad: 160, c: 'rgba(58,159,212,0.1)' },
+        { x: 0.6 + Math.sin(t * 0.002) * 0.04, y: 0.75 + Math.cos(t * 0.003) * 0.03, rad: 200, c: 'rgba(255,180,120,0.15)' },
       ];
       orbs.forEach((o) => {
         const ox = o.x * width;
