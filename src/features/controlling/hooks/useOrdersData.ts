@@ -132,8 +132,8 @@ export function useOrdersData(params: UseOrdersDataParams) {
     },
     // Only fetch when companies are selected (consistent with useHierarchyData/useWeeklyRevenue)
     enabled: companyIds.length > 0,
-    // Limit retries to prevent amplifying RPC timeouts (default=3 → 1)
-    retry: 1,
+    // Disable auto-retry: retrying expensive RPCs on timeout compounds DB load
+    retry: false,
     staleTime: QUERY_STALE_MEDIUM,
     gcTime: QUERY_GC_MEDIUM,
     placeholderData: keepPreviousData,

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters } from '@/stores/filtersStore';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import type { ChannelId } from '@/types';
@@ -418,9 +418,16 @@ export function useControllingData() {
     };
   }, [hierarchyQuery.data, ordersQuery.data, reviewsAggQuery.data, companyIds, channelIds]);
 
+  const refetch = useCallback(() => {
+    hierarchyQuery.refetch();
+    ordersQuery.refetch();
+    reviewsAggQuery.refetch();
+  }, [hierarchyQuery, ordersQuery, reviewsAggQuery]);
+
   return {
     data,
     isLoading: hierarchyQuery.isLoading || ordersQuery.isLoading,
     error: hierarchyQuery.error || ordersQuery.error,
+    refetch,
   };
 }

@@ -30,6 +30,10 @@ import type { DbCrpOrderHead } from './types';
 import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
+import { chunkedArray } from './utils';
+
+/** Max companies per RPC call to avoid PostgreSQL statement timeouts */
+const RPC_BATCH_SIZE = 20;
 
 // ============================================
 // TYPES
@@ -322,7 +326,11 @@ interface OrdersAggregationRPCRow {
  * console.log(data.byChannel.glovo.revenue); // 30000
  * ```
  */
-export async function fetchCrpOrdersAggregated(
+/**
+ * Single-call implementation of fetchCrpOrdersAggregated.
+ * Called directly when companyIds <= RPC_BATCH_SIZE, or per-batch otherwise.
+ */
+async function fetchCrpOrdersAggregatedSingle(
   params: FetchOrdersParams
 ): Promise<OrdersAggregation> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
@@ -450,6 +458,118 @@ export async function fetchCrpOrdersAggregated(
     : 0;
 
   return result;
+}
+
+/**
+ * Merge multiple OrdersAggregation results into one.
+ * Sums additive fields and recalculates derived metrics.
+ */
+function mergeOrdersAggregations(aggs: OrdersAggregation[]): OrdersAggregation {
+  const result: OrdersAggregation = {
+    totalRevenue: 0,
+    totalOrders: 0,
+    avgTicket: 0,
+    totalDiscounts: 0,
+    totalRefunds: 0,
+    netRevenue: 0,
+    promotionRate: 0,
+    refundRate: 0,
+    avgDiscountPerOrder: 0,
+    uniqueCustomers: 0,
+    ordersPerCustomer: 0,
+    totalAdSpent: 0,
+    totalAdRevenue: 0,
+    totalImpressions: 0,
+    totalClicks: 0,
+    totalAdOrders: 0,
+    roas: 0,
+    byChannel: {
+      glovo: createEmptyChannelAggregation(),
+      ubereats: createEmptyChannelAggregation(),
+      justeat: createEmptyChannelAggregation(),
+    },
+  };
+
+  // Sum additive fields
+  for (const agg of aggs) {
+    result.totalRevenue += agg.totalRevenue;
+    result.totalOrders += agg.totalOrders;
+    result.totalDiscounts += agg.totalDiscounts;
+    result.totalRefunds += agg.totalRefunds;
+    result.uniqueCustomers += agg.uniqueCustomers;
+    result.totalAdSpent += agg.totalAdSpent;
+    result.totalAdRevenue += agg.totalAdRevenue;
+    result.totalImpressions += agg.totalImpressions;
+    result.totalClicks += agg.totalClicks;
+    result.totalAdOrders += agg.totalAdOrders;
+
+    // Sum per-channel additive fields
+    for (const ch of ['glovo', 'ubereats', 'justeat'] as const) {
+      result.byChannel[ch].revenue += agg.byChannel[ch].revenue;
+      result.byChannel[ch].orders += agg.byChannel[ch].orders;
+      result.byChannel[ch].discounts += agg.byChannel[ch].discounts;
+      result.byChannel[ch].refunds += agg.byChannel[ch].refunds;
+      result.byChannel[ch].uniqueCustomers += agg.byChannel[ch].uniqueCustomers;
+      result.byChannel[ch].adSpent += agg.byChannel[ch].adSpent;
+      result.byChannel[ch].adRevenue += agg.byChannel[ch].adRevenue;
+      result.byChannel[ch].impressions += agg.byChannel[ch].impressions;
+      result.byChannel[ch].clicks += agg.byChannel[ch].clicks;
+      result.byChannel[ch].adOrders += agg.byChannel[ch].adOrders;
+    }
+  }
+
+  // Recalculate per-channel derived metrics
+  for (const ch of ['glovo', 'ubereats', 'justeat'] as const) {
+    result.byChannel[ch].netRevenue = result.byChannel[ch].revenue - result.byChannel[ch].refunds;
+  }
+
+  // Recalculate global derived metrics
+  result.avgTicket = result.totalOrders > 0
+    ? result.totalRevenue / result.totalOrders : 0;
+  result.netRevenue = result.totalRevenue - result.totalRefunds;
+  result.promotionRate = result.totalRevenue > 0
+    ? (result.totalDiscounts / result.totalRevenue) * 100 : 0;
+  result.refundRate = result.totalRevenue > 0
+    ? (result.totalRefunds / result.totalRevenue) * 100 : 0;
+  result.avgDiscountPerOrder = result.totalOrders > 0
+    ? result.totalDiscounts / result.totalOrders : 0;
+  result.ordersPerCustomer = result.uniqueCustomers > 0
+    ? result.totalOrders / result.uniqueCustomers : 0;
+  result.roas = result.totalAdSpent > 0
+    ? result.totalAdRevenue / result.totalAdSpent : 0;
+
+  return result;
+}
+
+/**
+ * Fetches and aggregates order data for dashboard display.
+ *
+ * Uses the `get_orders_aggregation` Supabase RPC function to perform
+ * aggregation server-side. The DB returns ~3 rows (one per channel)
+ * instead of downloading 50k+ individual orders.
+ *
+ * When companyIds exceeds RPC_BATCH_SIZE (20), splits into parallel
+ * batches to avoid PostgreSQL statement timeouts (error 57014).
+ */
+export async function fetchCrpOrdersAggregated(
+  params: FetchOrdersParams
+): Promise<OrdersAggregation> {
+  const { companyIds } = params;
+
+  // Small request → single call (current behavior)
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchCrpOrdersAggregatedSingle(params);
+  }
+
+  // Large request → split companyIds into batches, run in parallel, merge
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk =>
+      fetchCrpOrdersAggregatedSingle({ ...params, companyIds: chunk })
+    )
+  );
+
+  return mergeOrdersAggregations(batchResults);
 }
 
 /**
@@ -612,15 +732,39 @@ export async function fetchControllingMetricsRPC(
   startDate: string,
   endDate: string
 ): Promise<ControllingMetricsRow[]> {
-  const { data, error } = await supabase.rpc('get_controlling_metrics', {
-    p_company_ids: companyIds,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  // Small request → single call
+  if (companyIds.length <= RPC_BATCH_SIZE) {
+    const { data, error } = await supabase.rpc('get_controlling_metrics', {
+      p_company_ids: companyIds,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    });
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error;
+    }
+
+    return data || [];
   }
 
-  return data || [];
+  // Large request → split into parallel batches and concatenate
+  // Rows are keyed by company/store/address/portal so no overlap between batches
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase.rpc('get_controlling_metrics', {
+        p_company_ids: chunk,
+        p_start_date: `${startDate}T00:00:00`,
+        p_end_date: `${endDate}T23:59:59`,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data || []) as ControllingMetricsRow[];
+    })
+  );
+
+  return batchResults.flat();
 }

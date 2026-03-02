@@ -397,6 +397,24 @@ export function deduplicateAddressesKeepingLatest<T extends { pk_ts_month: strin
  * //   { primary: { pk_id_address: 'B1', ... }, allIds: ['B1'] }
  * // ]
  */
+/**
+ * Split an array into chunks of a given size.
+ *
+ * @param array - Array to split
+ * @param size - Maximum size of each chunk
+ * @returns Array of chunks
+ *
+ * @example
+ * chunkedArray([1,2,3,4,5], 2) // [[1,2], [3,4], [5]]
+ */
+export function chunkedArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function groupAddressesByName<T extends { pk_ts_month?: string; des_latitude?: number | null; des_longitude?: number | null }>(
   items: T[],
   addressFn: (item: T) => string,

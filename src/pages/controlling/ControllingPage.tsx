@@ -31,7 +31,7 @@ import {
 export function ControllingPage() {
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const dateRange = useDashboardFiltersStore((s) => s.dateRange);
-  const { data, isLoading, error } = useControllingData();
+  const { data, isLoading, error, refetch } = useControllingData();
   const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, weeks, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
 
   // Detail panel state — persist selected row ID across navigation
@@ -156,7 +156,7 @@ export function ControllingPage() {
   if (error || !data) {
     return (
       <div className="flex items-center justify-center h-96">
-        <ErrorAlert error={error instanceof Error ? error : new Error('Error al cargar los datos')} />
+        <ErrorAlert error={error instanceof Error ? error : new Error('Error al cargar los datos')} onRetry={refetch} />
       </div>
     );
   }
