@@ -250,7 +250,8 @@ export function useWeeklyRevenue() {
       return { byRowId, byChannel, metricsByRowId };
     },
     enabled: companyIds.length > 0,
-    retry: 1,
+    // Disable auto-retry: retrying expensive RPCs on timeout compounds DB load
+    retry: false,
     staleTime: QUERY_STALE_MEDIUM,
     gcTime: QUERY_GC_MEDIUM,
   });
