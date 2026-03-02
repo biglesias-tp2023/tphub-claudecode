@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useCompanyIds } from '@/stores/filtersStore';
 import { fetchControllingMetricsRPC } from '@/services/crp-portal';
+import { fetchAllDimensions } from '@/services/crp-portal/hierarchyBuilder';
 import { portalIdToChannelId } from '@/services/crp-portal/orders';
 import type { ControllingMetricsRow } from '@/services/crp-portal';
 import type { ChannelId } from '@/types';
@@ -68,8 +69,12 @@ interface AggregatedWeekMetrics {
 
 /**
  * Aggregate RPC metrics rows into revenue-only maps (for sparklines).
+ * @param addressRemap - Maps secondary address IDs to their primary (grouped) ID
  */
-function aggregateRevenueByRowId(rows: ControllingMetricsRow[]): AggregatedWeek {
+function aggregateRevenueByRowId(
+  rows: ControllingMetricsRow[],
+  addressRemap: Map<string, string>,
+): AggregatedWeek {
   const byRowId = new Map<string, number>();
   const byChannel = new Map<ChannelId, number>();
 
@@ -81,8 +86,9 @@ function aggregateRevenueByRowId(rows: ControllingMetricsRow[]): AggregatedWeek 
     const revenue = row.ventas || 0;
     const companyId = row.pfk_id_company;
     const storeId = row.pfk_id_store;
-    const addressId = row.pfk_id_store_address;
+    const rawAddressId = row.pfk_id_store_address;
     const portalId = row.pfk_id_portal;
+    const addressId = addressRemap.get(rawAddressId) || rawAddressId;
 
     addRow(`company-${companyId}`, revenue);
     addRow(`brand::${companyId}::${storeId}`, revenue);
@@ -111,8 +117,12 @@ function emptyMetrics(): Omit<WeekMetrics, 'weekLabel' | 'weekStart'> {
 
 /**
  * Aggregate ALL metrics from RPC rows into a map by row ID.
+ * @param addressRemap - Maps secondary address IDs to their primary (grouped) ID
  */
-function aggregateAllMetricsByRowId(rows: ControllingMetricsRow[]): AggregatedWeekMetrics {
+function aggregateAllMetricsByRowId(
+  rows: ControllingMetricsRow[],
+  addressRemap: Map<string, string>,
+): AggregatedWeekMetrics {
   const byRowId = new Map<string, Omit<WeekMetrics, 'weekLabel' | 'weekStart'>>();
 
   const getOrCreate = (key: string) => {
@@ -147,8 +157,9 @@ function aggregateAllMetricsByRowId(rows: ControllingMetricsRow[]): AggregatedWe
   for (const row of rows) {
     const companyId = row.pfk_id_company;
     const storeId = row.pfk_id_store;
-    const addressId = row.pfk_id_store_address;
+    const rawAddressId = row.pfk_id_store_address;
     const portalId = row.pfk_id_portal;
+    const addressId = addressRemap.get(rawAddressId) || rawAddressId;
     const channelId = portalIdToChannelId(portalId);
 
     addToMetrics(getOrCreate(`company-${companyId}`), row, channelId);
@@ -187,6 +198,18 @@ export function useWeeklyRevenue() {
   const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', [...companyIds].sort().join(',')],
     queryFn: async () => {
+      // Fetch dimensions to build address ID remap (secondary → primary).
+      // This ensures sparkline keys match grouped hierarchy row IDs.
+      const dimensions = await fetchAllDimensions(companyIds);
+      const addressRemap = new Map<string, string>();
+      for (const addr of dimensions.addresses) {
+        for (const id of addr.allIds) {
+          if (id !== addr.id) {
+            addressRemap.set(id, addr.id);
+          }
+        }
+      }
+
       // Fetch weeks sequentially to avoid overwhelming the database
       // (8 weeks × N batches per week = too many concurrent RPC calls)
       const weeklyResults: ControllingMetricsRow[][] = [];
@@ -197,10 +220,10 @@ export function useWeeklyRevenue() {
       }
 
       // Aggregate each week's data (revenue-only for sparklines)
-      const weeklyAggs = weeklyResults.map(aggregateRevenueByRowId);
+      const weeklyAggs = weeklyResults.map(rows => aggregateRevenueByRowId(rows, addressRemap));
 
       // Aggregate each week's FULL metrics (for detail panel)
-      const weeklyMetricsAggs = weeklyResults.map(aggregateAllMetricsByRowId);
+      const weeklyMetricsAggs = weeklyResults.map(rows => aggregateAllMetricsByRowId(rows, addressRemap));
 
       // Build row-level map: rowId → [week1, ..., week8] (revenue only)
       const allRowIds = new Set<string>();
