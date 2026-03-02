@@ -242,7 +242,6 @@ export {
   deduplicateByNameKeepingLatest,
   deduplicateAddressesKeepingLatest,
   normalizeAddress,
-  getCurrentMonthFilter,
 } from './utils';
 
 // ============================================
