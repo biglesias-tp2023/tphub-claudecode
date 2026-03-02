@@ -17,6 +17,10 @@ import { supabase } from '../supabase';
 import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
+import { chunkedArray } from './utils';
+
+/** Max companies per RPC call to avoid PostgreSQL statement timeouts */
+const RPC_BATCH_SIZE = 10;
 
 // ============================================
 // TYPES
@@ -171,9 +175,9 @@ interface ReviewsHeatmapRPCRow {
 // ============================================
 
 /**
- * Fetches aggregated review metrics using the RPC function.
+ * Single-batch reviews aggregation fetch.
  */
-export async function fetchCrpReviewsAggregated(
+async function fetchCrpReviewsAggregatedSingle(
   params: FetchReviewsParams
 ): Promise<ReviewsAggregation> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
@@ -273,9 +277,132 @@ export async function fetchCrpReviewsAggregated(
 }
 
 /**
- * Fetches heatmap data for negative reviews (rating <= 2).
+ * Merges multiple ReviewsAggregation results from batched calls.
  */
-export async function fetchCrpReviewsHeatmap(
+function mergeReviewsAggregations(aggs: ReviewsAggregation[]): ReviewsAggregation {
+  const result: ReviewsAggregation = {
+    totalReviews: 0,
+    avgRating: 0,
+    totalPositive: 0,
+    totalNegative: 0,
+    positivePercent: 0,
+    negativePercent: 0,
+    ratingDistribution: { rating1: 0, rating2: 0, rating3: 0, rating4: 0, rating5: 0 },
+    byChannel: { glovo: null, ubereats: null, justeat: null },
+  };
+
+  let totalWeightedRating = 0;
+  let totalDeliverySum = 0;
+  let totalDeliveryCount = 0;
+
+  // Per-channel accumulators
+  const channelAccum: Record<string, {
+    totalReviews: number; weightedRating: number;
+    positive: number; negative: number;
+    r1: number; r2: number; r3: number; r4: number; r5: number;
+    deliverySum: number; deliveryCount: number;
+  }> = {};
+
+  for (const agg of aggs) {
+    result.totalReviews += agg.totalReviews;
+    result.totalPositive += agg.totalPositive;
+    result.totalNegative += agg.totalNegative;
+    result.ratingDistribution.rating1 += agg.ratingDistribution.rating1;
+    result.ratingDistribution.rating2 += agg.ratingDistribution.rating2;
+    result.ratingDistribution.rating3 += agg.ratingDistribution.rating3;
+    result.ratingDistribution.rating4 += agg.ratingDistribution.rating4;
+    result.ratingDistribution.rating5 += agg.ratingDistribution.rating5;
+    totalWeightedRating += agg.avgRating * agg.totalReviews;
+
+    if (agg.avgDeliveryTime && agg.avgDeliveryTime > 0) {
+      totalDeliverySum += agg.avgDeliveryTime * agg.totalReviews;
+      totalDeliveryCount += agg.totalReviews;
+    }
+
+    // Merge per-channel
+    for (const ch of ['glovo', 'ubereats', 'justeat'] as ChannelId[]) {
+      const chAgg = agg.byChannel[ch];
+      if (!chAgg) continue;
+      if (!channelAccum[ch]) {
+        channelAccum[ch] = {
+          totalReviews: 0, weightedRating: 0,
+          positive: 0, negative: 0,
+          r1: 0, r2: 0, r3: 0, r4: 0, r5: 0,
+          deliverySum: 0, deliveryCount: 0,
+        };
+      }
+      const acc = channelAccum[ch];
+      acc.totalReviews += chAgg.totalReviews;
+      acc.weightedRating += chAgg.avgRating * chAgg.totalReviews;
+      acc.positive += chAgg.positiveReviews;
+      acc.negative += chAgg.negativeReviews;
+      acc.r1 += chAgg.ratingDistribution.rating1;
+      acc.r2 += chAgg.ratingDistribution.rating2;
+      acc.r3 += chAgg.ratingDistribution.rating3;
+      acc.r4 += chAgg.ratingDistribution.rating4;
+      acc.r5 += chAgg.ratingDistribution.rating5;
+      if (chAgg.avgDeliveryTime && chAgg.avgDeliveryTime > 0) {
+        acc.deliverySum += chAgg.avgDeliveryTime * chAgg.totalReviews;
+        acc.deliveryCount += chAgg.totalReviews;
+      }
+    }
+  }
+
+  // Derive global metrics
+  result.avgRating = result.totalReviews > 0 ? totalWeightedRating / result.totalReviews : 0;
+  result.positivePercent = result.totalReviews > 0 ? (result.totalPositive / result.totalReviews) * 100 : 0;
+  result.negativePercent = result.totalReviews > 0 ? (result.totalNegative / result.totalReviews) * 100 : 0;
+  if (totalDeliveryCount > 0) {
+    result.avgDeliveryTime = Math.round((totalDeliverySum / totalDeliveryCount) * 10) / 10;
+  }
+
+  // Derive per-channel metrics
+  for (const ch of ['glovo', 'ubereats', 'justeat'] as ChannelId[]) {
+    const acc = channelAccum[ch];
+    if (!acc || acc.totalReviews === 0) continue;
+    const chResult = createEmptyChannelAggregation(ch);
+    chResult.totalReviews = acc.totalReviews;
+    chResult.avgRating = acc.weightedRating / acc.totalReviews;
+    chResult.positiveReviews = acc.positive;
+    chResult.negativeReviews = acc.negative;
+    chResult.positivePercent = (acc.positive / acc.totalReviews) * 100;
+    chResult.negativePercent = (acc.negative / acc.totalReviews) * 100;
+    chResult.ratingDistribution = {
+      rating1: acc.r1, rating2: acc.r2, rating3: acc.r3, rating4: acc.r4, rating5: acc.r5,
+    };
+    if (acc.deliveryCount > 0) {
+      chResult.avgDeliveryTime = Math.round((acc.deliverySum / acc.deliveryCount) * 10) / 10;
+    }
+    result.byChannel[ch] = chResult;
+  }
+
+  return result;
+}
+
+/**
+ * Fetches aggregated review metrics using the RPC function.
+ * Batches by companyIds to avoid statement timeouts with many companies.
+ */
+export async function fetchCrpReviewsAggregated(
+  params: FetchReviewsParams
+): Promise<ReviewsAggregation> {
+  const { companyIds } = params;
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchCrpReviewsAggregatedSingle(params);
+  }
+
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk => fetchCrpReviewsAggregatedSingle({ ...params, companyIds: chunk }))
+  );
+
+  return mergeReviewsAggregations(batchResults);
+}
+
+/**
+ * Single-batch reviews heatmap fetch.
+ */
+async function fetchCrpReviewsHeatmapSingle(
   params: FetchReviewsParams
 ): Promise<ReviewsHeatmapCell[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
@@ -305,6 +432,39 @@ export async function fetchCrpReviewsHeatmap(
     hourOfDay: Number(row.hour_of_day),
     count: Number(row.review_count),
   }));
+}
+
+/**
+ * Fetches heatmap data for negative reviews (rating <= 2).
+ * Batches by companyIds to avoid statement timeouts with many companies.
+ */
+export async function fetchCrpReviewsHeatmap(
+  params: FetchReviewsParams
+): Promise<ReviewsHeatmapCell[]> {
+  const { companyIds } = params;
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchCrpReviewsHeatmapSingle(params);
+  }
+
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk => fetchCrpReviewsHeatmapSingle({ ...params, companyIds: chunk }))
+  );
+
+  // Merge by (dayOfWeek, hourOfDay): sum counts
+  const byKey = new Map<string, ReviewsHeatmapCell>();
+  for (const rows of batchResults) {
+    for (const row of rows) {
+      const key = `${row.dayOfWeek}-${row.hourOfDay}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count += row.count;
+      } else {
+        byKey.set(key, { ...row });
+      }
+    }
+  }
+  return [...byKey.values()];
 }
 
 /**
@@ -395,9 +555,9 @@ export async function fetchReviewTags(
   return tagMap;
 }
 
-export async function fetchCrpReviewsRaw(
+async function fetchCrpReviewsRawSingle(
   params: FetchReviewsParams,
-  limit = 200
+  limit: number
 ): Promise<RawReview[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
 
@@ -421,4 +581,27 @@ export async function fetchCrpReviewsRaw(
   }
 
   return (data || []) as RawReview[];
+}
+
+/**
+ * Fetches raw reviews. Batches by companyIds to avoid statement timeouts.
+ */
+export async function fetchCrpReviewsRaw(
+  params: FetchReviewsParams,
+  limit = 200
+): Promise<RawReview[]> {
+  const { companyIds } = params;
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchCrpReviewsRawSingle(params, limit);
+  }
+
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk => fetchCrpReviewsRawSingle({ ...params, companyIds: chunk }, limit))
+  );
+
+  // Concat all results, sort by most recent, take top `limit`
+  return batchResults.flat()
+    .sort((a, b) => b.ts_creation_time.localeCompare(a.ts_creation_time))
+    .slice(0, limit);
 }

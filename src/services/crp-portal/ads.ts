@@ -11,6 +11,10 @@ import { supabase } from '../supabase';
 import type { ChannelId } from '@/types';
 import { PORTAL_IDS } from './types';
 import { handleCrpError } from './errors';
+import { chunkedArray } from './utils';
+
+/** Max companies per RPC call to avoid PostgreSQL statement timeouts */
+const RPC_BATCH_SIZE = 10;
 
 // ============================================
 // TYPES
@@ -90,11 +94,9 @@ function shouldApplyChannelFilter(channelIds: ChannelId[]): boolean {
 // ============================================
 
 /**
- * Fetches daily advertising timeseries using the get_ads_daily_timeseries RPC.
- *
- * Returns an array of daily rows with impressions, clicks, orders, ad spend, and ad revenue.
+ * Single-batch ads timeseries fetch.
  */
-export async function fetchAdsTimeseries(
+async function fetchAdsTimeseriesSingle(
   params: AdsTimeseriesParams
 ): Promise<AdsTimeseriesRow[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
@@ -135,11 +137,45 @@ export async function fetchAdsTimeseries(
 }
 
 /**
- * Fetches hourly ADS distribution using the get_ads_hourly_distribution RPC.
- *
- * Returns 24 rows (hours 0-23) with aggregated ad spend, impressions, clicks, orders, and revenue.
+ * Fetches daily advertising timeseries using the get_ads_daily_timeseries RPC.
+ * Batches by companyIds to avoid statement timeouts with many companies.
  */
-export async function fetchAdsHourlyDistribution(
+export async function fetchAdsTimeseries(
+  params: AdsTimeseriesParams
+): Promise<AdsTimeseriesRow[]> {
+  const { companyIds } = params;
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchAdsTimeseriesSingle(params);
+  }
+
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk => fetchAdsTimeseriesSingle({ ...params, companyIds: chunk }))
+  );
+
+  // Merge by day: sum additive fields
+  const byDay = new Map<string, AdsTimeseriesRow>();
+  for (const rows of batchResults) {
+    for (const row of rows) {
+      const existing = byDay.get(row.day);
+      if (existing) {
+        existing.impressions += row.impressions;
+        existing.clicks += row.clicks;
+        existing.orders += row.orders;
+        existing.adSpent += row.adSpent;
+        existing.adRevenue += row.adRevenue;
+      } else {
+        byDay.set(row.day, { ...row });
+      }
+    }
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/**
+ * Single-batch ads hourly distribution fetch.
+ */
+async function fetchAdsHourlyDistributionSingle(
   params: AdsHourlyDistributionParams
 ): Promise<AdsHourlyDistributionRow[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
@@ -180,11 +216,45 @@ export async function fetchAdsHourlyDistribution(
 }
 
 /**
- * Fetches weekly ADS heatmap using the get_ads_weekly_heatmap RPC.
- *
- * Returns rows grouped by (day_of_week, hour_of_day) with aggregated metrics.
+ * Fetches hourly ADS distribution using the get_ads_hourly_distribution RPC.
+ * Batches by companyIds to avoid statement timeouts with many companies.
  */
-export async function fetchAdsWeeklyHeatmap(
+export async function fetchAdsHourlyDistribution(
+  params: AdsHourlyDistributionParams
+): Promise<AdsHourlyDistributionRow[]> {
+  const { companyIds } = params;
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchAdsHourlyDistributionSingle(params);
+  }
+
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk => fetchAdsHourlyDistributionSingle({ ...params, companyIds: chunk }))
+  );
+
+  // Merge by hourOfDay: sum additive fields
+  const byHour = new Map<number, AdsHourlyDistributionRow>();
+  for (const rows of batchResults) {
+    for (const row of rows) {
+      const existing = byHour.get(row.hourOfDay);
+      if (existing) {
+        existing.adSpent += row.adSpent;
+        existing.impressions += row.impressions;
+        existing.clicks += row.clicks;
+        existing.orders += row.orders;
+        existing.adRevenue += row.adRevenue;
+      } else {
+        byHour.set(row.hourOfDay, { ...row });
+      }
+    }
+  }
+  return [...byHour.values()].sort((a, b) => a.hourOfDay - b.hourOfDay);
+}
+
+/**
+ * Single-batch ads weekly heatmap fetch.
+ */
+async function fetchAdsWeeklyHeatmapSingle(
   params: AdsHourlyDistributionParams
 ): Promise<AdsWeeklyHeatmapRow[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate } = params;
@@ -224,4 +294,41 @@ export async function fetchAdsWeeklyHeatmap(
     orders: Number(row.orders) || 0,
     adRevenue: Number(row.ad_revenue) || 0,
   }));
+}
+
+/**
+ * Fetches weekly ADS heatmap using the get_ads_weekly_heatmap RPC.
+ * Batches by companyIds to avoid statement timeouts with many companies.
+ */
+export async function fetchAdsWeeklyHeatmap(
+  params: AdsHourlyDistributionParams
+): Promise<AdsWeeklyHeatmapRow[]> {
+  const { companyIds } = params;
+  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
+    return fetchAdsWeeklyHeatmapSingle(params);
+  }
+
+  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
+  const batchResults = await Promise.all(
+    chunks.map(chunk => fetchAdsWeeklyHeatmapSingle({ ...params, companyIds: chunk }))
+  );
+
+  // Merge by (dayOfWeek, hourOfDay): sum additive fields
+  const byKey = new Map<string, AdsWeeklyHeatmapRow>();
+  for (const rows of batchResults) {
+    for (const row of rows) {
+      const key = `${row.dayOfWeek}-${row.hourOfDay}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.adSpent += row.adSpent;
+        existing.impressions += row.impressions;
+        existing.clicks += row.clicks;
+        existing.orders += row.orders;
+        existing.adRevenue += row.adRevenue;
+      } else {
+        byKey.set(key, { ...row });
+      }
+    }
+  }
+  return [...byKey.values()];
 }
