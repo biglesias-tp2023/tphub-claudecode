@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 
 /* ─── TPHub Design System Colors ─── */
-const P50 = '#e8f4fa';
-const P100 = '#c5e3f3';
-const P200 = '#9dd0eb';
 const P300 = '#6bb8e0';
 const P400 = '#3a9fd4';
 const P500 = '#0b7bb8';
@@ -52,25 +49,14 @@ export function LoginPage() {
     >
       {/* Brand header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-        <div
+        <img
+          src="/images/logo/icon.svg"
+          alt="ThinkPaladar"
           style={{
             width: 38,
             height: 38,
-            borderRadius: 10,
-            background: `linear-gradient(135deg, ${P600} 0%, ${P800} 100%)`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(9,87,137,0.25)',
           }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="3" width="7" height="7" rx="1.5" fill={A400} />
-            <rect x="14" y="3" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.35)" />
-            <rect x="3" y="14" width="7" height="7" rx="1.5" fill="rgba(255,255,255,0.35)" />
-            <rect x="14" y="14" width="7" height="7" rx="1.5" fill={A400} />
-          </svg>
-        </div>
+        />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 18, fontWeight: 700, color: P800, letterSpacing: '-0.025em', lineHeight: 1.2 }}>
             thinkpaladar
