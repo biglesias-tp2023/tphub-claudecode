@@ -6,7 +6,7 @@
 
 import { supabase } from '../supabase';
 import type { DbCrpOrderHead } from './types';
-import { deduplicateAndFilterDeleted, deduplicateBy } from './utils';
+import { deduplicateAndFilterDeleted, deduplicateBy, normalizeAddress } from './utils';
 import { portalIdToChannelId } from './orders';
 import type { HierarchyMetrics, HierarchyDataRow } from './hierarchy';
 
@@ -130,14 +130,33 @@ export async function fetchAllDimensions(
     addressesResult.data || [],
     a => String(a.pk_id_address)
   );
-  const addresses: AddressDim[] = uniqueAddresses.map(a => ({
-    id: String(a.pk_id_address),
-    name: a.des_address || '',
-    companyId: String(a.pfk_id_company),
-    allIds: [String(a.pk_id_address)],
-    storeId: undefined,
-    deleted: a.flg_deleted === 1,
-  }));
+
+  // Group addresses by normalized name within the same company.
+  // The same physical address can have multiple IDs across portals (Glovo/UberEats).
+  // We merge them into a single row with allIds collecting every ID.
+  const addressGroups = new Map<string, typeof uniqueAddresses>();
+  for (const addr of uniqueAddresses) {
+    const key = `${addr.pfk_id_company}::${normalizeAddress(addr.des_address || '')}`;
+    if (!addressGroups.has(key)) addressGroups.set(key, []);
+    addressGroups.get(key)!.push(addr);
+  }
+
+  const addresses: AddressDim[] = [];
+  for (const [, group] of addressGroups) {
+    // Pick primary: prefer longest address name (most complete)
+    const sorted = [...group].sort(
+      (a, b) => (b.des_address?.length || 0) - (a.des_address?.length || 0)
+    );
+    const primary = sorted[0];
+    addresses.push({
+      id: String(primary.pk_id_address),
+      name: primary.des_address || '',
+      companyId: String(primary.pfk_id_company),
+      allIds: group.map(a => String(a.pk_id_address)),
+      storeId: undefined,
+      deleted: primary.flg_deleted === 1,
+    });
+  }
 
   const uniquePortals = deduplicateBy(
     portalsResult.data || [],
