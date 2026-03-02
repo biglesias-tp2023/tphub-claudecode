@@ -19,6 +19,9 @@ const METRIC_LABELS: Record<HeatmapMetric, string> = {
   orders: '# Pedidos',
   avgTicket: 'Ticket Medio',
   newCustomers: 'Nuevos clientes',
+  adSpent: 'Inversión Ads',
+  promos: 'Inversión Promos',
+  avgDeliveryTime: 'Tiempo de entrega',
 };
 
 // ============================================
@@ -27,6 +30,9 @@ const METRIC_LABELS: Record<HeatmapMetric, string> = {
 
 function getCellValue(cell: HeatmapCell, metric: HeatmapMetric): number {
   if (metric === 'newCustomers') return cell.newCustomers;
+  if (metric === 'adSpent') return cell.adSpent;
+  if (metric === 'promos') return cell.promos;
+  if (metric === 'avgDeliveryTime') return cell.avgDeliveryTime;
   return cell[metric];
 }
 
@@ -45,6 +51,12 @@ function formatValue(value: number, metric: HeatmapMetric, cell?: HeatmapCell): 
       return formatNumber(value);
     case 'newCustomers':
       return cell ? formatNewCustomers(cell.newCustomers, cell.newCustomerPct) : formatNumber(value);
+    case 'adSpent':
+      return cell ? `${formatCurrency(value)} (${Math.round(cell.adSpentPct)}%)` : formatCurrency(value);
+    case 'promos':
+      return cell ? `${formatCurrency(value)} (${Math.round(cell.promosPct)}%)` : formatCurrency(value);
+    case 'avgDeliveryTime':
+      return `${Math.round(value)} min`;
   }
 }
 
@@ -52,10 +64,14 @@ function formatTooltipValue(value: number, metric: HeatmapMetric): string {
   switch (metric) {
     case 'revenue':
     case 'avgTicket':
+    case 'adSpent':
+    case 'promos':
       return formatCurrency(value);
     case 'orders':
     case 'newCustomers':
       return formatNumber(value);
+    case 'avgDeliveryTime':
+      return value > 0 ? `${Math.round(value)} min` : '—';
   }
 }
 
@@ -83,6 +99,9 @@ function Tooltip({ cell, x, y }: TooltipData) {
         <p># Pedidos: {formatTooltipValue(cell.orders, 'orders')}</p>
         <p>Ticket Medio: {formatTooltipValue(cell.avgTicket, 'avgTicket')}</p>
         <p>Nuevos clientes: {formatNewCustomers(cell.newCustomers, cell.newCustomerPct) || '0'}</p>
+        <p>Inversión Ads: {formatTooltipValue(cell.adSpent, 'adSpent')}{cell.adSpent > 0 ? ` (${Math.round(cell.adSpentPct)}%)` : ''}</p>
+        <p>Inversión Promos: {formatTooltipValue(cell.promos, 'promos')}{cell.promos > 0 ? ` (${Math.round(cell.promosPct)}%)` : ''}</p>
+        <p>Tiempo entrega: {formatTooltipValue(cell.avgDeliveryTime, 'avgDeliveryTime')}</p>
       </div>
     </div>
   );
@@ -232,17 +251,37 @@ export function HeatmapGrid({ data, metric }: HeatmapGridProps) {
                 let dayOrders = 0;
                 let dayNewCustomers = 0;
                 let dayUniqueCustomers = 0;
+                let dayPromos = 0;
+                let dayAdSpent = 0;
+                let dayDeliverySum = 0;
+                let dayDeliveryCount = 0;
                 for (let h = START_HOUR; h < 24; h++) {
-                  dayRevenue += data[h][dow].revenue;
-                  dayOrders += data[h][dow].orders;
-                  dayNewCustomers += data[h][dow].newCustomers;
-                  dayUniqueCustomers += data[h][dow].uniqueCustomers;
+                  const c = data[h][dow];
+                  dayRevenue += c.revenue;
+                  dayOrders += c.orders;
+                  dayNewCustomers += c.newCustomers;
+                  dayUniqueCustomers += c.uniqueCustomers;
+                  dayPromos += c.promos;
+                  dayAdSpent += c.adSpent;
+                  if (c.avgDeliveryTime > 0) {
+                    dayDeliverySum += c.avgDeliveryTime * c.orders;
+                    dayDeliveryCount += c.orders;
+                  }
                 }
 
                 let summaryText: string;
                 if (metric === 'newCustomers') {
                   const pct = dayUniqueCustomers > 0 ? (dayNewCustomers / dayUniqueCustomers) * 100 : 0;
                   summaryText = dayNewCustomers > 0 ? formatNewCustomers(dayNewCustomers, pct) : '';
+                } else if (metric === 'adSpent') {
+                  const pct = dayRevenue > 0 ? (dayAdSpent / dayRevenue) * 100 : 0;
+                  summaryText = dayAdSpent > 0 ? `${formatCurrency(dayAdSpent)} (${Math.round(pct)}%)` : '';
+                } else if (metric === 'promos') {
+                  const pct = dayRevenue > 0 ? (dayPromos / dayRevenue) * 100 : 0;
+                  summaryText = dayPromos > 0 ? `${formatCurrency(dayPromos)} (${Math.round(pct)}%)` : '';
+                } else if (metric === 'avgDeliveryTime') {
+                  const avg = dayDeliveryCount > 0 ? dayDeliverySum / dayDeliveryCount : 0;
+                  summaryText = avg > 0 ? `${Math.round(avg)} min` : '';
                 } else {
                   const summaryValue =
                     metric === 'avgTicket'

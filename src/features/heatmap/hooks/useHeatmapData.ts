@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useBrands } from '@/features/dashboard/hooks/useBrands';
 import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
-import { fetchCrpOrdersRaw } from '@/services/crp-portal';
+import { fetchCrpOrdersRaw, fetchAdsWeeklyHeatmap } from '@/services/crp-portal';
 import type { Brand, Restaurant } from '@/types';
 import type { HeatmapMatrix } from '../types';
 import { formatDate } from '@/utils/dateUtils';
@@ -63,6 +63,11 @@ function createEmptyMatrix(): HeatmapMatrix {
       uniqueCustomers: 0,
       newCustomers: 0,
       newCustomerPct: 0,
+      promos: 0,
+      promosPct: 0,
+      adSpent: 0,
+      adSpentPct: 0,
+      avgDeliveryTime: 0,
     }))
   );
 }
@@ -114,13 +119,21 @@ export function useHeatmapData() {
         channelIds: channelIds.length > 0 ? channelIds : undefined,
       };
 
-      // Fetch current period + lookback in parallel
-      const [orders, lookbackOrders] = await Promise.all([
+      // Fetch current period + lookback + ads in parallel
+      const [orders, lookbackOrders, adsHeatmap] = await Promise.all([
         fetchCrpOrdersRaw({ ...baseParams, startDate, endDate }),
         fetchCrpOrdersRaw({
           ...baseParams,
           startDate: formatDate(lookbackStart),
           endDate: formatDate(lookbackEnd),
+        }),
+        fetchAdsWeeklyHeatmap({
+          companyIds: baseParams.companyIds,
+          brandIds: baseParams.brandIds,
+          addressIds: baseParams.addressIds,
+          channelIds: baseParams.channelIds,
+          startDate,
+          endDate,
         }),
       ]);
 
@@ -135,6 +148,9 @@ export function useHeatmapData() {
       // Per-cell customer tracking: key = "hour-dow"
       const cellCustomers = new Map<string, Set<string>>();
       const cellNewCustomers = new Map<string, Set<string>>();
+      // Per-cell delivery time tracking: sum of minutes + count
+      const cellDeliverySum = new Map<string, number>();
+      const cellDeliveryCount = new Map<string, number>();
 
       for (const order of orders) {
         if (!order.td_creation_time) continue;
@@ -144,6 +160,20 @@ export function useHeatmapData() {
         const cell = matrix[hour][dow];
         cell.revenue += order.amt_total_price || 0;
         cell.orders += 1;
+        cell.promos += order.amt_promotions || 0;
+
+        // Track delivery time (ts_accepted → ts_delivered)
+        if (order.ts_accepted && order.ts_delivered) {
+          const accepted = new Date(order.ts_accepted).getTime();
+          const delivered = new Date(order.ts_delivered).getTime();
+          const minutes = (delivered - accepted) / 60_000;
+          // Filter to reasonable range: 1-179 minutes
+          if (minutes >= 1 && minutes < 180) {
+            const key = `${hour}-${dow}`;
+            cellDeliverySum.set(key, (cellDeliverySum.get(key) || 0) + minutes);
+            cellDeliveryCount.set(key, (cellDeliveryCount.get(key) || 0) + 1);
+          }
+        }
 
         // Track customers per cell
         const customerId = order.cod_id_customer;
@@ -159,11 +189,22 @@ export function useHeatmapData() {
         }
       }
 
+      // Fill ads data from RPC (ISODOW 1-7 → matrix 0-6)
+      for (const row of adsHeatmap) {
+        const dow = row.dayOfWeek - 1; // ISODOW 1=Mon → 0, 7=Sun → 6
+        const hour = row.hourOfDay;
+        if (hour >= 0 && hour < 24 && dow >= 0 && dow < 7) {
+          matrix[hour][dow].adSpent += row.adSpent;
+        }
+      }
+
       // Calculate derived metrics per cell
       for (let h = 0; h < 24; h++) {
         for (let d = 0; d < 7; d++) {
           const cell = matrix[h][d];
           cell.avgTicket = cell.orders > 0 ? cell.revenue / cell.orders : 0;
+          cell.promosPct = cell.revenue > 0 ? (cell.promos / cell.revenue) * 100 : 0;
+          cell.adSpentPct = cell.revenue > 0 ? (cell.adSpent / cell.revenue) * 100 : 0;
 
           const key = `${h}-${d}`;
           const unique = cellCustomers.get(key)?.size ?? 0;
@@ -171,6 +212,10 @@ export function useHeatmapData() {
           cell.uniqueCustomers = unique;
           cell.newCustomers = newC;
           cell.newCustomerPct = unique > 0 ? (newC / unique) * 100 : 0;
+
+          const dSum = cellDeliverySum.get(key) || 0;
+          const dCount = cellDeliveryCount.get(key) || 0;
+          cell.avgDeliveryTime = dCount > 0 ? dSum / dCount : 0;
         }
       }
 

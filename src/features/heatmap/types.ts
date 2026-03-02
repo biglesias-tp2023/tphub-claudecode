@@ -1,4 +1,4 @@
-export type HeatmapMetric = 'revenue' | 'orders' | 'avgTicket' | 'newCustomers';
+export type HeatmapMetric = 'revenue' | 'orders' | 'avgTicket' | 'newCustomers' | 'adSpent' | 'promos' | 'avgDeliveryTime';
 
 export interface HeatmapCell {
   /** Hour of day (0-23) */
@@ -14,6 +14,16 @@ export interface HeatmapCell {
   newCustomers: number;
   /** newCustomers / uniqueCustomers * 100 */
   newCustomerPct: number;
+  /** Sum of amt_promotions in EUR */
+  promos: number;
+  /** (promos / revenue) * 100 */
+  promosPct: number;
+  /** Ad spend in EUR */
+  adSpent: number;
+  /** (adSpent / revenue) * 100 */
+  adSpentPct: number;
+  /** Average delivery time in minutes */
+  avgDeliveryTime: number;
 }
 
 /** 24 rows (hours) × 7 columns (days). matrix[hour][dayOfWeek] */

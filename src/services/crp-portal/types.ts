@@ -250,6 +250,10 @@ export interface DbCrpOrderHead {
   amt_refunds: number | null;
   /** Customer identifier */
   cod_id_customer: string | null;
+  /** Timestamp when order was accepted by the restaurant */
+  ts_accepted?: string | null;
+  /** Timestamp when order was delivered to the customer */
+  ts_delivered?: string | null;
 }
 
 // ============================================
