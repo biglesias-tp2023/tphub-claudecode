@@ -42,26 +42,31 @@ const TABLE_NAME = 'crp_portal__dt_company';
  * console.log(companies.length); // Number of active companies
  */
 export async function fetchCompanies(): Promise<Company[]> {
-  // Query all months, order by pk_ts_month DESC for deduplication
-  // (same pattern as brands/restaurants — avoids breaking at start of month when new data isn't loaded)
+  // Query all months WITHOUT status filter, order by pk_ts_month DESC
+  // We deduplicate first (keeping most recent snapshot), THEN filter by status.
+  // This ensures that if a company changed to "Churn" in the latest month,
+  // we don't fall back to an older month where it was still "Cliente Activo".
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month, pct_commission_glovo, pct_commission_uber_eats')
-    .in('des_status', VALID_COMPANY_STATUSES)
     .order('pk_ts_month', { ascending: false });
 
   if (error) {
     handleCrpError('fetchCompanies', error);
   }
 
-  // Deduplicate by NAME (des_company_name) case-insensitive, keeping the most recent pk_ts_month
-  // This handles cases where different IDs have the same company name
+  // Step 1: Deduplicate by NAME, keeping the most recent pk_ts_month snapshot
   const uniqueCompanies = deduplicateByNameKeepingLatest(
     data as DbCrpCompany[],
     (c) => c.des_company_name.toLowerCase()
   );
 
-  return uniqueCompanies.map(mapCompany);
+  // Step 2: Filter by valid status AFTER deduplication (uses latest status)
+  const activeCompanies = uniqueCompanies.filter((c) =>
+    (VALID_COMPANY_STATUSES as readonly string[]).includes(c.des_status)
+  );
+
+  return activeCompanies.map(mapCompany);
 }
 
 /**
@@ -78,11 +83,11 @@ export async function fetchCompanies(): Promise<Company[]> {
  * }
  */
 export async function fetchCompanyById(companyId: string): Promise<Company | null> {
+  // Get the most recent snapshot (no status filter — check after)
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month, pct_commission_glovo, pct_commission_uber_eats')
     .eq('pk_id_company', parseInt(companyId, 10))
-    .in('des_status', VALID_COMPANY_STATUSES)
     .order('pk_ts_month', { ascending: false })
     .limit(1)
     .single();
@@ -93,5 +98,10 @@ export async function fetchCompanyById(companyId: string): Promise<Company | nul
     throw new Error(`Error fetching company: ${error.message}`);
   }
 
-  return mapCompany(data as DbCrpCompany);
+  const company = data as DbCrpCompany;
+
+  // Check status from the latest snapshot
+  if (!(VALID_COMPANY_STATUSES as readonly string[]).includes(company.des_status)) return null;
+
+  return mapCompany(company);
 }
