@@ -42,13 +42,19 @@ const TABLE_NAME = 'crp_portal__dt_company';
  * console.log(companies.length); // Number of active companies
  */
 export async function fetchCompanies(): Promise<Company[]> {
-  // Query all months WITHOUT status filter, order by pk_ts_month DESC
+  // Query last 2 months WITHOUT status filter, order by pk_ts_month DESC
   // We deduplicate first (keeping most recent snapshot), THEN filter by status.
   // This ensures that if a company changed to "Churn" in the latest month,
   // we don't fall back to an older month where it was still "Cliente Activo".
+  // Limiting to 2 months avoids pulling entire history while handling month transitions.
+  const now = new Date();
+  const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const minMonth = `${twoMonthsAgo.getFullYear()}-${String(twoMonthsAgo.getMonth() + 1).padStart(2, '0')}-01`;
+
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select('pk_id_company, des_company_name, des_status, des_key_account_manager, td_firma_contrato, flg_deleted, pk_ts_month, pct_commission_glovo, pct_commission_uber_eats')
+    .gte('pk_ts_month', minMonth)
     .order('pk_ts_month', { ascending: false });
 
   if (error) {
