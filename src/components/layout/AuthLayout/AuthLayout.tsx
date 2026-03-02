@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 
 /* ─── TPHub Design System Colors ─── */
-const P50 = '#e8f4fa';
-const P100 = '#c5e3f3';
 const P300 = '#6bb8e0';
 const P400 = '#3a9fd4';
 const P600 = '#095789';
