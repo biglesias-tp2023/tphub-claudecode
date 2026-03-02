@@ -11,7 +11,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { useCompanyIds } from '@/stores/filtersStore';
 import { fetchWeeklyCustomerSegments } from '@/services/crp-portal';
 import type { CustomerSegmentRow } from '@/services/crp-portal';
 import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
@@ -69,18 +68,32 @@ function aggregateSegmentsByRowId(rows: CustomerSegmentRow[]) {
  * @returns segments - WeekSegmentData[] for 8 weeks, or null if not ready
  * @returns isLoading - Whether segments are still loading
  */
+/**
+ * Extract the company ID from a hierarchy row ID.
+ * Row formats: company-{id}, brand::{companyId}::..., address::{companyId}::..., channel::{companyId}::...
+ */
+function extractCompanyId(rowId: string): string | null {
+  if (rowId.startsWith('company-')) return rowId.replace('company-', '');
+  const parts = rowId.split('::');
+  return parts.length >= 2 ? parts[1] : null;
+}
+
 export function useDetailSegments(rowId: string | null) {
-  const companyIds = useCompanyIds();
   const weeks = useMemo(() => getLastNWeeks(SPARKLINE_WEEKS), []);
 
+  // Only query the single company for the clicked row (not all 80)
+  const targetCompanyId = rowId ? extractCompanyId(rowId) : null;
+
   const query = useQuery<WeekSegmentData[]>({
-    queryKey: ['detail-segments', rowId, [...companyIds].sort().join(',')],
+    queryKey: ['detail-segments', rowId, targetCompanyId],
     queryFn: async () => {
-      // Fetch 8 weeks sequentially to avoid parallel timeout issues
+      if (!targetCompanyId) return [];
+
+      // Fetch 8 weeks sequentially, only for the target company
       const weekResults: CustomerSegmentRow[][] = [];
       for (const week of weeks) {
         const rows = await fetchWeeklyCustomerSegments(
-          companyIds,
+          [targetCompanyId],
           week.start,
           week.end,
         );
@@ -94,7 +107,7 @@ export function useDetailSegments(rowId: string | null) {
         return { weekLabel: w.label, ...s };
       });
     },
-    enabled: !!rowId && companyIds.length > 0,
+    enabled: !!rowId && !!targetCompanyId,
     staleTime: QUERY_STALE_MEDIUM,
     gcTime: QUERY_GC_MEDIUM,
   });
