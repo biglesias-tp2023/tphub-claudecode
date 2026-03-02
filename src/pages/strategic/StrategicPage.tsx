@@ -382,8 +382,8 @@ export function StrategicPage() {
         onClose={() => state.setIsSetupOpen(false)}
         onComplete={state.handleSetupComplete}
         companyIds={state.effectiveCompanyIds}
-        brandIds={state.filterBrandIds}
-        addressIds={state.filterRestaurantIds}
+        brandIds={state.expandedBrandIds}
+        addressIds={state.expandedRestaurantIds}
       />
 
       <SalesProjectionWarning

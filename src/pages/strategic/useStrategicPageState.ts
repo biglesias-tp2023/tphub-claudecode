@@ -586,6 +586,8 @@ export function useStrategicPageState() {
     allRestaurants,
     filterBrandIds,
     filterRestaurantIds,
+    expandedBrandIds,
+    expandedRestaurantIds,
     profiles,
     tasksByDate,
     sortedDates,

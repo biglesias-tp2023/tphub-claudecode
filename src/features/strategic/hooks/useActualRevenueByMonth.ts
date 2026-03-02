@@ -46,6 +46,10 @@ interface ActualRevenueResult {
   latestMonthWithData: LatestMonthData | null;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Whether the query errored */
+  isError: boolean;
+  /** The error object if the query failed */
+  error: Error | null;
 }
 
 /**
@@ -94,8 +98,9 @@ export function useActualRevenueByMonth({
       ? [companyId]
       : [];
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['actual-revenue-by-month', resolvedCompanyIds, brandIds, addressIds, monthOffsets ?? monthsCount],
+    enabled: resolvedCompanyIds.length > 0,
     queryFn: async () => {
       // Use explicit offsets if provided, otherwise past months + current month
       const allMonths = monthOffsets
@@ -186,5 +191,7 @@ export function useActualRevenueByMonth({
     lastMonthRevenue: data?.lastMonthRevenue ?? 0,
     latestMonthWithData: data?.latestMonthWithData ?? null,
     isLoading,
+    isError,
+    error: error as Error | null,
   };
 }

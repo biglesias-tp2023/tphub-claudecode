@@ -8,9 +8,9 @@
  *
  * @module features/strategic/components/SalesProjectionSetup
  */
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Sparkles, Calendar, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
-
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
@@ -502,7 +502,7 @@ function TargetsStep({
 // ============================================
 
 export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds }: SalesProjectionSetupProps) {
-
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('channels');
   const [channels, setChannels] = useState<SalesChannel[]>(['glovo', 'ubereats', 'justeat']);
   const [mode, setMode] = useState<SalesInvestmentMode>('global');
@@ -537,6 +537,10 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       }
     }
   }, [isLoadingRevenue, isRevenueError, revenueError, autoLastMonthRevenue, latestMonthWithData, effectiveCompanyIds, isOpen]);
+
+  const handleRetryRevenue = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['actual-revenue-by-month'] });
+  }, [queryClient]);
 
   // Auto-populate baseline when CRP data arrives (only once per wizard open)
   // Tries last month first; if 0, falls back to the latest month with data
@@ -671,7 +675,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
             <InvestmentStep channels={channels} mode={mode} onModeChange={setMode} ads={ads} promos={promos} onAdsChange={setAds} onPromosChange={setPromos} />
           )}
           {step === 'baseline' && (
-            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} monthLabel={baselineMonthInfo.label} isPartialMonth={baselineMonthInfo.isPartial} />
+            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} isError={isRevenueError} onRetry={handleRetryRevenue} monthLabel={baselineMonthInfo.label} isPartialMonth={baselineMonthInfo.isPartial} />
           )}
           {step === 'targets' && <TargetsStep channels={channels} targets={targets} onChange={handleTargetChange} baseline={baseline} actualRevenue={autoRevenue} />}
         </div>
