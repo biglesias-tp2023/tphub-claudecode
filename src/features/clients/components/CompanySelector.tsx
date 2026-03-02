@@ -146,10 +146,9 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   // Handle select all visible
   const handleSelectAll = useCallback(() => {
     const visibleIds = filteredCompanies.map((c) => c.id);
-    const newIds = [...new Set([...companyIds, ...visibleIds])];
-    setCompanyIds(newIds);
+    setCompanyIds(visibleIds);
     resetDashboardFilters();
-  }, [filteredCompanies, companyIds, setCompanyIds, resetDashboardFilters]);
+  }, [filteredCompanies, setCompanyIds, resetDashboardFilters]);
 
   // Handle clear all
   const handleClearAll = useCallback(() => {
