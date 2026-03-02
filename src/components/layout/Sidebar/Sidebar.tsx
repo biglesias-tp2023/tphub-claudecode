@@ -37,19 +37,34 @@ interface NavItem {
   tag?: { text: string; color: 'green' | 'gray' | 'orange' };
 }
 
-const navItems: NavItem[] = [
-  { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
-  { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
-  { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
-  { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
-  { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'New!', color: 'green' } },
-  { label: 'Publicidad', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'New!', color: 'green' } },
-  { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
-  { label: 'Calculadora', icon: Calculator, to: ROUTES.CALCULATOR, tag: { text: 'New!', color: 'green' } },
-  { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
-  { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
-  { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
-  { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    label: 'Rendimiento',
+    items: [
+      { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
+      { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
+      { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'New!', color: 'green' } },
+      { label: 'Publicidad', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'New!', color: 'green' } },
+      { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
+      { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
+      { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
+      { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
+    ],
+  },
+  {
+    label: 'Herramientas',
+    items: [
+      { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
+      { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
+      { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
+      { label: 'Calculadora', icon: Calculator, to: ROUTES.CALCULATOR, tag: { text: 'New!', color: 'green' } },
+    ],
+  },
 ];
 
 export function Sidebar() {
@@ -185,46 +200,64 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 py-3 overflow-y-auto">
-          <ul className="space-y-1 px-3">
-            {navItems.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg',
-                      'transition-colors duration-150',
-                      'hover:bg-gray-100',
-                      isActive
-                        ? 'bg-primary-50 text-primary-600 font-medium'
-                        : 'text-gray-600',
-                      isSidebarCollapsed && 'justify-center px-2'
-                    )
-                  }
-                  title={isSidebarCollapsed ? item.label : undefined}
-                >
-                  <item.icon className="w-5 h-5 shrink-0" />
-                  {!isSidebarCollapsed && (
-                    <>
-                      <span>{item.label}</span>
-                      {item.tag && (
-                        <span className={cn(
-                          'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                          item.tag.color === 'green'
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : item.tag.color === 'orange'
-                            ? 'bg-amber-50 text-accent-400'
-                            : 'bg-gray-100 text-gray-400'
-                        )}>
-                          {item.tag.text}
-                        </span>
+          {navSections.map((section, sectionIdx) => (
+            <div key={section.label}>
+              {/* Section separator (between sections) */}
+              {sectionIdx > 0 && (
+                isSidebarCollapsed
+                  ? <div className="h-px bg-gray-100 mx-3 my-2" />
+                  : <div className="mt-3" />
+              )}
+
+              {/* Section header (only when expanded) */}
+              {!isSidebarCollapsed && (
+                <div className="px-6 pb-1.5 pt-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  {section.label}
+                </div>
+              )}
+
+              <ul className="space-y-1 px-3">
+                {section.items.map((item) => (
+                  <li key={item.to}>
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg',
+                          'transition-colors duration-150',
+                          'hover:bg-gray-100',
+                          isActive
+                            ? 'bg-primary-50 text-primary-600 font-medium'
+                            : 'text-gray-600',
+                          isSidebarCollapsed && 'justify-center px-2'
+                        )
+                      }
+                      title={isSidebarCollapsed ? item.label : undefined}
+                    >
+                      <item.icon className="w-5 h-5 shrink-0" />
+                      {!isSidebarCollapsed && (
+                        <>
+                          <span>{item.label}</span>
+                          {item.tag && (
+                            <span className={cn(
+                              'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                              item.tag.color === 'green'
+                                ? 'bg-emerald-50 text-emerald-600'
+                                : item.tag.color === 'orange'
+                                ? 'bg-amber-50 text-accent-400'
+                                : 'bg-gray-100 text-gray-400'
+                            )}>
+                              {item.tag.text}
+                            </span>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         {/* Bottom section - User */}
