@@ -187,12 +187,14 @@ export function useWeeklyRevenue() {
   const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', [...companyIds].sort().join(',')],
     queryFn: async () => {
-      // Fetch all 8 weeks of metrics in parallel
-      const weeklyResults = await Promise.all(
-        weeks.map((week) =>
-          fetchControllingMetricsRPC(companyIds, week.start, week.end)
-        )
-      );
+      // Fetch weeks sequentially to avoid overwhelming the database
+      // (8 weeks × N batches per week = too many concurrent RPC calls)
+      const weeklyResults: ControllingMetricsRow[][] = [];
+      for (const week of weeks) {
+        weeklyResults.push(
+          await fetchControllingMetricsRPC(companyIds, week.start, week.end)
+        );
+      }
 
       // Aggregate each week's data (revenue-only for sparklines)
       const weeklyAggs = weeklyResults.map(aggregateRevenueByRowId);
