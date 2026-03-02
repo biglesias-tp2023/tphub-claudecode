@@ -237,12 +237,12 @@ export function buildHierarchyFromRPCMetrics(
     });
   }
 
-  // 2. STORE rows — skip deleted with no data
+  // 2. STORE rows — skip stores with no data in either period
   for (const store of stores) {
     const storeKey = `${store.companyId}::${store.id}`;
     const currentStoreMetrics = currentAgg.byStore.get(storeKey);
     const previousStoreMetrics = previousAgg.byStore.get(storeKey);
-    if (store.deleted && !currentStoreMetrics && !previousStoreMetrics) continue;
+    if (!currentStoreMetrics && !previousStoreMetrics) continue;
 
     rows.push({
       id: `brand::${store.companyId}::${store.id}`,
@@ -305,7 +305,7 @@ export function buildHierarchyFromRPCMetrics(
       const currentAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, currentAgg);
       const previousAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, previousAgg);
 
-      if (address.deleted && !currentAddrMetrics && !previousAddrMetrics) continue;
+      if (!currentAddrMetrics && !previousAddrMetrics) continue;
 
       rows.push({
         id: `address::${address.companyId}::${address.id}`,
@@ -337,24 +337,8 @@ export function buildHierarchyFromRPCMetrics(
         }
       }
     } else {
-      // No mapped store — skip deleted addresses entirely (they have no data)
-      if (address.deleted) continue;
-
-      const companyStores = stores.filter(s => s.companyId === address.companyId);
-      const firstStore = companyStores.length > 0 ? companyStores[0] : undefined;
-      const parentId = firstStore
-        ? `brand::${firstStore.companyId}::${firstStore.id}`
-        : `company-${address.companyId}`;
-
-      rows.push({
-        id: `address::${address.companyId}::${address.id}`,
-        level: 'address',
-        name: address.name,
-        parentId,
-        companyId: address.companyId,
-        brandId: firstStore?.id,
-        metrics: toFinalMetrics(undefined, undefined),
-      });
+      // No mapped store — address has never had orders, skip entirely
+      continue;
     }
   }
 
