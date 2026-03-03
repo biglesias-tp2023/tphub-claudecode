@@ -149,9 +149,10 @@ export async function fetchAdsTimeseries(
   }
 
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk => fetchAdsTimeseriesSingle({ ...params, companyIds: chunk }))
-  );
+  const batchResults: AdsTimeseriesRow[][] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchAdsTimeseriesSingle({ ...params, companyIds: chunk }));
+  }
 
   // Merge by day: sum additive fields
   const byDay = new Map<string, AdsTimeseriesRow>();
@@ -228,9 +229,10 @@ export async function fetchAdsHourlyDistribution(
   }
 
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk => fetchAdsHourlyDistributionSingle({ ...params, companyIds: chunk }))
-  );
+  const batchResults: AdsHourlyDistributionRow[][] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchAdsHourlyDistributionSingle({ ...params, companyIds: chunk }));
+  }
 
   // Merge by hourOfDay: sum additive fields
   const byHour = new Map<number, AdsHourlyDistributionRow>();
@@ -309,9 +311,10 @@ export async function fetchAdsWeeklyHeatmap(
   }
 
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk => fetchAdsWeeklyHeatmapSingle({ ...params, companyIds: chunk }))
-  );
+  const batchResults: AdsWeeklyHeatmapRow[][] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchAdsWeeklyHeatmapSingle({ ...params, companyIds: chunk }));
+  }
 
   // Merge by (dayOfWeek, hourOfDay): sum additive fields
   const byKey = new Map<string, AdsWeeklyHeatmapRow>();

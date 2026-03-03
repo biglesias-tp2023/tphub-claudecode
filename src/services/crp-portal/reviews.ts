@@ -392,9 +392,10 @@ export async function fetchCrpReviewsAggregated(
   }
 
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk => fetchCrpReviewsAggregatedSingle({ ...params, companyIds: chunk }))
-  );
+  const batchResults: ReviewsAggregation[] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchCrpReviewsAggregatedSingle({ ...params, companyIds: chunk }));
+  }
 
   return mergeReviewsAggregations(batchResults);
 }
@@ -447,9 +448,10 @@ export async function fetchCrpReviewsHeatmap(
   }
 
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk => fetchCrpReviewsHeatmapSingle({ ...params, companyIds: chunk }))
-  );
+  const batchResults: ReviewsHeatmapCell[][] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchCrpReviewsHeatmapSingle({ ...params, companyIds: chunk }));
+  }
 
   // Merge by (dayOfWeek, hourOfDay): sum counts
   const byKey = new Map<string, ReviewsHeatmapCell>();
@@ -478,10 +480,9 @@ export async function fetchCrpReviewsComparison(
   previous: ReviewsAggregation;
   changes: ReviewsChanges;
 }> {
-  const [current, previous] = await Promise.all([
-    fetchCrpReviewsAggregated(currentParams),
-    fetchCrpReviewsAggregated(previousParams),
-  ]);
+  // Sequential to avoid overwhelming DB when each call already batches internally
+  const current = await fetchCrpReviewsAggregated(currentParams);
+  const previous = await fetchCrpReviewsAggregated(previousParams);
 
   const calcChange = (curr: number, prev: number): number =>
     prev > 0 ? ((curr - prev) / prev) * 100 : 0;
@@ -596,9 +597,10 @@ export async function fetchCrpReviewsRaw(
   }
 
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk => fetchCrpReviewsRawSingle({ ...params, companyIds: chunk }, limit))
-  );
+  const batchResults: RawReview[][] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchCrpReviewsRawSingle({ ...params, companyIds: chunk }, limit));
+  }
 
   // Concat all results, sort by most recent, take top `limit`
   return batchResults.flat()

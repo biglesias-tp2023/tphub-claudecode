@@ -561,13 +561,13 @@ export async function fetchCrpOrdersAggregated(
     return fetchCrpOrdersAggregatedSingle(params);
   }
 
-  // Large request → split companyIds into batches, run in parallel, merge
+  // Large request → split companyIds into sequential batches to avoid
+  // overwhelming the database with too many concurrent heavy queries
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(chunk =>
-      fetchCrpOrdersAggregatedSingle({ ...params, companyIds: chunk })
-    )
-  );
+  const batchResults: OrdersAggregation[] = [];
+  for (const chunk of chunks) {
+    batchResults.push(await fetchCrpOrdersAggregatedSingle({ ...params, companyIds: chunk }));
+  }
 
   return mergeOrdersAggregations(batchResults);
 }
@@ -616,10 +616,9 @@ export async function fetchCrpOrdersComparison(
   previous: OrdersAggregation;
   changes: OrdersChanges;
 }> {
-  const [current, previous] = await Promise.all([
-    fetchCrpOrdersAggregated(currentParams),
-    fetchCrpOrdersAggregated(previousParams),
-  ]);
+  // Sequential to avoid overwhelming DB when each call already batches internally
+  const current = await fetchCrpOrdersAggregated(currentParams);
+  const previous = await fetchCrpOrdersAggregated(previousParams);
 
   // Helper function to calculate percentage change
   const calcChange = (curr: number, prev: number): number =>
@@ -747,24 +746,23 @@ export async function fetchControllingMetricsRPC(
     return data || [];
   }
 
-  // Large request → split into parallel batches and concatenate
+  // Large request → split into sequential batches to avoid overwhelming the DB
   // Rows are keyed by company/store/address/portal so no overlap between batches
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults = await Promise.all(
-    chunks.map(async (chunk) => {
-      const { data, error } = await supabase.rpc('get_controlling_metrics', {
-        p_company_ids: chunk,
-        p_start_date: `${startDate}T00:00:00`,
-        p_end_date: `${endDate}T23:59:59`,
-      });
+  const batchResults: ControllingMetricsRow[][] = [];
+  for (const chunk of chunks) {
+    const { data, error } = await supabase.rpc('get_controlling_metrics', {
+      p_company_ids: chunk,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    });
 
-      if (error) {
-        throw error;
-      }
+    if (error) {
+      throw error;
+    }
 
-      return (data || []) as ControllingMetricsRow[];
-    })
-  );
+    batchResults.push((data || []) as ControllingMetricsRow[]);
+  }
 
   return batchResults.flat();
 }
