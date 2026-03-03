@@ -6,6 +6,7 @@ import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
 import { fetchCrpOrdersRaw, fetchAdsWeeklyHeatmap } from '@/services/crp-portal';
 import type { Brand, Restaurant } from '@/types';
 import type { HeatmapMatrix } from '../types';
+import type { HeatmapMetric } from '../types';
 import { formatDate } from '@/utils/dateUtils';
 
 // ============================================
@@ -76,7 +77,7 @@ function createEmptyMatrix(): HeatmapMatrix {
 // HOOK
 // ============================================
 
-export function useHeatmapData() {
+export function useHeatmapData(metric: HeatmapMetric) {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange, brandIds, channelIds, restaurantIds } = useDashboardFiltersStore();
 
@@ -98,6 +99,7 @@ export function useHeatmapData() {
   return useQuery<HeatmapMatrix>({
     queryKey: [
       'heatmap',
+      metric,
       startDate,
       endDate,
       [...companyIds].sort().join(','),
@@ -106,6 +108,9 @@ export function useHeatmapData() {
       channelIds.length > 0 ? channelIds.sort().join(',') : '',
     ],
     queryFn: async () => {
+      const needsLookback = metric === 'newCustomers';
+      const needsAds = metric === 'adSpent';
+
       // Compute lookback period: 90 days before startDate
       const lookbackStart = new Date(startDate);
       lookbackStart.setDate(lookbackStart.getDate() - LOOKBACK_DAYS);
@@ -119,22 +124,26 @@ export function useHeatmapData() {
         channelIds: channelIds.length > 0 ? channelIds : undefined,
       };
 
-      // Fetch current period + lookback + ads in parallel
+      // Only fetch lookback orders (for new customers) and ads when the metric needs them
       const [orders, lookbackOrders, adsHeatmap] = await Promise.all([
         fetchCrpOrdersRaw({ ...baseParams, startDate, endDate }),
-        fetchCrpOrdersRaw({
-          ...baseParams,
-          startDate: formatDate(lookbackStart),
-          endDate: formatDate(lookbackEnd),
-        }),
-        fetchAdsWeeklyHeatmap({
-          companyIds: baseParams.companyIds,
-          brandIds: baseParams.brandIds,
-          addressIds: baseParams.addressIds,
-          channelIds: baseParams.channelIds,
-          startDate,
-          endDate,
-        }),
+        needsLookback
+          ? fetchCrpOrdersRaw({
+              ...baseParams,
+              startDate: formatDate(lookbackStart),
+              endDate: formatDate(lookbackEnd),
+            })
+          : Promise.resolve([]),
+        needsAds
+          ? fetchAdsWeeklyHeatmap({
+              companyIds: baseParams.companyIds,
+              brandIds: baseParams.brandIds,
+              addressIds: baseParams.addressIds,
+              channelIds: baseParams.channelIds,
+              startDate,
+              endDate,
+            })
+          : Promise.resolve([]),
       ]);
 
       // Build set of existing customers from lookback period

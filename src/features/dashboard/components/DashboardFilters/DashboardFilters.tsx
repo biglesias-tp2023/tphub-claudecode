@@ -10,9 +10,13 @@ interface DashboardFiltersProps {
   className?: string;
   /** Channels to exclude from the selector (e.g., ['justeat'] if no data) */
   excludeChannels?: ('glovo' | 'ubereats' | 'justeat')[];
+  /** Hide the channel selector entirely */
+  hideChannels?: boolean;
+  /** Hide the date range picker */
+  hideDateRange?: boolean;
 }
 
-export function DashboardFilters({ className, excludeChannels }: DashboardFiltersProps) {
+export function DashboardFilters({ className, excludeChannels, hideChannels, hideDateRange }: DashboardFiltersProps) {
   const { dateRange, datePreset, setDateRangeWithPreset } = useDashboardFiltersStore();
 
   const handleDateChange = (range: DateRange, presetId: DatePreset) => {
@@ -33,17 +37,21 @@ export function DashboardFilters({ className, excludeChannels }: DashboardFilter
       </div>
 
       {/* Separator */}
-      <div className="h-10 w-px bg-gray-200 hidden lg:block" />
+      {(!hideChannels || !hideDateRange) && <div className="h-10 w-px bg-gray-200 hidden lg:block" />}
 
       {/* Independent filters (right) */}
-      <div className="flex flex-wrap items-center gap-4 lg:ml-auto">
-        <ChannelSelector excludeChannels={excludeChannels} />
-        <DateRangePicker
-          value={dateRange}
-          presetId={datePreset}
-          onChange={handleDateChange}
-        />
-      </div>
+      {(!hideChannels || !hideDateRange) && (
+        <div className="flex flex-wrap items-center gap-4 lg:ml-auto">
+          {!hideChannels && <ChannelSelector excludeChannels={excludeChannels} />}
+          {!hideDateRange && (
+            <DateRangePicker
+              value={dateRange}
+              presetId={datePreset}
+              onChange={handleDateChange}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

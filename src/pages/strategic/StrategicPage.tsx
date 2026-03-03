@@ -114,7 +114,7 @@ export function StrategicPage() {
       </div>
 
       {/* Dashboard Filters */}
-      <DashboardFilters />
+      <DashboardFilters hideChannels hideDateRange />
 
       {/* Show empty state or sales projection + objectives */}
       {!state.hasSalesProjection && !state.hasObjectives ? (

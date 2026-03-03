@@ -12,7 +12,7 @@ export function HeatmapPage() {
 
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange } = useDashboardFiltersStore();
-  const { data, isLoading, error } = useHeatmapData();
+  const { data, isLoading, error } = useHeatmapData(metric);
 
   const periodLabels = useMemo(() => getPeriodLabelsFromRange(dateRange), [dateRange]);
 
