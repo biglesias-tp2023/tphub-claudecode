@@ -4,6 +4,7 @@ import Fuse from 'fuse.js';
 import { Search, Building2, Check, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useGlobalFiltersStore, useDashboardFiltersStore, isUnrestrictedRole } from '@/stores/filtersStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCompanies } from '../hooks/useCompanies';
@@ -19,6 +20,7 @@ type TabType = 'all' | 'selected';
 export function CompanySelector({ className, collapsed = false }: CompanySelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [kamFilters, setKamFilters] = useState<string[]>([]);
@@ -88,9 +90,9 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
   const filteredCompanies = useMemo(() => {
     let result = sortedCompanies;
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      result = fuse.search(searchQuery).map((r) => r.item);
+    // Apply search filter (debounced to avoid re-running Fuse.js on every keystroke)
+    if (debouncedSearch.trim()) {
+      result = fuse.search(debouncedSearch).map((r) => r.item);
       // Re-sort after search to maintain alphabetical order
       result = [...result].sort((a, b) =>
         a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
@@ -113,7 +115,7 @@ export function CompanySelector({ className, collapsed = false }: CompanySelecto
     }
 
     return result;
-  }, [searchQuery, sortedCompanies, fuse, activeTab, companyIds, statusFilters, kamFilters]);
+  }, [debouncedSearch, sortedCompanies, fuse, activeTab, companyIds, statusFilters, kamFilters]);
 
   // Get selected companies for display
   const selectedCompanies = useMemo(() => {

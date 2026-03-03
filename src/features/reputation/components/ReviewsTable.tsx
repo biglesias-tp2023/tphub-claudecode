@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { cn } from '@/utils/cn';
 import { ThumbsUp, ThumbsDown, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, X } from 'lucide-react';
 import { StarRating } from '@/components/common';
@@ -49,7 +50,7 @@ function truncateId(id: string, maxLen = 12): string {
   return id.slice(0, maxLen) + '...';
 }
 
-export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: ReviewsTableProps) {
+export const ReviewsTable = memo(function ReviewsTable({ data, totalInPeriod, className, onRowClick }: ReviewsTableProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(50);
 
@@ -60,6 +61,8 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
   const [refundFilter, setRefundFilter] = useState<RefundFilter>('all');
   const [deliveryMin, setDeliveryMin] = useState('');
   const [deliveryMax, setDeliveryMax] = useState('');
+  const debouncedMin = useDebouncedValue(deliveryMin, 300);
+  const debouncedMax = useDebouncedValue(deliveryMax, 300);
 
   const hasActiveFilters = tagFilter !== 'all' || sentiment !== 'all' || commentFilter !== 'all' || refundFilter !== 'all' || deliveryMin !== '' || deliveryMax !== '';
 
@@ -104,9 +107,9 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
       result = result.filter((r) => r.refundAmount == null || r.refundAmount === 0);
     }
 
-    // Delivery time range
-    const minTime = deliveryMin !== '' ? Number(deliveryMin) : null;
-    const maxTime = deliveryMax !== '' ? Number(deliveryMax) : null;
+    // Delivery time range (debounced to avoid filtering on every keystroke)
+    const minTime = debouncedMin !== '' ? Number(debouncedMin) : null;
+    const maxTime = debouncedMax !== '' ? Number(debouncedMax) : null;
     if (minTime !== null || maxTime !== null) {
       result = result.filter((r) => {
         if (r.deliveryTime == null) return false;
@@ -117,7 +120,7 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
     }
 
     return result;
-  }, [data, tagFilter, sentiment, commentFilter, refundFilter, deliveryMin, deliveryMax]);
+  }, [data, tagFilter, sentiment, commentFilter, refundFilter, debouncedMin, debouncedMax]);
 
   // Reset to page 1 when filtered data or pageSize changes
   useEffect(() => { setPage(1); }, [filteredData, pageSize]);
@@ -392,4 +395,4 @@ export function ReviewsTable({ data, totalInPeriod, className, onRowClick }: Rev
       </div>
     </div>
   );
-}
+});

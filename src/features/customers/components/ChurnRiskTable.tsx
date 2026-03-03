@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { AlertTriangle, AlertCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
@@ -32,7 +33,7 @@ function formatRelativeDate(date: Date): string {
   return `Hace ${Math.floor(diffDays / 365)} años`;
 }
 
-export function ChurnRiskTable({ data, onViewAll }: ChurnRiskTableProps) {
+export const ChurnRiskTable = memo(function ChurnRiskTable({ data, onViewAll }: ChurnRiskTableProps) {
   if (data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 p-6">
@@ -132,4 +133,4 @@ export function ChurnRiskTable({ data, onViewAll }: ChurnRiskTableProps) {
       )}
     </div>
   );
-}
+});

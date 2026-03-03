@@ -15,10 +15,10 @@ import { useMemo } from 'react';
 import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { fetchHierarchyDataRPC } from '@/services/crp-portal';
 import type { HierarchyDataRow } from '@/services/crp-portal';
-import { useBrands } from '@/features/dashboard/hooks/useBrands';
-import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
-import { formatDate, getPreviousPeriodRange, parseNumericIds } from './dateUtils';
-import { expandBrandIds, expandRestaurantIds } from './idExpansion';
+import { useBrands } from '@/hooks/useBrands';
+import { useRestaurants } from '@/hooks/useRestaurants';
+import { expandBrandIds, expandRestaurantIds } from '@/hooks/idExpansion';
+import { formatDate, getPreviousPeriodRange, parseNumericIds } from '@/utils/dateUtils';
 
 // ============================================
 // HOOK

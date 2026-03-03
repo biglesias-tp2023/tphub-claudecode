@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/useToast';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useSessionState } from '@/features/controlling/hooks';
-import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
-import { useBrands } from '@/features/dashboard/hooks/useBrands';
-import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
+import { expandBrandIds, expandRestaurantIds } from '@/hooks/idExpansion';
+import { useBrands } from '@/hooks/useBrands';
+import { useRestaurants } from '@/hooks/useRestaurants';
 import { useCompanies } from '@/features/clients/hooks/useCompanies';
 import { fetchCrpCompanyById } from '@/services/crp-portal';
 import {

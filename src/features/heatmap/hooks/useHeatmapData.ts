@@ -1,45 +1,13 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
-import { useBrands } from '@/features/dashboard/hooks/useBrands';
-import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
+import { useBrands } from '@/hooks/useBrands';
+import { useRestaurants } from '@/hooks/useRestaurants';
+import { expandBrandIds, expandRestaurantIds } from '@/hooks/idExpansion';
 import { fetchCrpOrdersRaw, fetchAdsWeeklyHeatmap } from '@/services/crp-portal';
-import type { Brand, Restaurant } from '@/types';
 import type { HeatmapMatrix } from '../types';
 import type { HeatmapMetric } from '../types';
 import { formatDate } from '@/utils/dateUtils';
-
-// ============================================
-// HELPERS
-// ============================================
-
-function expandBrandIds(selectedIds: string[], brands: Brand[]): string[] {
-  if (selectedIds.length === 0) return [];
-  const expanded = new Set<string>();
-  for (const id of selectedIds) {
-    const brand = brands.find((b) => b.id === id || b.allIds.includes(id));
-    if (brand) {
-      for (const bid of brand.allIds) expanded.add(bid);
-    } else {
-      expanded.add(id);
-    }
-  }
-  return Array.from(expanded);
-}
-
-function expandRestaurantIds(selectedIds: string[], restaurants: Restaurant[]): string[] {
-  if (selectedIds.length === 0) return [];
-  const expanded = new Set<string>();
-  for (const id of selectedIds) {
-    const restaurant = restaurants.find((r) => r.id === id || r.allIds.includes(id));
-    if (restaurant) {
-      for (const rid of restaurant.allIds) expanded.add(rid);
-    } else {
-      expanded.add(id);
-    }
-  }
-  return Array.from(expanded);
-}
 
 /**
  * Convert JS getDay() (Sun=0) to ISO day-of-week (Mon=0, Sun=6).

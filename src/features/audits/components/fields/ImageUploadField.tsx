@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Upload, X, ChevronLeft, ChevronRight, Loader2, ZoomIn } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { supabase } from '@/services/supabase';
+import { validateFileMagicNumber } from '@/utils/fileValidation';
 import type { MysteryShopperField } from '../../config/mysteryShopperSchema';
 
 interface ImageInfo {
@@ -49,6 +50,13 @@ export function ImageUploadField({
     // Validate size
     if (file.size > MAX_FILE_SIZE) {
       setError(`Archivo demasiado grande (máx 10MB): ${file.name}`);
+      return null;
+    }
+
+    // Validate magic number matches declared type
+    const validMagic = await validateFileMagicNumber(file);
+    if (!validMagic) {
+      setError(`El archivo no coincide con el tipo declarado: ${file.name}`);
       return null;
     }
 

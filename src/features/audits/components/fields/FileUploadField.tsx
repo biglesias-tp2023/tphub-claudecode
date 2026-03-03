@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Upload, X, FileText, Loader2, Eye } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { supabase } from '@/services/supabase';
+import { validateFileMagicNumber } from '@/utils/fileValidation';
 import type { AuditField } from '@/types';
 
 interface FileInfo {
@@ -63,6 +64,13 @@ export function FileUploadField({
       // Validate size
       if (file.size > MAX_FILE_SIZE) {
         setError(`Archivo demasiado grande (máx 10MB): ${file.name}`);
+        continue;
+      }
+
+      // Validate magic number matches declared type
+      const validMagic = await validateFileMagicNumber(file);
+      if (!validMagic) {
+        setError(`El archivo no coincide con el tipo declarado: ${file.name}`);
         continue;
       }
 

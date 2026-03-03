@@ -17,9 +17,9 @@ import { es } from 'date-fns/locale';
 
 import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters } from '@/stores/filtersStore';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
-import { useBrands } from '@/features/dashboard/hooks/useBrands';
-import { useRestaurants } from '@/features/dashboard/hooks/useRestaurants';
-import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hooks/idExpansion';
+import { useBrands } from '@/hooks/useBrands';
+import { useRestaurants } from '@/hooks/useRestaurants';
+import { expandBrandIds, expandRestaurantIds } from '@/hooks/idExpansion';
 import { useCompaniesById } from '@/features/clients/hooks/useCompanies';
 import { fetchPnLPeriods } from '@/services/crp-portal';
 import { fetchAdsTimeseries } from '@/services/crp-portal';

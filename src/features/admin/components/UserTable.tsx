@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Crown, Shield, Trash2, AlertTriangle } from 'lucide-react';
 import { Badge, Button, Modal } from '@/components/ui';
 import { useCompanies } from '@/features/clients/hooks/useCompanies';
@@ -86,7 +86,7 @@ function DeleteConfirmModal({ profile, isOpen, onClose, onConfirm, isDeleting }:
   );
 }
 
-export function UserTable({ users, onEditCompanies, onEditRole }: UserTableProps) {
+export const UserTable = memo(function UserTable({ users, onEditCompanies, onEditRole }: UserTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [userToDelete, setUserToDelete] = useState<Profile | null>(null);
   const { data: companies = [] } = useCompanies();
@@ -302,4 +302,4 @@ export function UserTable({ users, onEditCompanies, onEditRole }: UserTableProps
       />
     </div>
   );
-}
+});
