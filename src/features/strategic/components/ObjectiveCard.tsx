@@ -40,9 +40,6 @@ import {
   Briefcase,
   AlertTriangle,
   CheckSquare,
-  Circle,
-  CheckCircle2,
-  PlayCircle,
   Target,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -84,35 +81,6 @@ const RESPONSIBLE_LABELS: Record<string, { label: string; icon: React.ElementTyp
   plataforma: { label: 'Platform', icon: Briefcase },
 };
 
-const STATUS_CONFIG: Record<ObjectiveStatus, {
-  icon: React.ElementType;
-  label: string;
-  bgColor: string;
-  textColor: string;
-  iconColor: string;
-}> = {
-  pending: {
-    icon: Circle,
-    label: 'Pendiente',
-    bgColor: 'bg-gray-100',
-    textColor: 'text-gray-600',
-    iconColor: 'text-gray-400',
-  },
-  in_progress: {
-    icon: PlayCircle,
-    label: 'En progreso',
-    bgColor: 'bg-primary-50',
-    textColor: 'text-primary-700',
-    iconColor: 'text-primary-500',
-  },
-  completed: {
-    icon: CheckCircle2,
-    label: 'Completado',
-    bgColor: 'bg-emerald-50',
-    textColor: 'text-emerald-700',
-    iconColor: 'text-emerald-500',
-  },
-};
 
 // ============================================
 // HELPERS
@@ -206,31 +174,6 @@ function StatusDropdown({ currentStatus, onStatusChange, isOpen, onToggle, onClo
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-// ============================================
-// STATUS BADGE COMPONENT (for non-KPI cards)
-// ============================================
-
-interface StatusBadgeProps {
-  status: ObjectiveStatus;
-}
-
-function StatusBadge({ status }: StatusBadgeProps) {
-  const config = STATUS_CONFIG[status];
-  const Icon = config.icon;
-
-  return (
-    <div className={cn(
-      'inline-flex items-center gap-1.5 px-2 py-1 rounded-full',
-      config.bgColor
-    )}>
-      <Icon className={cn('w-3.5 h-3.5', config.iconColor)} />
-      <span className={cn('text-[10px] font-medium', config.textColor)}>
-        {config.label}
-      </span>
     </div>
   );
 }
@@ -432,7 +375,7 @@ export const ObjectiveCard = memo(function ObjectiveCard({
 
             return (
               <>
-                {/* Top row: Category + Status Badge */}
+                {/* Top row: Category */}
                 <div className="flex items-center justify-between mb-3">
                   <span className={cn(
                     'text-[10px] font-semibold uppercase tracking-wider',
@@ -440,7 +383,6 @@ export const ObjectiveCard = memo(function ObjectiveCard({
                   )}>
                     {categoryConfig?.label || objective.category}
                   </span>
-                  <StatusBadge status={objective.status} />
                 </div>
 
                 {/* Content area with visual progress circle */}
@@ -554,18 +496,16 @@ export const ObjectiveCard = memo(function ObjectiveCard({
               )}
             </div>
 
-            {/* Right side: Status (only for KPI cards) + Responsible */}
+            {/* Right side: Status + Responsible */}
             <div className="flex items-center gap-2">
-              {/* Status dropdown (only for KPI cards, non-KPI shows badge above) */}
-              {hasKpi && (
-                <StatusDropdown
-                  currentStatus={objective.status}
-                  onStatusChange={handleStatusChange}
-                  isOpen={isStatusOpen}
-                  onToggle={() => setIsStatusOpen(!isStatusOpen)}
-                  onClose={() => setIsStatusOpen(false)}
-                />
-              )}
+              {/* Status dropdown */}
+              <StatusDropdown
+                currentStatus={objective.status}
+                onStatusChange={handleStatusChange}
+                isOpen={isStatusOpen}
+                onToggle={() => setIsStatusOpen(!isStatusOpen)}
+                onClose={() => setIsStatusOpen(false)}
+              />
 
               {/* Responsible */}
               <div className="flex items-center gap-1 text-[11px] text-gray-400">

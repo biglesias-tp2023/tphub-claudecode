@@ -323,7 +323,16 @@ export function useControllingData() {
         pedidosChange: changes.ordersChange,
         ticketMedio: current.avgTicket,
         ticketMedioChange: changes.avgTicketChange,
-        avgDeliveryTime: reviewsAggQuery.data?.current.avgDeliveryTime ?? 0,
+        avgDeliveryTime: (() => {
+          let wSum = 0, tOrders = 0;
+          for (const row of hierarchyRows) {
+            if (row.level === 'channel' && row.avgDeliveryTime && row.avgDeliveryTime > 0 && row.pedidos > 0) {
+              wSum += row.avgDeliveryTime * row.pedidos;
+              tOrders += row.pedidos;
+            }
+          }
+          return tOrders > 0 ? wSum / tOrders : 0;
+        })(),
         avgDeliveryTimeChange: (() => {
           const curr = reviewsAggQuery.data?.current.avgDeliveryTime ?? 0;
           const prev = reviewsAggQuery.data?.previous.avgDeliveryTime ?? 0;
@@ -361,6 +370,22 @@ export function useControllingData() {
         current.byChannel.ubereats.orders +
         current.byChannel.justeat.orders;
 
+      // Compute per-channel delivery time from hierarchy data (controlling metrics RPC)
+      // instead of reviews RPC which lacks DT for some channels (e.g. UberEats)
+      const dtAcc = new Map<string, { weightedSum: number; totalOrders: number }>();
+      for (const row of hierarchyRows) {
+        if (row.level === 'channel' && row.channelId && row.avgDeliveryTime && row.avgDeliveryTime > 0 && row.pedidos > 0) {
+          const existing = dtAcc.get(row.channelId) ?? { weightedSum: 0, totalOrders: 0 };
+          existing.weightedSum += row.avgDeliveryTime * row.pedidos;
+          existing.totalOrders += row.pedidos;
+          dtAcc.set(row.channelId, existing);
+        }
+      }
+      const channelDT = new Map<string, number>();
+      for (const [chId, acc] of dtAcc) {
+        if (acc.totalOrders > 0) channelDT.set(chId, acc.weightedSum / acc.totalOrders);
+      }
+
       const channelConfig = [
         { id: 'glovo' as ChannelId, name: CHANNELS.glovo.name, color: CHANNELS.glovo.color, logo: '' },
         { id: 'ubereats' as ChannelId, name: CHANNELS.ubereats.name, color: CHANNELS.ubereats.color, logo: '' },
@@ -387,7 +412,7 @@ export function useControllingData() {
           pedidos: channelData.orders,
           pedidosPercentage: totalChannelOrders > 0 ? (channelData.orders / totalChannelOrders) * 100 : 0,
           ticketMedio: channelData.orders > 0 ? channelData.revenue / channelData.orders : 0,
-          avgDeliveryTime: reviewsAggQuery.data?.current.byChannel[cfg.id]?.avgDeliveryTime ?? 0,
+          avgDeliveryTime: channelDT.get(cfg.id) ?? 0,
           ads: channelData.adSpent,
           adsPercentage: channelData.revenue > 0
             ? (channelData.adSpent / channelData.revenue) * 100 : 0,
