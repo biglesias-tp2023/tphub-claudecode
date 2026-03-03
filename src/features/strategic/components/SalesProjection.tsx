@@ -417,9 +417,9 @@ export function SalesProjection({
                             months={months}
                             values={targetRevenue}
                             channel={ch}
-                            onChange={(m, v) => updateTarget(m, ch, v)}
                             total={calculations.getChannelTotal(targetRevenue, ch)}
                             variant="target"
+                            readOnly={true}
                           />
                         );
                       })}

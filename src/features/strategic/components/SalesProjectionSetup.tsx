@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
-import type { SalesChannel, SalesInvestmentMode, SalesProjectionConfig, GridChannelMonthData, ChannelMonthEntry } from '@/types';
+import type { SalesChannel, SalesInvestmentMode, SalesProjectionConfig, SalesProjectionData, GridChannelMonthData, ChannelMonthEntry } from '@/types';
 
 // ============================================
 // TYPES
@@ -31,6 +31,8 @@ interface SalesProjectionSetupProps {
   brandIds?: string[];
   /** Address/restaurant IDs for filtering (from dashboard filters) */
   addressIds?: string[];
+  /** Existing projection to pre-fill the wizard (edit mode) */
+  existingProjection?: SalesProjectionData | null;
 }
 
 type Step = 'channels' | 'investment' | 'baseline' | 'targets';
@@ -501,7 +503,7 @@ function TargetsStep({
 // MAIN COMPONENT
 // ============================================
 
-export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds }: SalesProjectionSetupProps) {
+export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds, existingProjection }: SalesProjectionSetupProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('channels');
   const [channels, setChannels] = useState<SalesChannel[]>(['glovo', 'ubereats', 'justeat']);
@@ -512,6 +514,31 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   const [baselineLoaded, setBaselineLoaded] = useState(false);
   const [editingBaseline, setEditingBaseline] = useState(false);
   const [targets, setTargets] = useState<GridChannelMonthData>({});
+
+  // Pre-fill wizard from existing projection when opening in edit mode
+  useEffect(() => {
+    if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStep('channels');
+    setEditingBaseline(false);
+    if (existingProjection) {
+      setChannels(existingProjection.config.activeChannels);
+      setMode(existingProjection.config.investmentMode);
+      setAds(existingProjection.config.maxAdsPercent);
+      setPromos(existingProjection.config.maxPromosPercent);
+      setBaseline(existingProjection.baselineRevenue);
+      setBaselineLoaded(true);
+      setTargets(existingProjection.targetRevenue);
+    } else {
+      setChannels(['glovo', 'ubereats', 'justeat']);
+      setMode('global');
+      setAds(5);
+      setPromos(5);
+      setBaseline(lastMonthRevenue || { glovo: 0, ubereats: 0, justeat: 0 });
+      setBaselineLoaded(false);
+      setTargets({});
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch real revenue from CRP Portal for baseline auto-population
   // Use props (from parent page) first, then fallback to store values

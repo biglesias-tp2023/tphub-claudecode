@@ -384,6 +384,7 @@ export function StrategicPage() {
         companyIds={state.effectiveCompanyIds}
         brandIds={state.expandedBrandIds}
         addressIds={state.expandedRestaurantIds}
+        existingProjection={state.salesProjection}
       />
 
       <SalesProjectionWarning
