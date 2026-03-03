@@ -56,7 +56,7 @@ export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
           if (v >= 1000) return formatCurrency(v, { compact: true });
           return `${Math.round(v)} €`;
         }}
-        margin={{ top: 8, right: 8, left: 50, bottom: 0 }}
+        margin={{ top: 8, right: 8, left: 55, bottom: 20 }}
         renderTooltip={(dp, xLabel) => {
           const glovo = Number(dp.glovo) || 0;
           const ubereats = Number(dp.ubereats) || 0;
