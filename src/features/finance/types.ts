@@ -22,7 +22,7 @@ export type PnLLineId =
   | 'cogs'
   | 'net_revenue'
   | 'gross_profit'
-  | 'gross_margin';
+  | 'net_margin';
 
 /** Configuration for a single P&L line */
 export interface PnLLineConfig {
@@ -46,7 +46,7 @@ export const PNL_LINES: PnLLineConfig[] = [
   // RESULTADO
   { id: 'net_revenue', label: 'Ventas netas', section: 'resultado', isSubtraction: false, isPercentage: false },
   { id: 'gross_profit', label: 'Beneficio bruto', section: 'resultado', isSubtraction: false, isPercentage: false },
-  { id: 'gross_margin', label: 'Margen bruto %', section: 'resultado', isSubtraction: false, isPercentage: true },
+  { id: 'net_margin', label: 'Margen neto %', section: 'resultado', isSubtraction: false, isPercentage: true },
 ];
 
 export const PNL_SECTIONS = [

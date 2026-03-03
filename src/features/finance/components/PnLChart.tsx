@@ -17,7 +17,7 @@ const CHART_SERIES_CONFIG: {
   { lineId: 'gmv', label: 'GMV', color: '#095789' },
   { lineId: 'net_revenue', label: 'Ventas netas', color: '#0b7bb8' },
   { lineId: 'gross_profit', label: 'Beneficio bruto', color: '#10b981' },
-  { lineId: 'gross_margin', label: 'Margen bruto %', color: '#f59e0b', dashed: true, yAxis: 'right' },
+  { lineId: 'net_margin', label: 'Margen neto %', color: '#f59e0b', dashed: true, yAxis: 'right' },
 ];
 
 export const PnLChart = memo(function PnLChart({ data }: PnLChartProps) {
@@ -32,7 +32,7 @@ export const PnLChart = memo(function PnLChart({ data }: PnLChartProps) {
         gmv: periodData.gmv.value,
         net_revenue: periodData.net_revenue.value,
         gross_profit: periodData.gross_profit.value,
-        gross_margin: periodData.gross_margin.value,
+        net_margin: periodData.net_margin.value,
       };
     });
   }, [data]);
@@ -96,7 +96,7 @@ export const PnLChart = memo(function PnLChart({ data }: PnLChartProps) {
                       <span className="text-gray-600">{s.label}</span>
                     </div>
                     <span className="font-medium tabular-nums text-gray-900">
-                      {s.lineId === 'gross_margin'
+                      {s.lineId === 'net_margin'
                         ? formatPercentage(val, 1, false)
                         : formatCurrency(val)}
                     </span>
