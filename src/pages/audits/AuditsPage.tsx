@@ -112,6 +112,81 @@ function buildAuditExportData(
     return { title: section.title, icon: section.icon, fields };
   });
 
+  // Post-process: split Marketing into sub-sections for better PDF readability
+  const expandedSections: AuditExportSection[] = [];
+  for (const section of sections) {
+    if (section.title !== 'Marketing') {
+      expandedSections.push(section);
+      continue;
+    }
+
+    const glovoCampaigns = new Map<string, AuditExportField[]>();
+    const ubereatsCampaigns = new Map<string, AuditExportField[]>();
+    const summaryFields: AuditExportField[] = [];
+    const validatedFields: AuditExportField[] = [];
+    const nextStepsFields: AuditExportField[] = [];
+
+    for (const field of section.fields) {
+      const campMatch = field.key.match(/^(glovo|ubereats)_campaign_(\d+)_/);
+      if (campMatch) {
+        const campaigns = campMatch[1] === 'glovo' ? glovoCampaigns : ubereatsCampaigns;
+        if (!campaigns.has(campMatch[2])) campaigns.set(campMatch[2], []);
+        campaigns.get(campMatch[2])!.push(field);
+      } else if (['total_spend', 'total_ad_sales', 'roas', 'conversion_rate'].includes(field.key)) {
+        summaryFields.push(field);
+      } else if (field.key.startsWith('validated_')) {
+        validatedFields.push(field);
+      } else {
+        // active_promos, next_steps, marketing_suggestions, and any other fields
+        nextStepsFields.push(field);
+      }
+    }
+
+    const fieldHasValue = (f: AuditExportField) =>
+      f.value != null && f.value !== '' && f.value !== '-';
+    const campaignHasData = (fields: AuditExportField[]) => fields.some(fieldHasValue);
+
+    // Glovo campaigns — only campaigns with data, only non-empty fields within
+    const glovoFields: AuditExportField[] = [];
+    for (const [, fields] of [...glovoCampaigns.entries()].sort()) {
+      if (campaignHasData(fields)) glovoFields.push(...fields.filter(fieldHasValue));
+    }
+    if (glovoFields.length > 0) {
+      expandedSections.push({ title: 'Marketing - Campañas Glovo', fields: glovoFields });
+    }
+
+    // UberEats campaigns
+    const ubereatsFields: AuditExportField[] = [];
+    for (const [, fields] of [...ubereatsCampaigns.entries()].sort()) {
+      if (campaignHasData(fields)) ubereatsFields.push(...fields.filter(fieldHasValue));
+    }
+    if (ubereatsFields.length > 0) {
+      expandedSections.push({ title: 'Marketing - Campañas UberEats', fields: ubereatsFields });
+    }
+
+    // Summary (investment totals)
+    const filledSummary = summaryFields.filter(fieldHasValue);
+    if (filledSummary.length > 0) {
+      expandedSections.push({ title: 'Marketing - Resumen', fields: filledSummary });
+    }
+
+    // Validated actions (checkboxes — always show if section exists)
+    if (validatedFields.length > 0) {
+      expandedSections.push({ title: 'Marketing - Acciones validadas', fields: validatedFields });
+    }
+
+    // Next steps + suggestions
+    const filledNextSteps = nextStepsFields.filter(fieldHasValue);
+    if (filledNextSteps.length > 0) {
+      expandedSections.push({ title: 'Marketing - Próximos pasos', fields: filledNextSteps });
+    }
+
+    // Fallback: if nothing was created, keep original section
+    if (!expandedSections.some((s) => s.title.startsWith('Marketing'))) {
+      expandedSections.push(section);
+    }
+  }
+
   const totalScore = calculateTotalScore(auditType, audit.desFieldData);
 
   return {
@@ -122,7 +197,7 @@ function buildAuditExportData(
     completedAt: audit.tdCompletedAt,
     createdAt: audit.tdCreatedAt,
     createdBy: audit.createdByProfile?.fullName || 'Usuario',
-    sections,
+    sections: expandedSections,
     totalScore: totalScore.maximum > 0 ? totalScore : undefined,
   };
 }
