@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { ContactSelectField } from './fields/ContactSelectField';
+import { MarginCalculatorField } from './fields/MarginCalculatorField';
 import {
   ONBOARDING_SECTIONS,
   DAYS,
@@ -19,6 +20,7 @@ interface OnboardingFormProps {
   autoSave?: boolean;
   onAutoSave?: () => void;
   companyId?: string;
+  companyCommissions?: { glovo: number | null; ubereats: number | null };
 }
 
 export function OnboardingForm({
@@ -28,6 +30,7 @@ export function OnboardingForm({
   autoSave,
   onAutoSave,
   companyId,
+  companyCommissions,
 }: OnboardingFormProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['contact'])
@@ -95,6 +98,7 @@ export function OnboardingForm({
           onFieldChange={handleFieldChange}
           disabled={disabled}
           companyId={companyId}
+          companyCommissions={companyCommissions}
         />
       ))}
     </div>
@@ -113,6 +117,7 @@ interface SectionCardProps {
   onFieldChange: (fieldKey: string, value: unknown) => void;
   disabled?: boolean;
   companyId?: string;
+  companyCommissions?: { glovo: number | null; ubereats: number | null };
 }
 
 function SectionCard({
@@ -123,6 +128,7 @@ function SectionCard({
   onFieldChange,
   disabled,
   companyId,
+  companyCommissions,
 }: SectionCardProps) {
   const { completed, total } = getOnboardingSectionCompletion(section, fieldData);
   const Icon = section.icon;
@@ -180,16 +186,26 @@ function SectionCard({
               disabled={disabled}
             />
           ) : (
-            section.fields.map((field) => (
-              <FieldRenderer
-                key={field.key}
-                field={field}
-                value={fieldData[field.key]}
-                onChange={(value) => onFieldChange(field.key, value)}
-                disabled={disabled}
-                companyId={companyId}
-              />
-            ))
+            section.fields.map((field) =>
+              field.type === 'margin_calculator' ? (
+                <MarginCalculatorField
+                  key={field.key}
+                  fieldData={fieldData}
+                  onFieldChange={onFieldChange}
+                  disabled={disabled}
+                  companyCommissions={companyCommissions ?? { glovo: null, ubereats: null }}
+                />
+              ) : (
+                <FieldRenderer
+                  key={field.key}
+                  field={field}
+                  value={fieldData[field.key]}
+                  onChange={(value) => onFieldChange(field.key, value)}
+                  disabled={disabled}
+                  companyId={companyId}
+                />
+              )
+            )
           )}
         </div>
       )}

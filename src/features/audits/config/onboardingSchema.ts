@@ -19,7 +19,8 @@ export type OnboardingFieldType =
   | 'multi_select'
   | 'number'
   | 'checkbox'
-  | 'contact_select';
+  | 'contact_select'
+  | 'margin_calculator';
 
 export interface OnboardingField {
   key: string;
@@ -132,10 +133,8 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
     icon: Phone,
     fields: [
       { key: 'contact_name', label: 'Persona de contacto', type: 'contact_select', required: true, placeholder: 'Seleccionar contacto' },
-      { key: 'target_margin', label: 'Margen objetivo', type: 'text', required: false, placeholder: 'Ej: 30%' },
-      { key: 'commission_glovo', label: 'Comisión Glovo %', type: 'text', required: false, placeholder: 'Ej: 30%' },
-      { key: 'commission_ubereats', label: 'Comisión UberEats %', type: 'text', required: false, placeholder: 'Ej: 30%' },
-      { key: 'commission_justeat', label: 'Comisión JustEat %', type: 'text', required: false, placeholder: 'Ej: 30%' },
+      { key: 'margin_calculator', label: 'Comisiones y Margen', type: 'margin_calculator', required: false },
+      { key: 'contact_comments', label: 'Comentarios adicionales', type: 'textarea', required: false },
     ],
   },
 

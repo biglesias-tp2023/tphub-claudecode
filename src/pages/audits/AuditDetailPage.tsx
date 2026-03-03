@@ -95,33 +95,6 @@ export function AuditDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Only re-run when audit ID changes
   }, [auditId]);
 
-  // Auto-fill commissions from company data (onboarding only)
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => {
-    if (!isOnboarding || !audit?.company) return;
-
-    const company = audit.company;
-    setFieldData(prev => {
-      const updates: Record<string, unknown> = {};
-      let hasUpdates = false;
-
-      if (!prev.commission_glovo && company.commissionGlovo != null) {
-        updates.commission_glovo = `${Math.round(company.commissionGlovo * 100)}%`;
-        hasUpdates = true;
-      }
-      if (!prev.commission_ubereats && company.commissionUbereats != null) {
-        updates.commission_ubereats = `${Math.round(company.commissionUbereats * 100)}%`;
-        hasUpdates = true;
-      }
-      if (!prev.commission_justeat) {
-        updates.commission_justeat = '30%';
-        hasUpdates = true;
-      }
-
-      return hasUpdates ? { ...prev, ...updates } : prev;
-    });
-  }, [auditId, isOnboarding, audit?.company]);
-
   // Handle field data changes
   const handleFieldDataChange = useCallback((newFieldData: Record<string, unknown>) => {
     setFieldData(newFieldData);
@@ -410,6 +383,10 @@ export function AuditDetailPage() {
             autoSave={!isReadOnly}
             onAutoSave={handleAutoSave}
             companyId={audit.pfkIdCompany ?? undefined}
+            companyCommissions={{
+              glovo: audit.company?.commissionGlovo ?? null,
+              ubereats: audit.company?.commissionUbereats ?? null,
+            }}
           />
         ) : (
           <MysteryShopperForm
