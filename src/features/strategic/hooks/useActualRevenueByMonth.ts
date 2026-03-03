@@ -8,6 +8,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { fetchMonthlyRevenueByChannel } from '@/services/crp-portal';
+import { chunkedArray } from '@/services/crp-portal/utils';
 import type { GridChannelMonthData, ChannelMonthEntry } from '@/types';
 import type { ChannelId } from '@/types';
 
@@ -107,18 +108,27 @@ export function useActualRevenueByMonth({
         ? monthOffsets.map((o) => getMonthRange(o))
         : [...Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i))), getMonthRange(0)];
 
-      // Full date range for the single RPC call
-      const startDate = allMonths[0].start;
-      const endDate = allMonths[allMonths.length - 1].end;
+      // Split months into batches of 2 to avoid PostgreSQL statement
+      // timeouts (error 57014) on large date ranges (~7 months / 1.5M rows).
+      // Sequential calls keep each batch under ~2s (same pattern as
+      // fetchCrpOrdersAggregated in orders.ts).
+      const MONTH_BATCH_SIZE = 2;
+      const monthBatches = chunkedArray(allMonths, MONTH_BATCH_SIZE);
 
-      // ONE call instead of 6 — the RPC groups by month+channel server-side
-      const rows = await fetchMonthlyRevenueByChannel({
-        companyIds: resolvedCompanyIds.length > 0 ? resolvedCompanyIds : undefined,
-        brandIds: brandIds?.length ? brandIds : undefined,
-        addressIds: addressIds?.length ? addressIds : undefined,
-        startDate,
-        endDate,
-      });
+      const rows: Awaited<ReturnType<typeof fetchMonthlyRevenueByChannel>> = [];
+      for (const batch of monthBatches) {
+        const startDate = batch[0].start;
+        const endDate = batch[batch.length - 1].end;
+
+        const batchRows = await fetchMonthlyRevenueByChannel({
+          companyIds: resolvedCompanyIds.length > 0 ? resolvedCompanyIds : undefined,
+          brandIds: brandIds?.length ? brandIds : undefined,
+          addressIds: addressIds?.length ? addressIds : undefined,
+          startDate,
+          endDate,
+        });
+        rows.push(...batchRows);
+      }
 
       // Initialize all months with zero values
       const revenueByMonth: GridChannelMonthData = {};
