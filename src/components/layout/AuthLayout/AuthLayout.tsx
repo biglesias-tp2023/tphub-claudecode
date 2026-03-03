@@ -25,15 +25,17 @@ function AuroraWaves({ width, height }: { width: number; height: number }) {
     let t = 0;
 
     const waves = [
-      { r: 9, g: 87, b: 137, alpha: 0.45, speed: 0.007, amp: 65, freq: 0.003, yOff: 0.45 },
-      { r: 11, g: 123, b: 184, alpha: 0.35, speed: 0.005, amp: 50, freq: 0.004, yOff: 0.52 },
-      { r: 255, g: 161, b: 102, alpha: 0.4, speed: 0.008, amp: 55, freq: 0.0028, yOff: 0.5 },
-      { r: 58, g: 159, b: 212, alpha: 0.3, speed: 0.0085, amp: 45, freq: 0.0035, yOff: 0.58 },
-      { r: 255, g: 133, b: 51, alpha: 0.35, speed: 0.009, amp: 50, freq: 0.003, yOff: 0.62 },
-      { r: 255, g: 180, b: 120, alpha: 0.3, speed: 0.006, amp: 45, freq: 0.0032, yOff: 0.68 },
-      { r: 107, g: 184, b: 224, alpha: 0.25, speed: 0.0065, amp: 35, freq: 0.005, yOff: 0.56 },
-      { r: 255, g: 145, b: 70, alpha: 0.3, speed: 0.0055, amp: 50, freq: 0.0022, yOff: 0.74 },
-      { r: 7, g: 69, b: 103, alpha: 0.35, speed: 0.004, amp: 55, freq: 0.002, yOff: 0.8 },
+      // ── Blues first (background layer) ──
+      { r: 9, g: 87, b: 137, alpha: 0.45, speed: 0.007, amp: 65, freq: 0.003, yOff: 0.42 },
+      { r: 11, g: 123, b: 184, alpha: 0.35, speed: 0.005, amp: 50, freq: 0.004, yOff: 0.48 },
+      { r: 58, g: 159, b: 212, alpha: 0.3, speed: 0.0085, amp: 45, freq: 0.0035, yOff: 0.54 },
+      { r: 107, g: 184, b: 224, alpha: 0.25, speed: 0.0065, amp: 35, freq: 0.005, yOff: 0.58 },
+      { r: 7, g: 69, b: 103, alpha: 0.35, speed: 0.004, amp: 55, freq: 0.002, yOff: 0.63 },
+      // ── Oranges on top (foreground layer) ──
+      { r: 255, g: 161, b: 102, alpha: 0.4, speed: 0.008, amp: 55, freq: 0.0028, yOff: 0.68 },
+      { r: 255, g: 133, b: 51, alpha: 0.35, speed: 0.009, amp: 50, freq: 0.003, yOff: 0.73 },
+      { r: 255, g: 180, b: 120, alpha: 0.3, speed: 0.006, amp: 45, freq: 0.0032, yOff: 0.78 },
+      { r: 255, g: 145, b: 70, alpha: 0.3, speed: 0.0055, amp: 50, freq: 0.0022, yOff: 0.83 },
     ];
 
     function draw() {
