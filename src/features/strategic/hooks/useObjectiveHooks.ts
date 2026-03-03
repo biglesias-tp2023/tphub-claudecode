@@ -41,8 +41,8 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
   // Note: restaurantIds from store maps to addressIds in the new CRP Portal model
   const objectivesQuery = useQuery({
     queryKey: horizon
-      ? queryKeys.strategicObjectives.byHorizon(companyIds, horizon)
-      : queryKeys.strategicObjectives.all(companyIds),
+      ? queryKeys.strategicObjectives.byHorizon(companyIds, horizon, brandIds, filterAddressIds)
+      : queryKeys.strategicObjectives.all(companyIds, brandIds, filterAddressIds),
     queryFn: () => fetchStrategicObjectives({
       companyIds: companyIds.length > 0 ? companyIds : undefined,
       brandIds: brandIds.length > 0 ? brandIds : undefined,

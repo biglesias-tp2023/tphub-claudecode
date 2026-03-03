@@ -150,9 +150,10 @@ export const queryKeys = {
 
   /** Strategic objectives (OKRs) */
   strategicObjectives: {
-    all: (restaurantIds: string[]) => ['strategic-objectives', restaurantIds] as const,
-    byHorizon: (restaurantIds: string[], horizon: string) =>
-      ['strategic-objectives', 'horizon', restaurantIds, horizon] as const,
+    all: (companyIds: string[], brandIds?: string[], addressIds?: string[]) =>
+      ['strategic-objectives', companyIds, brandIds ?? [], addressIds ?? []] as const,
+    byHorizon: (companyIds: string[], horizon: string, brandIds?: string[], addressIds?: string[]) =>
+      ['strategic-objectives', 'horizon', companyIds, horizon, brandIds ?? [], addressIds ?? []] as const,
     detail: (id: string) => ['strategic-objectives', 'detail', id] as const,
   },
 
