@@ -99,10 +99,7 @@ export function SalesProjection({
     const currentTargetPromos = activeChannels.reduce((sum, ch) => sum + calcTargetPromos(currentKey, ch), 0);
     const currentActualPromos = getMonthTotal(effectiveActualPromos, currentKey);
 
-    // Rentabilidad: 100% - ADS% - Promos% - weighted commission%
-    const currentAdsPercent = currentActual > 0 ? (currentActualAds / currentActual) * 100 : 0;
-    const currentPromosPercent = currentActual > 0 ? (currentActualPromos / currentActual) * 100 : 0;
-
+    // Weighted commission (must be computed before rentabilidad)
     const defaultFee = 30;
     const weightedCommission = (() => {
       if (!commissions || currentActual <= 0) return defaultFee;
@@ -114,15 +111,40 @@ export function SalesProjection({
       return (glovoRev * commissions.glovo + uberRev * commissions.ubereats + justeatRev * commissions.justeat) / totalRev;
     })();
 
+    // Rentabilidad ACTUAL: 100% - actual ADS% - actual Promos% - weighted commission%
+    const currentAdsPercent = currentActual > 0 ? (currentActualAds / currentActual) * 100 : 0;
+    const currentPromosPercent = currentActual > 0 ? (currentActualPromos / currentActual) * 100 : 0;
     const currentRentabilidad = currentActual > 0
       ? 100 - currentAdsPercent - currentPromosPercent - weightedCommission
       : null;
+
+    // Rentabilidad OBJETIVO: 100% - configured ADS% - configured Promos% - weighted commission%
+    const targetAdsPercent = (() => {
+      if (currentActual <= 0) return 0;
+      let weightedSum = 0;
+      for (const ch of activeChannels) {
+        const chRevenue = effectiveActualRevenue[currentKey]?.[ch] || 0;
+        weightedSum += chRevenue * getPercent(config.maxAdsPercent, ch);
+      }
+      return weightedSum / currentActual;
+    })();
+    const targetPromosPercent = (() => {
+      if (currentActual <= 0) return 0;
+      let weightedSum = 0;
+      for (const ch of activeChannels) {
+        const chRevenue = effectiveActualRevenue[currentKey]?.[ch] || 0;
+        weightedSum += chRevenue * getPercent(config.maxPromosPercent, ch);
+      }
+      return weightedSum / currentActual;
+    })();
+    const targetRentabilidad = 100 - targetAdsPercent - targetPromosPercent - weightedCommission;
 
     return {
       getMonthTotal, getChannelTotal, grandTarget, grandActual,
       calcTargetAds, calcTargetPromos, totalTargetAds, totalTargetPromos, totalActualAds, totalActualPromos,
       currentTarget, currentActual, currentTargetAds, currentActualAds, currentTargetPromos, currentActualPromos,
       currentAdsPercent, currentPromosPercent, weightedCommission, currentRentabilidad,
+      targetAdsPercent, targetPromosPercent, targetRentabilidad,
     };
   }, [months, activeChannels, targetRevenue, effectiveActualRevenue, effectiveActualAds, effectiveActualPromos, config, commissions]);
 
@@ -307,12 +329,15 @@ export function SalesProjection({
         {showActual && calculations.currentRentabilidad !== null && (
           <div>
             <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Rentabilidad</p>
-            <p className={cn(
-              'text-xl font-bold tabular-nums',
-              calculations.currentRentabilidad >= 0 ? 'text-emerald-600' : 'text-red-500'
-            )}>
-              {calculations.currentRentabilidad.toFixed(1)}%
-            </p>
+            <div className="flex items-baseline gap-1.5">
+              <p className={cn(
+                'text-xl font-bold tabular-nums',
+                calculations.currentRentabilidad >= 0 ? 'text-emerald-600' : 'text-red-500'
+              )}>
+                {calculations.currentRentabilidad.toFixed(1)}%
+              </p>
+              <p className="text-sm text-gray-400">/ {calculations.targetRentabilidad.toFixed(1)}%</p>
+            </div>
             <p className="text-[10px] text-gray-400 mt-0.5">
               ADS {calculations.currentAdsPercent.toFixed(1)}% · Promos {calculations.currentPromosPercent.toFixed(1)}% · Fee {calculations.weightedCommission.toFixed(0)}%
             </p>
