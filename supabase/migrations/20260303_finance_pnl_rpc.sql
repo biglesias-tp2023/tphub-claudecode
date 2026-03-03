@@ -6,13 +6,16 @@
 -- Date: 2026-03-03
 -- ============================================
 
+-- Drop previous version if it exists (TIMESTAMPTZ signature)
+DROP FUNCTION IF EXISTS get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+
 CREATE OR REPLACE FUNCTION get_pnl_periods(
-  p_company_ids   TEXT[]        DEFAULT NULL,
-  p_brand_ids     TEXT[]        DEFAULT NULL,
-  p_address_ids   TEXT[]        DEFAULT NULL,
-  p_start_date    TIMESTAMPTZ   DEFAULT NULL,
-  p_end_date      TIMESTAMPTZ   DEFAULT NULL,
-  p_granularity   TEXT          DEFAULT 'month'  -- 'week' | 'month' | 'quarter'
+  p_company_ids   TEXT[]      DEFAULT NULL,
+  p_brand_ids     TEXT[]      DEFAULT NULL,
+  p_address_ids   TEXT[]      DEFAULT NULL,
+  p_start_date    TIMESTAMP   DEFAULT NULL,
+  p_end_date      TIMESTAMP   DEFAULT NULL,
+  p_granularity   TEXT        DEFAULT 'month'  -- 'week' | 'month' | 'quarter'
 )
 RETURNS TABLE (
   period_start  DATE,
@@ -46,6 +49,9 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMPTZ, TIMESTAMPTZ, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMP, TIMESTAMP, TEXT) TO authenticated;
 
 COMMENT ON FUNCTION get_pnl_periods IS 'Aggregates order data by configurable period (week/month/quarter) with portal breakdown for the P&L Finance dashboard.';
+
+-- Reload PostgREST schema cache
+NOTIFY pgrst, 'reload schema';

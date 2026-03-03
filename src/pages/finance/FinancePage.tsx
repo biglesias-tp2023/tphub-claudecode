@@ -76,7 +76,7 @@ export function FinancePage() {
       </div>
 
       {/* Filters */}
-      <DashboardFilters />
+      <DashboardFilters hideChannels />
 
       {/* Multi-company disclaimer */}
       {isMultiCompany && (
