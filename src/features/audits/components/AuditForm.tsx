@@ -13,6 +13,7 @@ interface AuditFormProps {
   disabled?: boolean;
   autoSave?: boolean;
   onAutoSave?: () => void;
+  companyId?: string;
 }
 
 export function AuditForm({
@@ -22,6 +23,7 @@ export function AuditForm({
   disabled,
   autoSave,
   onAutoSave,
+  companyId,
 }: AuditFormProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(auditType.fieldSchema.sections.map((s) => s.key))
@@ -87,6 +89,7 @@ export function AuditForm({
           onFieldChange={handleFieldChange}
           disabled={disabled}
           getIconComponent={getIconComponent}
+          companyId={companyId}
         />
       ))}
     </div>
@@ -101,6 +104,7 @@ interface SectionCardProps {
   onFieldChange: (fieldKey: string, value: unknown) => void;
   disabled?: boolean;
   getIconComponent: (iconName: string | undefined) => React.ReactNode;
+  companyId?: string;
 }
 
 function SectionCard({
@@ -111,6 +115,7 @@ function SectionCard({
   onFieldChange,
   disabled,
   getIconComponent,
+  companyId,
 }: SectionCardProps) {
   // Calculate section completion
   const completedFields = section.fields.filter((field) => {
@@ -178,6 +183,7 @@ function SectionCard({
               value={fieldData[field.key]}
               onChange={(value) => onFieldChange(field.key, value)}
               disabled={disabled}
+              companyId={companyId}
             />
           ))}
 

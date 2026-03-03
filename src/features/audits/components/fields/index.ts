@@ -12,3 +12,4 @@ export { FileUploadField } from './FileUploadField';
 export { FieldRenderer } from './FieldRenderer';
 export { RatingField } from './RatingField';
 export { ImageUploadField } from './ImageUploadField';
+export { ContactSelectField } from './ContactSelectField';

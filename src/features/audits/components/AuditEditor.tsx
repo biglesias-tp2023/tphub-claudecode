@@ -44,6 +44,34 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
       setFieldData(audit.desFieldData);
     }
   }, [audit]);
+
+  // Auto-fill commissions from company data
+  useEffect(() => {
+    if (!audit?.pfkIdCompany || companies.length === 0) return;
+
+    const company = companies.find(c => c.id === audit.pfkIdCompany);
+    if (!company) return;
+
+    setFieldData(prev => {
+      const updates: Record<string, unknown> = {};
+      let hasUpdates = false;
+
+      if (!prev.commission_glovo && company.commissionGlovo != null) {
+        updates.commission_glovo = `${Math.round(company.commissionGlovo * 100)}%`;
+        hasUpdates = true;
+      }
+      if (!prev.commission_ubereats && company.commissionUbereats != null) {
+        updates.commission_ubereats = `${Math.round(company.commissionUbereats * 100)}%`;
+        hasUpdates = true;
+      }
+      if (!prev.commission_justeat) {
+        updates.commission_justeat = '30%';
+        hasUpdates = true;
+      }
+
+      return hasUpdates ? { ...prev, ...updates } : prev;
+    });
+  }, [audit?.pfkIdCompany, companies]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle field data changes
@@ -287,6 +315,7 @@ export function AuditEditor({ auditId, onClose, onSaved }: AuditEditorProps) {
             disabled={audit.desStatus === 'completed' || audit.desStatus === 'delivered'}
             autoSave={audit.desStatus !== 'completed' && audit.desStatus !== 'delivered'}
             onAutoSave={handleAutoSave}
+            companyId={audit.pfkIdCompany ?? undefined}
           />
         </div>
       </main>

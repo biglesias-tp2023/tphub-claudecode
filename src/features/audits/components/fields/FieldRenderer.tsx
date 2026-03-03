@@ -10,6 +10,7 @@ import { TimeField } from './TimeField';
 import { CompanySelectField } from './CompanySelectField';
 import { UserSelectField } from './UserSelectField';
 import { FileUploadField } from './FileUploadField';
+import { ContactSelectField } from './ContactSelectField';
 
 interface FileInfo {
   name: string;
@@ -24,9 +25,10 @@ interface FieldRendererProps {
   onChange: (value: unknown) => void;
   disabled?: boolean;
   auditId?: string; // For file uploads
+  companyId?: string; // For contact_select
 }
 
-export function FieldRenderer({ field, value, onChange, disabled, auditId }: FieldRendererProps) {
+export function FieldRenderer({ field, value, onChange, disabled, auditId, companyId }: FieldRendererProps) {
   // Wrap field in a div with data-field-key for scroll targeting
   const wrapWithId = (children: React.ReactNode) => (
     <div data-field-key={field.key} id={`field-${field.key}`}>
@@ -143,6 +145,17 @@ export function FieldRenderer({ field, value, onChange, disabled, auditId }: Fie
           onChange={onChange}
           disabled={disabled}
           auditId={auditId}
+        />
+      );
+
+    case 'contact_select':
+      return wrapWithId(
+        <ContactSelectField
+          field={field}
+          value={value as string | null}
+          onChange={onChange}
+          disabled={disabled}
+          companyId={companyId}
         />
       );
 

@@ -130,7 +130,7 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
     title: 'Información de Contacto',
     icon: Phone,
     fields: [
-      { key: 'contact_name', label: 'Persona de contacto', type: 'text', required: true, placeholder: 'Nombre del punto de contacto' },
+      { key: 'contact_name', label: 'Persona de contacto', type: 'contact_select' as OnboardingFieldType, required: true, placeholder: 'Seleccionar contacto' },
       { key: 'contact_phone', label: 'Teléfono', type: 'text', required: true, placeholder: 'Teléfono de contacto' },
       { key: 'target_margin', label: 'Margen objetivo', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'commission_glovo', label: 'Comisión Glovo %', type: 'text', required: false, placeholder: 'Ej: 30%' },

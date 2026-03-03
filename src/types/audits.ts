@@ -19,7 +19,8 @@ export type AuditFieldType =
   | 'time'            // Time picker only
   | 'company_select'  // Dropdown from companies table
   | 'user_select'     // Dropdown from profiles table
-  | 'file';           // File/image upload
+  | 'file'            // File/image upload
+  | 'contact_select'; // Dropdown from HubSpot contacts
 
 /**
  * Configuration for a single field in an audit form
