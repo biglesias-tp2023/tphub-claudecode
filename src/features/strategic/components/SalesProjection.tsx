@@ -309,7 +309,7 @@ export function SalesProjection({
           isInvestment={false}
         />
         <Scorecard
-          label="Presupuesto ADS"
+          label="Inversión ADS"
           value={calculations.currentTargetAds}
           actual={calculations.currentActualAds}
           color="text-amber-600"
@@ -318,7 +318,7 @@ export function SalesProjection({
           isInvestment
         />
         <Scorecard
-          label="Presupuesto Promo"
+          label="Inversión Promo"
           value={calculations.currentTargetPromos}
           actual={calculations.currentActualPromos}
           color="text-purple-600"
