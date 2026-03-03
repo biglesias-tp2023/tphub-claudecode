@@ -146,6 +146,14 @@ export function useStrategicPageState() {
       : '';
   }, [filterBrandIds, allBrands, effectiveCompanyIds]);
 
+  // Resolve primary brand ID for scope-aware projection loading
+  const primaryBrandId = useMemo(() => {
+    if (filterBrandIds.length > 0) {
+      return filterBrandIds[0];
+    }
+    return null;
+  }, [filterBrandIds]);
+
   // Commissions from CRP Portal (for rentabilidad scorecard)
   const { data: allCompanies = [] } = useCompanies();
   const commissions = useMemo(() => {
@@ -172,7 +180,7 @@ export function useStrategicPageState() {
   const {
     data: salesProjection = null,
     isLoading: isLoadingProjection,
-  } = useSalesProjection({ companyId: primaryCompanyId });
+  } = useSalesProjection({ companyId: primaryCompanyId, brandId: primaryBrandId });
 
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
@@ -317,6 +325,7 @@ export function useStrategicPageState() {
     try {
       await upsertProjection.mutateAsync({
         companyId: primaryCompanyId,
+        brandId: primaryBrandId,
         config,
         baselineRevenue,
         targetRevenue,
@@ -328,7 +337,7 @@ export function useStrategicPageState() {
     } catch {
       error('Error al crear proyección');
     }
-  }, [primaryCompanyId, upsertProjection, success, error]);
+  }, [primaryCompanyId, primaryBrandId, upsertProjection, success, error]);
 
   const handleUpdateTargetRevenue = useCallback((data: GridChannelMonthData) => {
     if (!salesProjection) return;
@@ -592,6 +601,7 @@ export function useStrategicPageState() {
     companyIds,
     effectiveCompanyIds,
     primaryCompanyId,
+    primaryBrandId,
     allCompanies,
     allBrands,
     allRestaurants,

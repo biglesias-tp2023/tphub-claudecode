@@ -157,7 +157,11 @@ export function StrategicPage() {
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-medium text-gray-900">Proyeccion de ventas</p>
-                  <p className="text-xs text-gray-500">Configura objetivos de facturacion por canal</p>
+                  <p className="text-xs text-gray-500">
+                    {brandName
+                      ? `Configura objetivos para ${brandName}`
+                      : 'Configura objetivos de facturacion por canal'}
+                  </p>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 rounded-lg group-hover:bg-primary-100 transition-colors">
