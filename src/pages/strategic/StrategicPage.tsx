@@ -385,6 +385,7 @@ export function StrategicPage() {
         brandIds={state.expandedBrandIds}
         addressIds={state.expandedRestaurantIds}
         existingProjection={state.salesProjection}
+        scopeLabel={[companyName, brandName, addressName].filter(Boolean).join(' > ')}
       />
 
       <SalesProjectionWarning

@@ -33,6 +33,8 @@ interface SalesProjectionSetupProps {
   addressIds?: string[];
   /** Existing projection to pre-fill the wizard (edit mode) */
   existingProjection?: SalesProjectionData | null;
+  /** Scope label shown in the header (e.g. "Company > Brand") */
+  scopeLabel?: string;
 }
 
 type Step = 'channels' | 'investment' | 'baseline' | 'targets';
@@ -503,7 +505,7 @@ function TargetsStep({
 // MAIN COMPONENT
 // ============================================
 
-export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds, existingProjection }: SalesProjectionSetupProps) {
+export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds, existingProjection, scopeLabel }: SalesProjectionSetupProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('channels');
   const [channels, setChannels] = useState<SalesChannel[]>(['glovo', 'ubereats', 'justeat']);
@@ -680,7 +682,11 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900">Configurar proyección de ventas</h2>
-              <p className="text-xs text-gray-500">Paso {idx + 1} de {steps.length}</p>
+              {scopeLabel ? (
+                <p className="text-xs text-gray-500">{scopeLabel} · Paso {idx + 1} de {steps.length}</p>
+              ) : (
+                <p className="text-xs text-gray-500">Paso {idx + 1} de {steps.length}</p>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50">
