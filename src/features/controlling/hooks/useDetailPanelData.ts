@@ -37,14 +37,11 @@ export interface DetailWeekData {
 }
 
 interface UseDetailPanelDataParams {
-  rowId: string | null;
-  weeklyMetrics: Map<string, WeekMetrics[]>;
+  metrics: WeekMetrics[] | null;
 }
 
-export function useDetailPanelData({ rowId, weeklyMetrics }: UseDetailPanelDataParams) {
+export function useDetailPanelData({ metrics }: UseDetailPanelDataParams) {
   const data = useMemo((): DetailWeekData[] | null => {
-    if (!rowId) return null;
-    const metrics = weeklyMetrics.get(rowId);
     if (!metrics || metrics.length === 0) return null;
 
     return metrics.map((m) => {
@@ -74,7 +71,7 @@ export function useDetailPanelData({ rowId, weeklyMetrics }: UseDetailPanelDataP
         promotedOrders: m.promotedOrders,
       };
     });
-  }, [rowId, weeklyMetrics]);
+  }, [metrics]);
 
   return { data };
 }

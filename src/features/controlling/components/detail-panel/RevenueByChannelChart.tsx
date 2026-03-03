@@ -2,13 +2,17 @@ import { useMemo } from 'react';
 import { AreaChart } from '@/components/charts/rosen/AreaChart';
 import { CHANNELS } from '@/constants/channels';
 import { formatCurrency } from '@/utils/formatters';
+import type { ChannelId } from '@/types';
 import type { DetailWeekData } from '../../hooks/useDetailPanelData';
+
+type ChannelView = 'all' | ChannelId;
 
 interface RevenueByChannelChartProps {
   data: DetailWeekData[];
+  channelView?: ChannelView;
 }
 
-export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
+export function RevenueByChannelChart({ data, channelView = 'all' }: RevenueByChannelChartProps) {
   const chartData = useMemo(
     () =>
       data.map((d) => ({
@@ -19,6 +23,91 @@ export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
     [data]
   );
 
+  const yTickFormatter = (v: number) => {
+    if (v === 0) return '0 \u20AC';
+    if (v >= 1000) return formatCurrency(v, { compact: true });
+    return `${Math.round(v)} \u20AC`;
+  };
+
+  const margin = { top: 8, right: 8, left: 55, bottom: 20 };
+
+  if (channelView === 'glovo') {
+    return (
+      <div>
+        <div className="flex items-center gap-4 mb-2">
+          <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
+            <img src={CHANNELS.glovo.logoUrl} alt="Glovo" className="w-4 h-4 object-contain" />Glovo
+          </span>
+        </div>
+        <div className="h-[170px]">
+          <AreaChart
+            data={chartData}
+            xKey="week"
+            series={[
+              {
+                dataKey: 'glovo',
+                name: 'Glovo',
+                color: '#F5A623',
+                gradientOpacity: [0.35, 0.05],
+                strokeWidth: 2,
+              },
+            ]}
+            yTickFormatter={yTickFormatter}
+            margin={margin}
+            renderTooltip={(dp, xLabel) => {
+              const glovo = Number(dp.glovo) || 0;
+              return (
+                <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+                  <p className="font-medium mb-1">{xLabel}</p>
+                  <p className="text-amber-300">Glovo: {formatCurrency(glovo)}</p>
+                </div>
+              );
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (channelView === 'ubereats') {
+    return (
+      <div>
+        <div className="flex items-center gap-4 mb-2">
+          <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
+            <img src={CHANNELS.ubereats.logoUrl} alt="Uber Eats" className="w-4 h-4 object-contain" />Uber Eats
+          </span>
+        </div>
+        <div className="h-[170px]">
+          <AreaChart
+            data={chartData}
+            xKey="week"
+            series={[
+              {
+                dataKey: 'ubereats',
+                name: 'Uber Eats',
+                color: '#06C167',
+                gradientOpacity: [0.35, 0.05],
+                strokeWidth: 2,
+              },
+            ]}
+            yTickFormatter={yTickFormatter}
+            margin={margin}
+            renderTooltip={(dp, xLabel) => {
+              const ubereats = Number(dp.ubereats) || 0;
+              return (
+                <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+                  <p className="font-medium mb-1">{xLabel}</p>
+                  <p className="text-emerald-300">Uber Eats: {formatCurrency(ubereats)}</p>
+                </div>
+              );
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Default: 'all' — stacked view
   return (
     <div>
       <div className="flex items-center gap-4 mb-2">
@@ -51,12 +140,8 @@ export function RevenueByChannelChart({ data }: RevenueByChannelChartProps) {
             stackId: 'revenue',
           },
         ]}
-        yTickFormatter={(v) => {
-          if (v === 0) return '0 €';
-          if (v >= 1000) return formatCurrency(v, { compact: true });
-          return `${Math.round(v)} €`;
-        }}
-        margin={{ top: 8, right: 8, left: 55, bottom: 20 }}
+        yTickFormatter={yTickFormatter}
+        margin={margin}
         renderTooltip={(dp, xLabel) => {
           const glovo = Number(dp.glovo) || 0;
           const ubereats = Number(dp.ubereats) || 0;

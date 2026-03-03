@@ -78,16 +78,19 @@ function extractCompanyId(rowId: string): string | null {
   return parts.length >= 2 ? parts[1] : null;
 }
 
-export function useDetailSegments(rowId: string | null) {
+export function useDetailSegments(rowIds: string[]) {
   const weeks = useMemo(() => getLastNWeeks(SPARKLINE_WEEKS), []);
 
   // Only query the single company for the clicked row (not all 80)
-  const targetCompanyId = rowId ? extractCompanyId(rowId) : null;
+  const targetCompanyId = rowIds.length > 0 ? extractCompanyId(rowIds[0]) : null;
+
+  // Stable query key: sort IDs to avoid cache misses from ordering
+  const sortedIds = useMemo(() => [...rowIds].sort(), [rowIds]);
 
   const query = useQuery<WeekSegmentData[]>({
-    queryKey: ['detail-segments', rowId, targetCompanyId],
+    queryKey: ['detail-segments', sortedIds, targetCompanyId],
     queryFn: async () => {
-      if (!targetCompanyId) return [];
+      if (!targetCompanyId || rowIds.length === 0) return [];
 
       // Fetch 8 weeks sequentially, only for the target company
       const weekResults: CustomerSegmentRow[][] = [];
@@ -100,14 +103,22 @@ export function useDetailSegments(rowId: string | null) {
         weekResults.push(rows);
       }
 
-      // Aggregate each week and extract data for the target row
+      // Aggregate each week and sum segments across all provided rowIds
       return weeks.map((w, i) => {
         const weekAgg = aggregateSegmentsByRowId(weekResults[i] ?? []);
-        const s = weekAgg.get(rowId!) ?? emptySegments();
-        return { weekLabel: w.label, ...s };
+        const totals = emptySegments();
+        for (const rid of rowIds) {
+          const s = weekAgg.get(rid);
+          if (s) {
+            totals.newCustomers += s.newCustomers;
+            totals.occasionalCustomers += s.occasionalCustomers;
+            totals.frequentCustomers += s.frequentCustomers;
+          }
+        }
+        return { weekLabel: w.label, ...totals };
       });
     },
-    enabled: !!rowId && !!targetCompanyId,
+    enabled: rowIds.length > 0 && !!targetCompanyId,
     staleTime: QUERY_STALE_MEDIUM,
     gcTime: QUERY_GC_MEDIUM,
   });
