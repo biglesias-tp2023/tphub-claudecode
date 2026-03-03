@@ -29,6 +29,8 @@ const AuditsPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ def
 const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => ({ default: m.AuditDetailPage })));
 // Marketing: advertising analytics
 const MarketingPage = lazyWithRetry(() => import('@/pages/marketing').then(m => ({ default: m.MarketingPage })));
+// Finance: P&L dashboard
+const FinancePage = lazyWithRetry(() => import('@/pages/finance').then(m => ({ default: m.FinancePage })));
 // Alerts: alert configuration and company preferences
 const AlertsPage = lazyWithRetry(() => import('@/pages/alerts').then(m => ({ default: m.AlertsPage })));
 // Admin: user management (admin-only)
@@ -143,6 +145,7 @@ export const router = createBrowserRouter([
       { path: 'audits', element: <LazyPage><AuditsPage /></LazyPage> },
       { path: 'audits/:id', element: <LazyPage><AuditDetailPage /></LazyPage> },
       { path: 'marketing', element: <LazyPage><MarketingPage /></LazyPage> },
+      { path: 'finance', element: <LazyPage><FinancePage /></LazyPage> },
       { path: 'maps', element: <LazyPage><MapsPage /></LazyPage> },
       { path: 'admin', element: <LazyPage><AdminPage /></LazyPage> },
       { path: 'admin/users', element: <LazyPage><AdminPage /></LazyPage> },

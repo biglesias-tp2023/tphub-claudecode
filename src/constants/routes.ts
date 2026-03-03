@@ -21,6 +21,7 @@ export const ROUTES = {
   MAPS: '/maps',
   MARKET: '/market',
   MARKETING: '/marketing',
+  FINANCE: '/finance',
   ALERTS: '/alerts',
   ADMIN: '/admin',
 

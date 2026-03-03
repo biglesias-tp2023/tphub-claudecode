@@ -180,6 +180,15 @@ export {
 
 export type { CrpProduct } from './products';
 
+// P&L (period aggregations for Finance dashboard)
+export { fetchPnLPeriods } from './pnl';
+
+export type {
+  PnLGranularity,
+  PnLPeriodsParams,
+  PnLPeriodRow,
+} from './pnl';
+
 // Ads (timeseries for Marketing dashboard + hourly distribution + weekly heatmap)
 export { fetchAdsTimeseries, fetchAdsHourlyDistribution, fetchAdsWeeklyHeatmap } from './ads';
 
