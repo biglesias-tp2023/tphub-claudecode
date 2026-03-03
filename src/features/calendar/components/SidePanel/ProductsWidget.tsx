@@ -50,7 +50,7 @@ function ProductItem({ product, onClick }: { product: ProductWithTier; onClick?:
       {/* Product image or placeholder */}
       <div className="w-10 h-10 rounded bg-gray-100 shrink-0 flex items-center justify-center overflow-hidden">
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+          <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <Package className="w-5 h-5 text-gray-400" />
         )}

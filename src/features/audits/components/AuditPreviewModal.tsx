@@ -240,6 +240,7 @@ function ImageViewerModal({
             src={current.url}
             alt={current.name}
             className="max-w-full max-h-[60vh] object-contain rounded-lg"
+            loading="lazy"
           />
         </div>
 
@@ -259,7 +260,7 @@ function ImageViewerModal({
                       : 'border-transparent hover:border-gray-300'
                   )}
                 >
-                  <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                  <img src={img.url} alt={img.name} className="w-full h-full object-cover" loading="lazy" />
                 </button>
               ))}
             </div>

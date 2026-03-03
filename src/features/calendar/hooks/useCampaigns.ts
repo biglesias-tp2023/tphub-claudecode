@@ -44,13 +44,13 @@ function getStoredCampaigns(): PromotionalCampaign[] {
 
     // Validate that parsed data is an array
     if (!Array.isArray(parsed)) {
-      console.warn('[useCampaigns] Invalid localStorage data: expected array, got', typeof parsed);
+      if (import.meta.env.DEV) console.warn('[useCampaigns] Invalid localStorage data: expected array, got', typeof parsed);
       return [];
     }
 
     return parsed;
   } catch (error) {
-    console.warn('[useCampaigns] Failed to parse localStorage campaigns:', error);
+    if (import.meta.env.DEV) console.warn('[useCampaigns] Failed to parse localStorage campaigns:', error);
     return [];
   }
 }

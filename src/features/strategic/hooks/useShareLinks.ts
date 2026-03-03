@@ -82,7 +82,7 @@ export function useCreateShareLink() {
       queryClient.setQueryData(shareLinkKeys.byObjective(data.objectiveId), data);
     },
     onError: (error: Error) => {
-      console.error('Error creating share link:', error);
+      if (import.meta.env.DEV) console.error('Error creating share link:', error);
     },
   });
 }
@@ -100,7 +100,7 @@ export function useUpdateShareLink() {
       queryClient.setQueryData(shareLinkKeys.byObjective(data.objectiveId), data);
     },
     onError: (error: Error) => {
-      console.error('Error updating share link:', error);
+      if (import.meta.env.DEV) console.error('Error updating share link:', error);
     },
   });
 }
@@ -118,7 +118,7 @@ export function useDeleteShareLink() {
       queryClient.setQueryData(shareLinkKeys.byObjective(objectiveId), null);
     },
     onError: (error: Error) => {
-      console.error('Error deleting share link:', error);
+      if (import.meta.env.DEV) console.error('Error deleting share link:', error);
     },
   });
 }
@@ -135,7 +135,7 @@ export function useRegenerateToken() {
       queryClient.setQueryData(shareLinkKeys.byObjective(data.objectiveId), data);
     },
     onError: (error: Error) => {
-      console.error('Error regenerating token:', error);
+      if (import.meta.env.DEV) console.error('Error regenerating token:', error);
     },
   });
 }

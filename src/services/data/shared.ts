@@ -10,7 +10,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
  * Logs the full error for debugging but throws a generic user-facing message.
  */
 export function handleQueryError(error: PostgrestError, userMessage: string): never {
-  console.error(`[supabase-data] ${userMessage}:`, error.message, error.details);
+  if (import.meta.env.DEV) console.error(`[supabase-data] ${userMessage}:`, error.message, error.details);
   throw new Error(userMessage);
 }
 

@@ -606,6 +606,7 @@ const CompanyItem = memo(function CompanyItem({
             src={company.logoUrl}
             alt={company.name}
             className="w-full h-full object-contain rounded-lg"
+            loading="lazy"
           />
         ) : (
           company.name.charAt(0).toUpperCase()

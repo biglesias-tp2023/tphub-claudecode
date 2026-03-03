@@ -200,6 +200,7 @@ export function FileUploadField({
                     src={file.url}
                     alt={file.name}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
               ) : (

@@ -1,22 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-
-// Stale times por tipo de dato
-export const STALE_TIMES = {
-  clients: 10 * 60 * 1000,    // 10 min - cambian poco
-  locations: 10 * 60 * 1000,  // 10 min - cambian poco
-  orders: 2 * 60 * 1000,      // 2 min - pueden llegar nuevos
-  analytics: 5 * 60 * 1000,   // 5 min - datos agregados
-  products: 10 * 60 * 1000,   // 10 min - catálogo estable
-} as const;
+import { QUERY_STALE_MEDIUM, QUERY_GC_LONG } from '@/constants/queryConfig';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,       // 5 minutos por defecto
-      gcTime: 30 * 60 * 1000,         // Garbage collection: 30 minutos
+      staleTime: QUERY_STALE_MEDIUM,  // 5 min default (use SHORT/LONG per hook)
+      gcTime: QUERY_GC_LONG,          // 30 min garbage collection
       retry: 1,
-      refetchOnWindowFocus: false,    // Evitar refetch excesivo
+      refetchOnWindowFocus: false,
     },
   },
 });

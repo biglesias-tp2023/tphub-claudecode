@@ -255,6 +255,7 @@ export function ImageUploadField({
                 src={image.url}
                 alt={image.name}
                 className="w-full h-full object-cover cursor-pointer"
+                loading="lazy"
                 onClick={() => openLightbox(index)}
               />
               {/* Overlay on hover */}
@@ -331,6 +332,7 @@ export function ImageUploadField({
             src={images[lightboxIndex].url}
             alt={images[lightboxIndex].name}
             className="max-w-[90vw] max-h-[85vh] object-contain"
+            loading="lazy"
             onClick={(e) => e.stopPropagation()}
           />
 

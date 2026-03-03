@@ -339,7 +339,7 @@ export function SalesProjection({
               <p className="text-sm text-gray-400">/ {calculations.targetRentabilidad.toFixed(1)}%</p>
             </div>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              ADS {calculations.currentAdsPercent.toFixed(1)}%<span className="text-gray-300">/{calculations.targetAdsPercent.toFixed(0)}%</span> · Promos {calculations.currentPromosPercent.toFixed(1)}%<span className="text-gray-300">/{calculations.targetPromosPercent.toFixed(0)}%</span> · Fee {calculations.weightedCommission.toFixed(0)}%
+              ADS {calculations.targetAdsPercent.toFixed(1)}% · Promos {calculations.targetPromosPercent.toFixed(1)}% · Fee {calculations.weightedCommission.toFixed(0)}%
             </p>
           </div>
         )}

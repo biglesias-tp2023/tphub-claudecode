@@ -314,7 +314,7 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
 
             // Validate basic structure
             if (!parsed || typeof parsed !== 'object' || !parsed.state) {
-              console.warn('[FiltersStore] Invalid localStorage structure, using defaults');
+              if (import.meta.env.DEV) console.warn('[FiltersStore] Invalid localStorage structure, using defaults');
               return null;
             }
 
@@ -322,7 +322,7 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
             if (parsed.state.channelIds) {
               const validChannels = ['glovo', 'ubereats', 'justeat'];
               if (!Array.isArray(parsed.state.channelIds)) {
-                console.warn('[FiltersStore] Invalid channelIds, resetting to empty array');
+                if (import.meta.env.DEV) console.warn('[FiltersStore] Invalid channelIds, resetting to empty array');
                 parsed.state.channelIds = [];
               } else {
                 // Filter out invalid channel IDs
@@ -354,7 +354,7 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
               const end = new Date(parsed.state.dateRange.end);
 
               if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                console.warn('[FiltersStore] Invalid date range, using defaults');
+                if (import.meta.env.DEV) console.warn('[FiltersStore] Invalid date range, using defaults');
                 delete parsed.state.dateRange;
               } else {
                 parsed.state.dateRange = { start, end };
@@ -365,7 +365,7 @@ export const useDashboardFiltersStore = create<DashboardFiltersState>()(
             return parsed;
           } catch (error) {
             // If parsing fails, return null to use defaults
-            console.warn('[FiltersStore] Failed to parse localStorage:', error);
+            if (import.meta.env.DEV) console.warn('[FiltersStore] Failed to parse localStorage:', error);
             return null;
           }
         },
