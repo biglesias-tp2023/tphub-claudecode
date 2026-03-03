@@ -118,9 +118,6 @@ export function useStrategicPageState() {
   } = useDashboardFiltersStore();
 
   const effectiveCompanyIds = globalCompanyIds.length > 0 ? globalCompanyIds : companyIds;
-  const primaryCompanyId = effectiveCompanyIds.length > 0
-    ? effectiveCompanyIds[effectiveCompanyIds.length - 1]
-    : '';
 
   // Expand multi-portal IDs for brand/restaurant filters
   const { data: allBrands = [] } = useBrands();
@@ -134,6 +131,20 @@ export function useStrategicPageState() {
     () => expandRestaurantIds(filterRestaurantIds, allRestaurants),
     [filterRestaurantIds, allRestaurants]
   );
+
+  // Resolve primary company: when a brand is selected, use its parent company
+  // so the projection lookup matches even with 2+ companies selected.
+  const primaryCompanyId = useMemo(() => {
+    if (filterBrandIds.length > 0 && allBrands.length > 0) {
+      const brand = allBrands.find(b => filterBrandIds.includes(b.id));
+      if (brand?.companyId && effectiveCompanyIds.includes(brand.companyId)) {
+        return brand.companyId;
+      }
+    }
+    return effectiveCompanyIds.length > 0
+      ? effectiveCompanyIds[effectiveCompanyIds.length - 1]
+      : '';
+  }, [filterBrandIds, allBrands, effectiveCompanyIds]);
 
   // Commissions from CRP Portal (for rentabilidad scorecard)
   const { data: allCompanies = [] } = useCompanies();
