@@ -108,11 +108,10 @@ export function useActualRevenueByMonth({
         ? monthOffsets.map((o) => getMonthRange(o))
         : [...Array.from({ length: monthsCount }, (_, i) => getMonthRange(-(monthsCount - i))), getMonthRange(0)];
 
-      // Split months into batches of 2 to avoid PostgreSQL statement
-      // timeouts (error 57014) on large date ranges (~7 months / 1.5M rows).
-      // Sequential calls keep each batch under ~2s (same pattern as
-      // fetchCrpOrdersAggregated in orders.ts).
-      const MONTH_BATCH_SIZE = 2;
+      // Query one month at a time to avoid PostgreSQL statement
+      // timeouts (error 57014) on large datasets. Even 2 months can
+      // timeout for companies with high order volume.
+      const MONTH_BATCH_SIZE = 1;
       const monthBatches = chunkedArray(allMonths, MONTH_BATCH_SIZE);
 
       const rows: Awaited<ReturnType<typeof fetchMonthlyRevenueByChannel>> = [];

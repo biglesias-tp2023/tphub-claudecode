@@ -6,8 +6,9 @@
 -- Date: 2026-03-03
 -- ============================================
 
--- Drop previous version if it exists (TIMESTAMPTZ signature)
+-- Drop previous versions
 DROP FUNCTION IF EXISTS get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMP, TIMESTAMP, TEXT);
 
 CREATE OR REPLACE FUNCTION get_pnl_periods(
   p_company_ids   TEXT[]      DEFAULT NULL,
@@ -25,11 +26,9 @@ RETURNS TABLE (
   refunds       NUMERIC,
   order_count   BIGINT
 )
-LANGUAGE plpgsql
+LANGUAGE sql
 STABLE
 AS $$
-BEGIN
-  RETURN QUERY
   SELECT
     (date_trunc(p_granularity, o.td_creation_time AT TIME ZONE 'Europe/Madrid'))::DATE AS period_start,
     o.pfk_id_portal::TEXT                                                              AS portal_id,
@@ -46,7 +45,6 @@ BEGIN
     AND (p_end_date     IS NULL OR o.td_creation_time           <= p_end_date)
   GROUP BY 1, 2
   ORDER BY 1, 2;
-END;
 $$;
 
 GRANT EXECUTE ON FUNCTION get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMP, TIMESTAMP, TEXT) TO authenticated;

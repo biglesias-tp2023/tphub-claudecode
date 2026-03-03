@@ -9,7 +9,7 @@
  * @module features/strategic/components/SalesProjectionSetup
  */
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Sparkles, Calendar, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
+import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Calendar, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
@@ -678,7 +678,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+              <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-gray-900">Configurar proyección de ventas</h2>
