@@ -47,8 +47,8 @@ const navSections: NavSection[] = [
     label: 'Rendimiento',
     items: [
       { label: 'Controlling', icon: PieChart, to: ROUTES.CONTROLLING },
-      { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP, tag: { text: 'New!', color: 'green' } },
-      { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION, tag: { text: 'New!', color: 'green' } },
+      { label: 'Heatmap', icon: Grid3X3, to: ROUTES.HEATMAP },
+      { label: 'Reputación', icon: Star, to: ROUTES.REPUTATION },
       { label: 'Publicidad', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'New!', color: 'green' } },
       { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
       { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'Beta', color: 'orange' } },
@@ -59,10 +59,10 @@ const navSections: NavSection[] = [
   {
     label: 'Herramientas',
     items: [
-      { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
       { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
-      { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
+      { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
       { label: 'Calculadora', icon: Calculator, to: ROUTES.CALCULATOR, tag: { text: 'New!', color: 'green' } },
+      { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
     ],
   },
 ];
