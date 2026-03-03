@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Search,
+  Info,
 } from 'lucide-react';
 import { Card, Spinner, ToastContainer } from '@/components/ui';
 import { ExportButtons } from '@/components/common';
@@ -115,6 +116,16 @@ export function StrategicPage() {
 
       {/* Dashboard Filters */}
       <DashboardFilters hideChannels hideDateRange />
+
+      {/* Multi-company disclaimer */}
+      {state.companyIds.length > 1 && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <Info className="w-4 h-4 text-amber-600 shrink-0" />
+          <p className="text-sm text-amber-800">
+            Por favor, selecciona una única compañía para poder trabajar con una única proyección de ventas.
+          </p>
+        </div>
+      )}
 
       {/* Show empty state or sales projection + objectives */}
       {!state.hasSalesProjection && !state.hasObjectives ? (
