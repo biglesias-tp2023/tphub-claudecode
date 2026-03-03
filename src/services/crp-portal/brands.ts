@@ -16,7 +16,7 @@ import { supabase } from '../supabase';
 import type { Brand } from '@/types';
 import type { DbCrpStore } from './types';
 import { mapBrand } from './mappers';
-import { groupByName, parseNumericIds, normalizeName, deduplicateAndFilterDeleted } from './utils';
+import { groupByName, parseNumericIds, normalizeBrandName, deduplicateAndFilterDeleted } from './utils';
 import { handleCrpError } from './errors';
 
 /** Table name for stores/brands in CRP Portal */
@@ -71,10 +71,11 @@ export async function fetchBrands(companyIds?: string[]): Promise<Brand[]> {
 
   // Step 2: Group by normalized NAME (des_store), collecting all IDs that share the same name
   // This handles multi-portal scenarios where the same brand has different IDs per platform
-  // Uses normalizeName to handle variations like "26KG - Pasta" vs "26KG Pasta"
+  // Uses normalizeBrandName to handle variations like "26KG - Pasta" vs "26KG Pasta"
+  // and location suffixes like "Maison Kayser (Bernabeu)" → "Maison Kayser"
   const grouped = groupByName(
     activeStores,
-    (s) => normalizeName(s.des_store),
+    (s) => normalizeBrandName(s.des_store),
     (s) => String(s.pk_id_store)
   );
 

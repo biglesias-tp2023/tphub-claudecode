@@ -144,6 +144,28 @@ export function normalizeName(name: string): string {
 }
 
 /**
+ * Normalize a brand/store name for deduplication comparison.
+ * Extends normalizeName by also stripping parenthetical location suffixes.
+ *
+ * In CRP Portal, the same brand can appear with location suffixes:
+ * - "Maison Kayser" vs "Maison Kayser (Bernabeu)" vs "Maison Kayser (Retiro)"
+ * These should all be grouped as the same brand.
+ *
+ * @param name - Brand name to normalize
+ * @returns Normalized brand name for comparison
+ *
+ * @example
+ * normalizeBrandName('Maison Kayser (Bernabeu)') // 'maison kayser'
+ * normalizeBrandName('Maison Kayser (Retiro)')   // 'maison kayser'
+ * normalizeBrandName('Maison Kayser Ensaladas')  // 'maison kayser ensaladas'
+ */
+export function normalizeBrandName(name: string): string {
+  // Strip parenthetical content (location suffixes) before normalizing
+  const withoutParens = name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  return normalizeName(withoutParens);
+}
+
+/**
  * Get the first day of the current month in YYYY-MM-DD format.
  * Used for filtering by pk_ts_month in CRP Portal tables.
  *
