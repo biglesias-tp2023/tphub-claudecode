@@ -17,6 +17,8 @@ interface AreaChartProps {
   referenceLines?: ReferenceLineConfig[];
   renderTooltip?: (dataPoint: Record<string, unknown>, xLabel: string) => ReactNode;
   curveType?: 'monotone' | 'linear';
+  xAxisLabel?: string;
+  yAxisLabel?: string;
 }
 
 export function AreaChart({
@@ -34,6 +36,8 @@ export function AreaChart({
   referenceLines,
   renderTooltip,
   curveType = 'monotone',
+  xAxisLabel,
+  yAxisLabel,
 }: AreaChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -206,6 +210,27 @@ export function AreaChart({
       .attr('font-size', tickFontSize)
       .attr('fill', tickColor);
 
+    // Axis labels
+    if (xAxisLabel) {
+      g.append('text')
+        .attr('x', innerWidth / 2)
+        .attr('y', innerHeight + margin.bottom - 2)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 11)
+        .attr('fill', '#9CA3AF')
+        .text(xAxisLabel);
+    }
+    if (yAxisLabel) {
+      g.append('text')
+        .attr('transform', `rotate(-90)`)
+        .attr('x', -innerHeight / 2)
+        .attr('y', -margin.left + 12)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 11)
+        .attr('fill', '#9CA3AF')
+        .text(yAxisLabel);
+    }
+
     // Right Y Axis (if any series uses yAxisId: 'right')
     if (hasRightAxis) {
       const yRightAxisG = g.append('g')
@@ -369,7 +394,7 @@ export function AreaChart({
         setTooltip(null);
       });
     }
-  }, [data, series, dimensions, margin, xKey, gridDash, gridColor, gridVertical, tickFontSize, tickColor, yTickFormatter, rightYTickFormatter, referenceLines, renderTooltip, curveType]);
+  }, [data, series, dimensions, margin, xKey, gridDash, gridColor, gridVertical, tickFontSize, tickColor, yTickFormatter, rightYTickFormatter, referenceLines, renderTooltip, curveType, xAxisLabel, yAxisLabel]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">

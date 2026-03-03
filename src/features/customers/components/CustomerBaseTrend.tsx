@@ -59,6 +59,9 @@ export function CustomerBaseTrend({ data }: CustomerBaseTrendProps) {
           <AreaChart
             data={chartData}
             xKey="weekLabel"
+            margin={{ top: 10, right: 10, left: 45, bottom: 30 }}
+            xAxisLabel="Semana"
+            yAxisLabel="Nº Clientes"
             series={SERIES.map((s) => ({
               dataKey: s.dataKey,
               name: s.name,
