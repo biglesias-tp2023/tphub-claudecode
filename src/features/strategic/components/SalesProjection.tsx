@@ -41,7 +41,7 @@ import { SalesTableRow } from './SalesTableRow';
 
 export function SalesProjection({
   config, targetRevenue, actualRevenue = {}, actualAds = {}, actualPromos = {},
-  onTargetChange, onEditConfig,
+  onTargetChange: _onTargetChange, onEditConfig,
   restaurantName = 'Restaurante',
   realRevenueByMonth,
   realPromosByMonth,
@@ -146,20 +146,6 @@ export function SalesProjection({
   }, [config.endDate]);
   /* eslint-enable react-hooks/purity */
 
-  // Update handlers
-  const updateData = useCallback((
-    current: GridChannelMonthData,
-    setter: ((data: GridChannelMonthData) => void) | undefined,
-    month: string, ch: SalesChannel, val: string
-  ) => {
-    if (!setter) return;
-    const newData = { ...current };
-    if (!newData[month]) newData[month] = { glovo: 0, ubereats: 0, justeat: 0 };
-    newData[month] = { ...newData[month], [ch]: parseFloat(val) || 0 };
-    setter(newData);
-  }, []);
-
-  const updateTarget = (m: string, ch: SalesChannel, v: string) => updateData(targetRevenue, onTargetChange, m, ch, v);
   // Actual data is read-only (comes from CRP Portal), no setter needed
   const updateActualRevenue = (_m: string, _ch: SalesChannel, _v: string) => {};
   const updateActualAds = (_m: string, _ch: SalesChannel, _v: string) => {};
