@@ -18,6 +18,7 @@ import type { AuditFilters } from '@/features/audits/components';
 import { useAuditsWithDetails, useAuditTypes, useDeleteAudit } from '@/features/audits/hooks';
 import { getAuditScopeLabel, calculateTotalScore } from '@/features/audits/config';
 import { MYSTERY_SHOPPER_SECTIONS } from '@/features/audits/config/mysteryShopperSchema';
+import { ONBOARDING_SECTIONS } from '@/features/audits/config/onboardingSchema';
 import { fetchAuditWithDetailsById, fetchAuditTypeById, fetchAllProfiles } from '@/services/supabase-data';
 import { useGlobalFiltersStore } from '@/stores/filtersStore';
 import type {
@@ -45,22 +46,36 @@ function buildAuditExportData(
     delivered: 'Entregada',
   };
 
-  // Use MYSTERY_SHOPPER_SECTIONS for mystery shopper audits (hardcoded schema with all fields)
-  const isMysteryShopper = auditType.slug === 'mystery_shopper';
-  const schemaSections = isMysteryShopper
-    ? MYSTERY_SHOPPER_SECTIONS.map((s) => ({
-        key: s.id,
-        title: s.title,
-        icon: undefined as string | undefined,
-        fields: s.fields.map((f) => ({
-          key: f.key,
-          label: f.label,
-          type: f.type as string,
-          maxScore: f.max,
-          scoreLabels: undefined as string[] | undefined,
-        })),
-      }))
-    : auditType.fieldSchema.sections;
+  // Use hardcoded schemas for known audit types (DB field_schema may be empty)
+  const hardcodedSections =
+    auditType.slug === 'mystery_shopper'
+      ? MYSTERY_SHOPPER_SECTIONS.map((s) => ({
+          key: s.id,
+          title: s.title,
+          icon: undefined as string | undefined,
+          fields: s.fields.map((f) => ({
+            key: f.key,
+            label: f.label,
+            type: f.type as string,
+            maxScore: f.max,
+            scoreLabels: undefined as string[] | undefined,
+          })),
+        }))
+      : auditType.slug === 'onboarding'
+        ? ONBOARDING_SECTIONS.map((s) => ({
+            key: s.id,
+            title: s.title,
+            icon: undefined as string | undefined,
+            fields: s.fields.map((f) => ({
+              key: f.key,
+              label: f.label,
+              type: f.type as string,
+              maxScore: undefined as number | undefined,
+              scoreLabels: undefined as string[] | undefined,
+            })),
+          }))
+        : null;
+  const schemaSections = hardcodedSections ?? auditType.fieldSchema.sections;
 
   // Read-only fields that are stored on the audit record, not in desFieldData
   const readOnlyOverrides: Record<string, unknown> = {
