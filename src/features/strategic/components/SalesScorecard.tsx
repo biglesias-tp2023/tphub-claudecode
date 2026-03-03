@@ -39,7 +39,7 @@ export function Scorecard({
     ? (isPositive ? 'text-red-500' : 'text-emerald-600')
     : (isPositive ? 'text-emerald-600' : 'text-amber-600');
 
-  const hasActual = showActual && actual > 0;
+  const hasActual = showActual && (actual > 0 || isRealData);
 
   return (
     <div>
