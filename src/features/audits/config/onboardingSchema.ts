@@ -18,7 +18,8 @@ export type OnboardingFieldType =
   | 'select'
   | 'multi_select'
   | 'number'
-  | 'checkbox';
+  | 'checkbox'
+  | 'contact_select';
 
 export interface OnboardingField {
   key: string;
@@ -130,15 +131,13 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
     title: 'Información de Contacto',
     icon: Phone,
     fields: [
-      { key: 'contact_name', label: 'Persona de contacto', type: 'contact_select' as OnboardingFieldType, required: true, placeholder: 'Seleccionar contacto' },
-      { key: 'contact_phone', label: 'Teléfono', type: 'text', required: true, placeholder: 'Teléfono de contacto' },
+      { key: 'contact_name', label: 'Persona de contacto', type: 'contact_select', required: true, placeholder: 'Seleccionar contacto' },
       { key: 'target_margin', label: 'Margen objetivo', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'commission_glovo', label: 'Comisión Glovo %', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'commission_ubereats', label: 'Comisión UberEats %', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'commission_justeat', label: 'Comisión JustEat %', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'contact_preference', label: 'Preferencia de contacto', type: 'multi_select', required: true, options: ['Llamada', 'Whatsapp', 'Correo', 'Online Meeting', 'Visita Bimensual'] },
       { key: 'weekly_report_preference', label: 'Preferencia de reporte semanal', type: 'multi_select', required: true, options: ['Llamada', 'Correo'] },
-      { key: 'mkt_plan_preference', label: 'Preferencia de plan de marketing', type: 'multi_select', required: false, options: ['Llamada', 'Whatsapp', 'Correo', 'Online Meeting'] },
     ],
   },
 

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { ContactSelectField } from './fields/ContactSelectField';
 import {
   ONBOARDING_SECTIONS,
   DAYS,
@@ -17,6 +18,7 @@ interface OnboardingFormProps {
   disabled?: boolean;
   autoSave?: boolean;
   onAutoSave?: () => void;
+  companyId?: string;
 }
 
 export function OnboardingForm({
@@ -25,6 +27,7 @@ export function OnboardingForm({
   disabled,
   autoSave,
   onAutoSave,
+  companyId,
 }: OnboardingFormProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['contact'])
@@ -91,6 +94,7 @@ export function OnboardingForm({
           onToggle={() => toggleSection(section.id)}
           onFieldChange={handleFieldChange}
           disabled={disabled}
+          companyId={companyId}
         />
       ))}
     </div>
@@ -108,6 +112,7 @@ interface SectionCardProps {
   onToggle: () => void;
   onFieldChange: (fieldKey: string, value: unknown) => void;
   disabled?: boolean;
+  companyId?: string;
 }
 
 function SectionCard({
@@ -117,6 +122,7 @@ function SectionCard({
   onToggle,
   onFieldChange,
   disabled,
+  companyId,
 }: SectionCardProps) {
   const { completed, total } = getOnboardingSectionCompletion(section, fieldData);
   const Icon = section.icon;
@@ -181,6 +187,7 @@ function SectionCard({
                 value={fieldData[field.key]}
                 onChange={(value) => onFieldChange(field.key, value)}
                 disabled={disabled}
+                companyId={companyId}
               />
             ))
           )}
@@ -259,9 +266,10 @@ interface FieldRendererProps {
   value: unknown;
   onChange: (value: unknown) => void;
   disabled?: boolean;
+  companyId?: string;
 }
 
-function FieldRenderer({ field, value, onChange, disabled }: FieldRendererProps) {
+function FieldRenderer({ field, value, onChange, disabled, companyId }: FieldRendererProps) {
   const wrapWithId = (children: React.ReactNode) => (
     <div data-field-key={field.key} id={`field-${field.key}`}>
       {children}
@@ -414,6 +422,17 @@ function FieldRenderer({ field, value, onChange, disabled }: FieldRendererProps)
           />
           <span className="text-sm text-gray-700">{field.label}</span>
         </label>
+      );
+
+    case 'contact_select':
+      return wrapWithId(
+        <ContactSelectField
+          field={{ key: field.key, label: field.label, type: 'contact_select', required: field.required, placeholder: field.placeholder }}
+          value={value as string | null}
+          onChange={onChange}
+          disabled={disabled}
+          companyId={companyId}
+        />
       );
 
     default:
