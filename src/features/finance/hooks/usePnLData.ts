@@ -23,7 +23,6 @@ import { expandBrandIds, expandRestaurantIds } from '@/features/controlling/hook
 import { useCompaniesById } from '@/features/clients/hooks/useCompanies';
 import { fetchPnLPeriods } from '@/services/crp-portal';
 import { fetchAdsTimeseries } from '@/services/crp-portal';
-import { PORTAL_IDS } from '@/services/crp-portal';
 import { QUERY_STALE_SHORT, QUERY_GC_SHORT } from '@/constants/queryConfig';
 import { formatDate } from '@/utils/dateUtils';
 
@@ -38,12 +37,6 @@ import type {
 // ============================================
 // HELPERS
 // ============================================
-
-function portalIdToChannel(portalId: string): 'glovo' | 'ubereats' | 'justeat' | null {
-  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
-  if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
-  return null;
-}
 
 /** Truncate a date string to period start based on granularity */
 function dateToPeriodKey(dateStr: string, granularity: PnLGranularity): string {
@@ -219,7 +212,8 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
     const periodMap = new Map<string, PeriodAgg>();
 
     for (const row of pnlRows) {
-      const channel = portalIdToChannel(row.portalId);
+      // RPC returns channel names directly: 'glovo', 'ubereats', 'other'
+      const channel = row.channel as 'glovo' | 'ubereats' | 'other';
 
       // Filter by channel tab
       if (channelTab !== 'total' && channel !== channelTab) continue;
@@ -228,7 +222,7 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       const existing = periodMap.get(key);
 
       // Calculate commission for this row based on its channel
-      const commRate = channel
+      const commRate = (channel === 'glovo' || channel === 'ubereats')
         ? commissionRates[channel]
         : 0.30;
       const commAmount = row.revenue * commRate;

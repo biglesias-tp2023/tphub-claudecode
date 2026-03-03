@@ -6,7 +6,7 @@
 -- Date: 2026-03-03
 -- ============================================
 
--- Drop previous versions
+-- Drop all previous versions
 DROP FUNCTION IF EXISTS get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMPTZ, TIMESTAMPTZ, TEXT);
 DROP FUNCTION IF EXISTS get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMP, TIMESTAMP, TEXT);
 
@@ -19,7 +19,7 @@ CREATE OR REPLACE FUNCTION get_pnl_periods(
   p_granularity   TEXT        DEFAULT 'month'  -- 'week' | 'month' | 'quarter'
 )
 RETURNS TABLE (
-  period_start  DATE,
+  period_start  TEXT,
   portal_id     TEXT,
   revenue       NUMERIC,
   promos        NUMERIC,
@@ -30,12 +30,20 @@ LANGUAGE sql
 STABLE
 AS $$
   SELECT
-    (date_trunc(p_granularity, o.td_creation_time AT TIME ZONE 'Europe/Madrid'))::DATE AS period_start,
-    o.pfk_id_portal::TEXT                                                              AS portal_id,
-    COALESCE(SUM(o.amt_total_price), 0)                                                AS revenue,
-    COALESCE(SUM(o.amt_promotions), 0)                                                 AS promos,
-    COALESCE(SUM(o.amt_refunds), 0)                                                    AS refunds,
-    COUNT(o.pk_uuid_order)                                                             AS order_count
+    CASE p_granularity
+      WHEN 'week'    THEN to_char(date_trunc('week',    o.td_creation_time), 'YYYY-MM-DD')
+      WHEN 'quarter' THEN to_char(date_trunc('quarter', o.td_creation_time), 'YYYY-MM-DD')
+      ELSE                to_char(date_trunc('month', o.td_creation_time), 'YYYY-MM-DD')
+    END                                    AS period_start,
+    CASE
+      WHEN o.pfk_id_portal IN ('E22BC362', 'E22BC362-2') THEN 'glovo'
+      WHEN o.pfk_id_portal = '3CCD6861' THEN 'ubereats'
+      ELSE 'other'
+    END                                    AS portal_id,
+    COALESCE(SUM(o.amt_total_price), 0)    AS revenue,
+    COALESCE(SUM(o.amt_promotions), 0)     AS promos,
+    COALESCE(SUM(o.amt_refunds), 0)        AS refunds,
+    COUNT(o.pk_uuid_order)                 AS order_count
   FROM crp_portal__ft_order_head o
   WHERE
         (p_company_ids  IS NULL OR o.pfk_id_company::TEXT        = ANY(p_company_ids))
@@ -51,5 +59,4 @@ GRANT EXECUTE ON FUNCTION get_pnl_periods(TEXT[], TEXT[], TEXT[], TIMESTAMP, TIM
 
 COMMENT ON FUNCTION get_pnl_periods IS 'Aggregates order data by configurable period (week/month/quarter) with portal breakdown for the P&L Finance dashboard.';
 
--- Reload PostgREST schema cache
 NOTIFY pgrst, 'reload schema';

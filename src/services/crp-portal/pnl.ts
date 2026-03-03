@@ -9,7 +9,6 @@
 
 import { supabase } from '../supabase';
 import type { ChannelId } from '@/types';
-import { PORTAL_IDS } from './types';
 import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
 
@@ -34,34 +33,12 @@ export interface PnLPeriodsParams {
 
 export interface PnLPeriodRow {
   periodStart: string;
-  portalId: string;
+  /** Channel name returned by RPC: 'glovo' | 'ubereats' | 'other' */
+  channel: string;
   revenue: number;
   promos: number;
   refunds: number;
   orderCount: number;
-}
-
-// ============================================
-// HELPERS
-// ============================================
-
-const CHANNELS_WITH_DATA: ChannelId[] = ['glovo', 'ubereats'];
-
-function channelIdToPortalIds(channelId: ChannelId): string[] {
-  switch (channelId) {
-    case 'glovo':
-      return [PORTAL_IDS.GLOVO, PORTAL_IDS.GLOVO_NEW];
-    case 'ubereats':
-      return [PORTAL_IDS.UBEREATS];
-    case 'justeat':
-      return [];
-    default:
-      return [];
-  }
-}
-
-function shouldApplyChannelFilter(channelIds: ChannelId[]): boolean {
-  return !CHANNELS_WITH_DATA.every((ch) => channelIds.includes(ch));
 }
 
 // ============================================
@@ -76,11 +53,6 @@ async function fetchPnLPeriodsSingle(
 ): Promise<PnLPeriodRow[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate, granularity } = params;
 
-  let portalIdsToFilter: string[] | null = null;
-  if (channelIds && channelIds.length > 0 && shouldApplyChannelFilter(channelIds)) {
-    portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
-  }
-
   const { data, error } = await supabase.rpc('get_pnl_periods', {
     p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
     p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
@@ -94,7 +66,7 @@ async function fetchPnLPeriodsSingle(
     handleCrpError('fetchPnLPeriods', error);
   }
 
-  // Apply client-side portal filter if needed
+  // Map RPC results — portal_id now contains channel names ('glovo', 'ubereats', 'other')
   const rows = ((data || []) as Array<{
     period_start: string;
     portal_id: string;
@@ -104,15 +76,16 @@ async function fetchPnLPeriodsSingle(
     order_count: number;
   }>).map((row) => ({
     periodStart: row.period_start,
-    portalId: String(row.portal_id),
+    channel: String(row.portal_id),
     revenue: Number(row.revenue) || 0,
     promos: Number(row.promos) || 0,
     refunds: Number(row.refunds) || 0,
     orderCount: Number(row.order_count) || 0,
   }));
 
-  if (portalIdsToFilter && portalIdsToFilter.length > 0) {
-    return rows.filter((r) => portalIdsToFilter!.includes(r.portalId));
+  // Client-side channel filter if specific channels selected
+  if (channelIds && channelIds.length > 0) {
+    return rows.filter((r) => channelIds.includes(r.channel as ChannelId));
   }
 
   return rows;
@@ -136,11 +109,11 @@ export async function fetchPnLPeriods(
     batchResults.push(await fetchPnLPeriodsSingle({ ...params, companyIds: chunk }));
   }
 
-  // Merge by (periodStart, portalId): sum additive fields
+  // Merge by (periodStart, channel): sum additive fields
   const byKey = new Map<string, PnLPeriodRow>();
   for (const rows of batchResults) {
     for (const row of rows) {
-      const key = `${row.periodStart}|${row.portalId}`;
+      const key = `${row.periodStart}|${row.channel}`;
       const existing = byKey.get(key);
       if (existing) {
         existing.revenue += row.revenue;
