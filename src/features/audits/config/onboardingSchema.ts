@@ -136,8 +136,6 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
       { key: 'commission_glovo', label: 'Comisión Glovo %', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'commission_ubereats', label: 'Comisión UberEats %', type: 'text', required: false, placeholder: 'Ej: 30%' },
       { key: 'commission_justeat', label: 'Comisión JustEat %', type: 'text', required: false, placeholder: 'Ej: 30%' },
-      { key: 'contact_preference', label: 'Preferencia de contacto', type: 'multi_select', required: true, options: ['Llamada', 'Whatsapp', 'Correo', 'Online Meeting', 'Visita Bimensual'] },
-      { key: 'weekly_report_preference', label: 'Preferencia de reporte semanal', type: 'multi_select', required: true, options: ['Llamada', 'Correo'] },
     ],
   },
 
