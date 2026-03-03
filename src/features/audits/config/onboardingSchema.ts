@@ -1,7 +1,6 @@
 import {
   Phone,
   Swords,
-  Clock,
   Store,
   Globe,
   Megaphone,
@@ -83,43 +82,6 @@ function createCampaignFields(prefix: string, n: number, platformName: string): 
 }
 
 // ============================================
-// SCHEDULE CONSTANTS
-// ============================================
-
-const DAYS = [
-  { key: 'mon', label: 'Lun' },
-  { key: 'tue', label: 'Mar' },
-  { key: 'wed', label: 'Mié' },
-  { key: 'thu', label: 'Jue' },
-  { key: 'fri', label: 'Vie' },
-  { key: 'sat', label: 'Sáb' },
-  { key: 'sun', label: 'Dom' },
-];
-
-const MEAL_PERIODS = [
-  { key: 'meal', label: 'Comidas' },
-  { key: 'valley', label: 'Horas Valle' },
-  { key: 'dinner', label: 'Cenas' },
-];
-
-export { DAYS, MEAL_PERIODS };
-
-function createScheduleFields(): OnboardingField[] {
-  const fields: OnboardingField[] = [];
-  for (const period of MEAL_PERIODS) {
-    for (const day of DAYS) {
-      fields.push({
-        key: `schedule_${period.key}_${day.key}`,
-        label: `${period.label} - ${day.label}`,
-        type: 'checkbox',
-        required: false,
-      });
-    }
-  }
-  return fields;
-}
-
-// ============================================
 // SECTIONS
 // ============================================
 
@@ -156,17 +118,7 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
   },
 
   // ============================================
-  // SECTION 3: Horarios
-  // ============================================
-  {
-    id: 'schedule',
-    title: 'Horarios',
-    icon: Clock,
-    fields: createScheduleFields(),
-  },
-
-  // ============================================
-  // SECTION 4: Perfil Glovo
+  // SECTION 3: Perfil Glovo
   // ============================================
   {
     id: 'profile_glovo',

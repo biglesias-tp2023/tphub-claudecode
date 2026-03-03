@@ -136,16 +136,34 @@ export function StrategicPage() {
         <>
           {/* Sales Projection */}
           {state.hasSalesProjection && state.salesProjection ? (
-            <SalesProjection
-              config={state.salesProjection.config}
-              targetRevenue={state.salesProjection.targetRevenue}
-              onTargetChange={state.handleUpdateTargetRevenue}
-              onEditConfig={() => state.setIsSetupOpen(true)}
-              realRevenueByMonth={state.realRevenueByMonth}
-              realPromosByMonth={state.realPromosByMonth}
-              realAdsByMonth={state.realAdsByMonth}
-              commissions={state.commissions}
-            />
+            <>
+              {state.isFallbackProjection && brandName && (
+                <div className="flex items-center justify-between px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <p className="text-xs text-amber-800">
+                      Mostrando proyeccion general — <strong>{brandName}</strong> no tiene proyeccion propia
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => state.setIsSetupOpen(true)}
+                    className="text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors whitespace-nowrap"
+                  >
+                    Crear para {brandName}
+                  </button>
+                </div>
+              )}
+              <SalesProjection
+                config={state.salesProjection.config}
+                targetRevenue={state.salesProjection.targetRevenue}
+                onTargetChange={state.handleUpdateTargetRevenue}
+                onEditConfig={() => state.setIsSetupOpen(true)}
+                realRevenueByMonth={state.realRevenueByMonth}
+                realPromosByMonth={state.realPromosByMonth}
+                realAdsByMonth={state.realAdsByMonth}
+                commissions={state.commissions}
+              />
+            </>
           ) : (
             <button
               onClick={() => state.setIsSetupOpen(true)}

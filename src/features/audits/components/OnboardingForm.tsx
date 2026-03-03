@@ -5,8 +5,6 @@ import { ContactSelectField } from './fields/ContactSelectField';
 import { MarginCalculatorField } from './fields/MarginCalculatorField';
 import {
   ONBOARDING_SECTIONS,
-  DAYS,
-  MEAL_PERIODS,
   calculateOnboardingCompletion,
   getOnboardingSectionCompletion,
   type OnboardingSection,
@@ -179,14 +177,7 @@ function SectionCard({
       {/* Section content */}
       {expanded && (
         <div className="border-t border-gray-100 p-4 space-y-5">
-          {section.id === 'schedule' ? (
-            <ScheduleGrid
-              fieldData={fieldData}
-              onFieldChange={onFieldChange}
-              disabled={disabled}
-            />
-          ) : (
-            section.fields.map((field) =>
+          {section.fields.map((field) =>
               field.type === 'margin_calculator' ? (
                 <MarginCalculatorField
                   key={field.key}
@@ -205,70 +196,9 @@ function SectionCard({
                   companyId={companyId}
                 />
               )
-            )
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-// ============================================
-// SCHEDULE GRID (Special rendering for Horarios)
-// ============================================
-
-interface ScheduleGridProps {
-  fieldData: Record<string, unknown>;
-  onFieldChange: (fieldKey: string, value: unknown) => void;
-  disabled?: boolean;
-}
-
-function ScheduleGrid({ fieldData, onFieldChange, disabled }: ScheduleGridProps) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr>
-            <th className="text-left py-2 pr-3 font-medium text-gray-700 whitespace-nowrap" />
-            {DAYS.map((day) => (
-              <th
-                key={day.key}
-                className="text-center py-2 px-1 font-medium text-gray-700 whitespace-nowrap min-w-[48px]"
-              >
-                {day.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {MEAL_PERIODS.map((period) => (
-            <tr key={period.key} className="border-t border-gray-100">
-              <td className="py-3 pr-3 font-medium text-gray-700 whitespace-nowrap">
-                {period.label}
-              </td>
-              {DAYS.map((day) => {
-                const key = `schedule_${period.key}_${day.key}`;
-                const checked = !!fieldData[key];
-                return (
-                  <td key={day.key} className="py-3 px-1 text-center">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => onFieldChange(key, e.target.checked)}
-                      disabled={disabled}
-                      className={cn(
-                        'w-5 h-5 rounded border-gray-300 text-primary-600',
-                        'focus:ring-2 focus:ring-primary-300 focus:ring-offset-0',
-                        disabled && 'opacity-50 cursor-not-allowed'
-                      )}
-                    />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

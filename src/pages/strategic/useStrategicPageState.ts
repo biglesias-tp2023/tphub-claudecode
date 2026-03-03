@@ -178,9 +178,22 @@ export function useStrategicPageState() {
   // ============================================
 
   const {
-    data: salesProjection = null,
-    isLoading: isLoadingProjection,
+    data: brandProjection = null,
+    isLoading: isLoadingBrandProjection,
   } = useSalesProjection({ companyId: primaryCompanyId, brandId: primaryBrandId });
+
+  // Fallback: company-level projection when brand is selected but has no own projection
+  const {
+    data: companyProjection = null,
+    isLoading: isLoadingCompanyProjection,
+  } = useSalesProjection({
+    companyId: primaryCompanyId,
+    brandId: null,
+  });
+
+  const salesProjection = brandProjection ?? companyProjection;
+  const isLoadingProjection = isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false);
+  const isFallbackProjection = primaryBrandId !== null && brandProjection === null && companyProjection !== null;
 
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
@@ -591,6 +604,7 @@ export function useStrategicPageState() {
     // Computed flags
     hasObjectives,
     hasSalesProjection,
+    isFallbackProjection,
     daysRemaining,
 
     // Data
