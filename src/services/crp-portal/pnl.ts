@@ -4,16 +4,15 @@
  * Fetches order data aggregated by configurable period (week/month/quarter)
  * with portal-level breakdown for the Finance P&L dashboard.
  *
+ * Date ranges are batched into 1-month chunks to avoid PostgreSQL statement
+ * timeouts, following the same pattern as useActualRevenueByMonth.
+ *
  * @module services/crp-portal/pnl
  */
 
 import { supabase } from '../supabase';
 import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
-import { chunkedArray } from './utils';
-
-/** Max companies per RPC call to avoid PostgreSQL statement timeouts */
-const RPC_BATCH_SIZE = 10;
 
 // ============================================
 // TYPES
@@ -42,14 +41,66 @@ export interface PnLPeriodRow {
 }
 
 // ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Split a date range into 1-month chunks to avoid statement timeouts.
+ * Returns array of { start, end } date strings (YYYY-MM-DD).
+ */
+function splitIntoMonthChunks(startDate: string, endDate: string): { start: string; end: string }[] {
+  const chunks: { start: string; end: string }[] = [];
+  const end = new Date(`${endDate}T23:59:59`);
+
+  let cursor = new Date(`${startDate}T00:00:00`);
+
+  while (cursor <= end) {
+    const chunkStart = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+
+    // End of this chunk = last day of the month or endDate (whichever is earlier)
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0); // last day of month
+    const chunkEnd = monthEnd < end
+      ? `${monthEnd.getFullYear()}-${String(monthEnd.getMonth() + 1).padStart(2, '0')}-${String(monthEnd.getDate()).padStart(2, '0')}`
+      : endDate;
+
+    chunks.push({ start: chunkStart, end: chunkEnd });
+
+    // Move cursor to first day of next month
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+
+  return chunks;
+}
+
+/**
+ * Merge rows by (periodStart, channel), summing additive fields.
+ */
+function mergeRows(allRows: PnLPeriodRow[]): PnLPeriodRow[] {
+  const byKey = new Map<string, PnLPeriodRow>();
+  for (const row of allRows) {
+    const key = `${row.periodStart}|${row.channel}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.revenue += row.revenue;
+      existing.promos += row.promos;
+      existing.refunds += row.refunds;
+      existing.orderCount += row.orderCount;
+    } else {
+      byKey.set(key, { ...row });
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.periodStart.localeCompare(b.periodStart));
+}
+
+// ============================================
 // MAIN FUNCTIONS
 // ============================================
 
 /**
- * Single-batch P&L periods fetch.
+ * Single RPC call for a specific date range + company set.
  */
 async function fetchPnLPeriodsSingle(
-  params: PnLPeriodsParams
+  params: Omit<PnLPeriodsParams, 'channelIds'> & { channelIds?: ChannelId[] }
 ): Promise<PnLPeriodRow[]> {
   const { companyIds, brandIds, addressIds, channelIds, startDate, endDate, granularity } = params;
 
@@ -66,7 +117,7 @@ async function fetchPnLPeriodsSingle(
     handleCrpError('fetchPnLPeriods', error);
   }
 
-  // Map RPC results — portal_id now contains channel names ('glovo', 'ubereats', 'other')
+  // Map RPC results — portal_id contains channel names ('glovo', 'ubereats', 'other')
   const rows = ((data || []) as Array<{
     period_start: string;
     portal_id: string;
@@ -93,37 +144,31 @@ async function fetchPnLPeriodsSingle(
 
 /**
  * Fetches P&L period data using the get_pnl_periods RPC.
- * Batches by companyIds to avoid statement timeouts with many companies.
+ *
+ * Batches by 1-month date chunks to avoid statement timeouts on large
+ * datasets. Results are merged by (periodStart, channel) so weekly/quarterly
+ * periods that span chunk boundaries are correctly aggregated.
  */
 export async function fetchPnLPeriods(
   params: PnLPeriodsParams
 ): Promise<PnLPeriodRow[]> {
-  const { companyIds } = params;
-  if (!companyIds || companyIds.length <= RPC_BATCH_SIZE) {
-    return fetchPnLPeriodsSingle(params);
+  const { startDate, endDate } = params;
+
+  // Split into 1-month chunks
+  const dateChunks = splitIntoMonthChunks(startDate, endDate);
+
+  const allRows: PnLPeriodRow[] = [];
+
+  // Sequential calls to avoid overwhelming the DB
+  for (const chunk of dateChunks) {
+    const chunkRows = await fetchPnLPeriodsSingle({
+      ...params,
+      startDate: chunk.start,
+      endDate: chunk.end,
+    });
+    allRows.push(...chunkRows);
   }
 
-  const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
-  const batchResults: PnLPeriodRow[][] = [];
-  for (const chunk of chunks) {
-    batchResults.push(await fetchPnLPeriodsSingle({ ...params, companyIds: chunk }));
-  }
-
-  // Merge by (periodStart, channel): sum additive fields
-  const byKey = new Map<string, PnLPeriodRow>();
-  for (const rows of batchResults) {
-    for (const row of rows) {
-      const key = `${row.periodStart}|${row.channel}`;
-      const existing = byKey.get(key);
-      if (existing) {
-        existing.revenue += row.revenue;
-        existing.promos += row.promos;
-        existing.refunds += row.refunds;
-        existing.orderCount += row.orderCount;
-      } else {
-        byKey.set(key, { ...row });
-      }
-    }
-  }
-  return [...byKey.values()].sort((a, b) => a.periodStart.localeCompare(b.periodStart));
+  // Merge rows from different chunks (important for week/quarter that span months)
+  return mergeRows(allRows);
 }
