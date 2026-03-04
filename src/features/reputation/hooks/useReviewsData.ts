@@ -78,6 +78,8 @@ export function useReviewsAggregation(params: UseReviewsParams) {
         { ...baseParams, startDate: previousStartDate, endDate: previousEndDate }
       );
     },
+    enabled: companyIds.length > 0,
+    retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -109,6 +111,8 @@ export function useReviewsHeatmap(params: UseReviewsParams) {
         endDate,
       });
     },
+    enabled: companyIds.length > 0,
+    retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -144,6 +148,8 @@ export function useReviewsRaw(params: UseReviewsParams, limit = 200) {
         limit
       );
     },
+    enabled: companyIds.length > 0,
+    retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -203,6 +209,8 @@ export function useRefundsSummary(params: UseReviewsParams) {
         totalRefundsChange: result.changes.refundsChange,
       };
     },
+    enabled: companyIds.length > 0,
+    retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

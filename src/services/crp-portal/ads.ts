@@ -14,7 +14,7 @@ import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
 
 /** Max companies per RPC call to avoid PostgreSQL statement timeouts */
-const RPC_BATCH_SIZE = 10;
+const RPC_BATCH_SIZE = 5;
 
 // ============================================
 // TYPES

@@ -210,13 +210,15 @@ export function useWeeklyRevenue() {
         }
       }
 
-      // Fetch weeks sequentially to avoid overwhelming the database
-      // (8 weeks × N batches per week = too many concurrent RPC calls)
+      // Fetch weeks with bounded parallelism (2 at a time) to reduce wall-clock
+      // time while avoiding too many concurrent RPC calls to the database
       const weeklyResults: ControllingMetricsRow[][] = [];
-      for (const week of weeks) {
-        weeklyResults.push(
-          await fetchControllingMetricsRPC(companyIds, week.start, week.end)
+      for (let i = 0; i < weeks.length; i += 2) {
+        const batch = weeks.slice(i, i + 2);
+        const results = await Promise.all(
+          batch.map(week => fetchControllingMetricsRPC(companyIds, week.start, week.end))
         );
+        weeklyResults.push(...results);
       }
 
       // Aggregate each week's data (revenue-only for sparklines)

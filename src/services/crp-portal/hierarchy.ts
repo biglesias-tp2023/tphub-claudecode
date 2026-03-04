@@ -101,9 +101,11 @@ export async function fetchHierarchyDataRPC(
 
   const dimensions = await fetchAllDimensions(companyIds);
 
-  // Sequential to avoid overwhelming DB (each call runs 8 sequential batches)
-  const currentMetrics = await fetchControllingMetricsRPC(companyIds, startDate, endDate);
-  const previousMetrics = await fetchControllingMetricsRPC(companyIds, previousStartDate, previousEndDate);
+  // Parallel: current and previous query disjoint date ranges
+  const [currentMetrics, previousMetrics] = await Promise.all([
+    fetchControllingMetricsRPC(companyIds, startDate, endDate),
+    fetchControllingMetricsRPC(companyIds, previousStartDate, previousEndDate),
+  ]);
 
   const currentAgg = aggregateRPCMetrics(currentMetrics);
   const previousAgg = aggregateRPCMetrics(previousMetrics);

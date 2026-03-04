@@ -33,7 +33,7 @@ import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
 
 /** Max companies per RPC call to avoid PostgreSQL statement timeouts */
-const RPC_BATCH_SIZE = 10;
+const RPC_BATCH_SIZE = 5;
 
 // ============================================
 // TYPES
@@ -616,9 +616,12 @@ export async function fetchCrpOrdersComparison(
   previous: OrdersAggregation;
   changes: OrdersChanges;
 }> {
-  // Sequential to avoid overwhelming DB when each call already batches internally
-  const current = await fetchCrpOrdersAggregated(currentParams);
-  const previous = await fetchCrpOrdersAggregated(previousParams);
+  // Parallel: current and previous query disjoint date ranges so they don't
+  // compete for the same rows. Each already batches internally (sequential).
+  const [current, previous] = await Promise.all([
+    fetchCrpOrdersAggregated(currentParams),
+    fetchCrpOrdersAggregated(previousParams),
+  ]);
 
   // Helper function to calculate percentage change
   const calcChange = (curr: number, prev: number): number =>
