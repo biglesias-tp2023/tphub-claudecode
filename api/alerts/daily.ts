@@ -439,8 +439,8 @@ REGLAS:
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[daily-alerts] Starting execution');
 
-  // 1. Only POST
-  if (req.method !== 'POST') {
+  // 1. Accept GET (Vercel Cron) and POST (manual trigger)
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
