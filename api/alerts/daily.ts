@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 import { sendEmail, buildAlertEmailHtml, type AlertCompanyData } from './email.js';
 import { escapeHtml, verifyCronSecret } from './auth.js';
 
@@ -109,6 +108,20 @@ interface DbAlertPreference {
   promos_threshold: number | null;
 }
 
+interface DeliveryTimeAnomaly {
+  company_id: string;
+  company_name: string;
+  key_account_manager: string | null;
+  store_name: string;
+  address_name: string;
+  channel: string;
+  yesterday_avg_delivery_min: number;
+  yesterday_orders_with_time: number;
+  baseline_avg_delivery_min: number | null;
+  delivery_time_deviation_pct: number | null;
+  weeks_with_data: number;
+}
+
 interface ConsultantGroup {
   consultant: {
     name: string;
@@ -119,6 +132,7 @@ interface ConsultantGroup {
   reviews: ReviewAnomaly[];
   ads: AdsAnomaly[];
   promos: PromoAnomaly[];
+  deliveryTime: DeliveryTimeAnomaly[];
   /** Whether this consultant wants Slack notifications (default true) */
   wantsSlack: boolean;
   /** Whether this consultant wants Email notifications */
@@ -138,11 +152,77 @@ async function sendSlack(message: string): Promise<void> {
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: message }),
+    body: JSON.stringify({
+      text: message,
+      username: 'TPHub Alertas',
+      icon_url: 'https://hub.thinkpaladar.com/images/logo/logo.png',
+    }),
   });
   if (!response.ok) {
     console.error(`Slack webhook failed: ${response.status} ${response.statusText}`);
   }
+}
+
+/**
+ * Extract city name from address string.
+ * Examples:
+ *   "Carrer de Jaume I, 7, 08002 Barcelona, España" → "Barcelona"
+ *   "Calle Gran Via, 42, 28013 Madrid, Spain" → "Madrid"
+ *   "Av. Diagonal, 123, Barcelona" → "Barcelona"
+ *   "Carrer de Mallorca 270" → "" (no city found)
+ */
+function extractCity(address: string): string {
+  // Try: match city after 5-digit postal code
+  const postalMatch = address.match(/\b\d{5}\s+([A-ZÀ-Ú][a-záéíóúñàèìòùü]+(?:\s+[a-záéíóúñàèìòùüA-ZÀ-Ú]+)*)/);
+  if (postalMatch) return postalMatch[1].trim();
+
+  // Known Spanish cities — match if present in the address
+  const knownCities = [
+    'Madrid', 'Barcelona', 'Valencia', 'Sevilla', 'Zaragoza', 'Malaga', 'Málaga',
+    'Murcia', 'Palma', 'Bilbao', 'Alicante', 'Cordoba', 'Córdoba', 'Valladolid',
+    'Vigo', 'Gijon', 'Gijón', 'Hospitalet', "L'Hospitalet", 'Vitoria', 'Granada',
+    'Elche', 'Oviedo', 'Badalona', 'Terrassa', 'Cartagena', 'Sabadell', 'Jerez',
+    'Mostoles', 'Móstoles', 'Alcalá', 'Pamplona', 'Fuenlabrada', 'Almería',
+    'Leganés', 'Donostia', 'San Sebastián', 'Santander', 'Burgos', 'Castellón',
+    'Alcorcón', 'Getafe', 'Las Palmas', 'Logroño', 'Badajoz', 'Salamanca',
+    'Huelva', 'Lleida', 'Tarragona', 'León', 'Cádiz', 'Jaén', 'Ourense',
+    'Marbella', 'Torrejón', 'Reus', 'Girona', 'Lugo', 'Cáceres', 'Lorca',
+    'Pontevedra', 'Toledo', 'Torrevieja',
+  ];
+  const addrLower = address.toLowerCase();
+  for (const city of knownCities) {
+    if (addrLower.includes(city.toLowerCase())) return city;
+  }
+
+  // Fallback: last comma-separated segment before "España"/"Spain"
+  const parts = address.split(',').map((s) => s.trim());
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i].replace(/\b(España|Spain)\b/gi, '').trim();
+    // Must look like a city name (starts with uppercase, no pure numbers, no street prefixes)
+    if (part && /^[A-ZÀ-Ú]/.test(part) && !/^\d+$/.test(part) && part.length > 2
+      && !/^(Calle|Carrer|Av\.|Avda|C\/|Pza|Plaza|Paseo|Ronda|Camino)/i.test(part)) {
+      return part;
+    }
+  }
+  return '';
+}
+
+type AnyAnomaly = OrderAnomaly | ReviewAnomaly | AdsAnomaly | PromoAnomaly | DeliveryTimeAnomaly;
+
+/** Apply strict filters — only keep critical anomalies for Slack */
+function filterCriticalAnomalies(group: ConsultantGroup): ConsultantGroup {
+  return {
+    ...group,
+    orders: group.orders.filter((a) => a.orders_deviation_pct <= -25),
+    reviews: group.reviews.filter(
+      (a) => a.yesterday_avg_rating < 4.0 || a.yesterday_negative_count >= 3,
+    ),
+    ads: group.ads.filter(
+      (a) => a.yesterday_roas < 2.0 || (a.yesterday_ad_spent > 0 && a.yesterday_ad_orders === 0),
+    ),
+    promos: group.promos.filter((a) => (a.promo_rate_deviation_pct ?? 0) >= 30),
+    deliveryTime: group.deliveryTime, // already filtered at RPC level (>40 min)
+  };
 }
 
 function getYesterdayLabel(): string {
@@ -159,6 +239,7 @@ function groupAnomaliesByConsultant(
   reviewAnomalies: ReviewAnomaly[],
   adsAnomalies: AdsAnomaly[],
   promoAnomalies: PromoAnomaly[],
+  deliveryTimeAnomalies: DeliveryTimeAnomaly[],
   prefsMap: Map<string, DbAlertPreference>,
 ): Record<string, ConsultantGroup> {
   const groups: Record<string, ConsultantGroup> = {};
@@ -190,6 +271,7 @@ function groupAnomaliesByConsultant(
         reviews: [],
         ads: [],
         promos: [],
+        deliveryTime: [],
         wantsSlack: true,
         wantsEmail: false,
       };
@@ -213,6 +295,7 @@ function groupAnomaliesByConsultant(
         reviews: [],
         ads: [],
         promos: [],
+        deliveryTime: [],
         wantsSlack: true,
         wantsEmail: false,
       };
@@ -281,6 +364,18 @@ function groupAnomaliesByConsultant(
     }
   }
 
+  // Group delivery time anomalies
+  for (const anomaly of deliveryTimeAnomalies) {
+    const consultants = companyToConsultants.get(anomaly.company_id);
+    if (consultants && consultants.length > 0) {
+      for (const c of consultants) {
+        getOrCreateGroup(c, anomaly.company_id).deliveryTime.push(anomaly);
+      }
+    } else {
+      getUnassignedGroup().deliveryTime.push(anomaly);
+    }
+  }
+
   // Bruno Iglesias receives ALL anomalies (global overview)
   const GLOBAL_ALERT_EMAIL = 'biglesias@thinkpaladar.com';
   const brunoProfile = profiles.find((p) => p.email === GLOBAL_ALERT_EMAIL);
@@ -292,6 +387,7 @@ function groupAnomaliesByConsultant(
     const existingReviewKeys = new Set(group.reviews.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
     const existingAdsKeys = new Set(group.ads.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
     const existingPromoKeys = new Set(group.promos.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
+    const existingDeliveryKeys = new Set(group.deliveryTime.map((a) => `${a.company_id}:${a.store_name}:${a.channel}`));
 
     for (const a of orderAnomalies) {
       const key = `${a.company_id}:${a.store_name}:${a.channel}`;
@@ -309,128 +405,96 @@ function groupAnomaliesByConsultant(
       const key = `${a.company_id}:${a.store_name}:${a.channel}`;
       if (!existingPromoKeys.has(key)) { group.promos.push(a); existingPromoKeys.add(key); }
     }
+    for (const a of deliveryTimeAnomalies) {
+      const key = `${a.company_id}:${a.store_name}:${a.channel}`;
+      if (!existingDeliveryKeys.has(key)) { group.deliveryTime.push(a); existingDeliveryKeys.add(key); }
+    }
   }
 
   return groups;
 }
 
-function buildFallbackMessage(groups: Record<string, ConsultantGroup>): string {
-  const lines: string[] = [`*Alertas diarias — ${getYesterdayLabel()}*\n`];
+/** Build a Slack message for a single consultant, grouped by client (company+store+channel) */
+function buildConsultantMessage(group: ConsultantGroup): string {
+  const filtered = filterCriticalAnomalies(group);
+  const allAnomalies: { key: string; city: string; anomaly: AnyAnomaly; type: string }[] = [];
 
-  for (const group of Object.values(groups)) {
-    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
-    if (totalAnomalies === 0) continue;
-
-    const mention = group.consultant.slackUserId
-      ? `<@${group.consultant.slackUserId}>`
-      : `*${group.consultant.name}*`;
-    lines.push(`\n${mention}\n`);
-
-    if (group.orders.length > 0) {
-      lines.push('*Pedidos:*');
-      for (const a of group.orders) {
-        const emoji = a.orders_deviation_pct <= -25 ? ':red_circle:' : ':large_yellow_circle:';
-        lines.push(
-          `${emoji} *${a.company_name} — ${a.store_name}* | ${a.address_name} (${a.channel}) — ${a.yesterday_orders} pedidos (media: ${a.avg_orders_baseline}) → *${a.orders_deviation_pct}%*`,
-        );
-      }
-    }
-
-    if (group.reviews.length > 0) {
-      lines.push('*Resenas:*');
-      for (const a of group.reviews) {
-        lines.push(
-          `:star: *${a.company_name} — ${a.store_name}* | ${a.address_name} (${a.channel}) — Rating: *${a.yesterday_avg_rating}* (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`,
-        );
-      }
-    }
-
-    if (group.promos.length > 0) {
-      lines.push('*Promos:*');
-      for (const a of group.promos) {
-        lines.push(
-          `:ticket: *${a.company_name} — ${a.store_name}* | ${a.address_name} (${a.channel}) — Promos: *${a.yesterday_promos}€* (${a.yesterday_promo_rate}% de ventas, media: ${a.baseline_avg_promo_rate}%) → *+${a.promo_spend_deviation_pct}%*`,
-        );
-      }
-    }
-
-    if (group.ads.length > 0) {
-      lines.push('*Publicidad:*');
-      for (const a of group.ads) {
-        lines.push(
-          `:loudspeaker: *${a.company_name} — ${a.store_name}* | ${a.address_name} (${a.channel}) — ROAS: *${a.yesterday_roas}x* (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}€`,
-        );
-      }
-    }
+  for (const a of filtered.orders) {
+    const key = `${a.company_name}|${a.store_name}|${a.channel}`;
+    allAnomalies.push({ key, city: extractCity(a.address_name), anomaly: a, type: 'orders' });
+  }
+  for (const a of filtered.reviews) {
+    const key = `${a.company_name}|${a.store_name}|${a.channel}`;
+    allAnomalies.push({ key, city: extractCity(a.address_name), anomaly: a, type: 'reviews' });
+  }
+  for (const a of filtered.ads) {
+    const key = `${a.company_name}|${a.store_name}|${a.channel}`;
+    allAnomalies.push({ key, city: extractCity(a.address_name), anomaly: a, type: 'ads' });
+  }
+  for (const a of filtered.promos) {
+    const key = `${a.company_name}|${a.store_name}|${a.channel}`;
+    allAnomalies.push({ key, city: extractCity(a.address_name), anomaly: a, type: 'promos' });
+  }
+  for (const a of filtered.deliveryTime) {
+    const key = `${a.company_name}|${a.store_name}|${a.channel}`;
+    allAnomalies.push({ key, city: extractCity(a.address_name), anomaly: a, type: 'deliveryTime' });
   }
 
-  return lines.join('\n');
+  if (allAnomalies.length === 0) return '';
+
+  // Group by client key
+  const byClient = new Map<string, typeof allAnomalies>();
+  for (const item of allAnomalies) {
+    const existing = byClient.get(item.key) ?? [];
+    existing.push(item);
+    byClient.set(item.key, existing);
+  }
+
+  const mention = group.consultant.slackUserId
+    ? `<@${group.consultant.slackUserId}>`
+    : `*${group.consultant.name}*`;
+
+  const lines: string[] = [
+    `:bell: *Alertas — ${getYesterdayLabel()}*\n`,
+    mention,
+    '',
+  ];
+
+  for (const [clientKey, items] of byClient) {
+    const [companyName, storeName, channel] = clientKey.split('|');
+    const city = items[0].city;
+    const locationParts = [storeName, city, channel].filter(Boolean);
+    lines.push(`*${companyName}* · ${locationParts.join(' · ')}`);
+
+    for (const { anomaly, type } of items) {
+      if (type === 'orders') {
+        const a = anomaly as OrderAnomaly;
+        lines.push(`  :chart_with_downwards_trend: Pedidos: ${a.yesterday_orders} (media ${Math.round(a.avg_orders_baseline)}) → *${a.orders_deviation_pct}%*`);
+      } else if (type === 'reviews') {
+        const a = anomaly as ReviewAnomaly;
+        lines.push(`  :star: Rating: ${a.yesterday_avg_rating} vs ${a.baseline_avg_rating} · ${a.yesterday_negative_count} negativas`);
+      } else if (type === 'ads') {
+        const a = anomaly as AdsAnomaly;
+        const extra = a.yesterday_ad_orders === 0 && a.yesterday_clicks > 0
+          ? ` · ${a.yesterday_clicks} clics sin conversion`
+          : '';
+        lines.push(`  :loudspeaker: ROAS: ${a.yesterday_roas}x vs ${a.baseline_avg_roas}x · Gasto ${a.yesterday_ad_spent}\u20AC${extra}`);
+      } else if (type === 'promos') {
+        const a = anomaly as PromoAnomaly;
+        lines.push(`  :ticket: Promos: ${a.yesterday_promo_rate}% de ventas (media ${a.baseline_avg_promo_rate}%) → *+${a.promo_rate_deviation_pct}%*`);
+      } else if (type === 'deliveryTime') {
+        const a = anomaly as DeliveryTimeAnomaly;
+        const baseline = a.baseline_avg_delivery_min != null ? ` (media ${a.baseline_avg_delivery_min} min)` : '';
+        lines.push(`  :stopwatch: Delivery: *${a.yesterday_avg_delivery_min} min*${baseline} · ${a.yesterday_orders_with_time} pedidos`);
+      }
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n').trim();
 }
 
-async function formatWithClaude(groups: Record<string, ConsultantGroup>): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.log('ANTHROPIC_API_KEY not configured, using fallback template');
-    return buildFallbackMessage(groups);
-  }
-
-  const anthropic = new Anthropic({ apiKey });
-
-  // Build data summary for Claude
-  const dataForClaude: Record<string, unknown>[] = [];
-  for (const group of Object.values(groups)) {
-    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
-    if (totalAnomalies === 0) continue;
-    dataForClaude.push({
-      consultant: group.consultant,
-      orders: group.orders,
-      reviews: group.reviews,
-      promos: group.promos,
-      ads: group.ads,
-    });
-  }
-
-  if (dataForClaude.length === 0) {
-    return ':large_green_circle: Todos los restaurantes dentro de rango normal ayer (pedidos, resenas, promos y ads).';
-  }
-
-  try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 500,
-      messages: [
-        {
-          role: 'user',
-          content: `Genera el mensaje de alerta diaria para Slack con estos datos de anomalias de ayer (${getYesterdayLabel()}).
-
-Datos por consultor:
-${JSON.stringify(dataForClaude, null, 2)}
-
-REGLAS:
-- Formato Slack (emojis, *negrita*, breve)
-- Para cada consultor: si tiene slack_user_id, usar <@SLACK_USER_ID> como mencion. Si no, usar *nombre* en negrita.
-- PEDIDOS: Agrupa en :red_circle: Criticos (>25% caida) y :large_yellow_circle: Vigilancia (20-25% caida). Formato: Empresa — Marca | Direccion (Canal) — X pedidos (media Y) → Z%
-- RESENAS: Usa :star: con rating ayer vs media y negativas. Solo si hay anomalias.
-- PROMOS: Usa :ticket: con gasto en promos, % sobre ventas ayer vs media. Solo si hay anomalias.
-- ADS: Usa :loudspeaker: con ROAS y gasto. Solo si hay anomalias.
-- Si desviacion > 30%, anade hipotesis breve de causa.
-- Al final indica cuantos restaurantes estan en rango normal (total activos - anomalias).
-- Omite secciones sin anomalias (no pongas "Resenas: todo ok").
-- NO inventes datos. Usa SOLO los proporcionados.
-- Empieza con *Alertas diarias — ${getYesterdayLabel()}*`,
-        },
-      ],
-      system:
-        'Eres un analista de delivery para ThinkPaladar. Genera alertas concisas para Slack en espanol. No uses markdown de headers (##), solo formato Slack (*negrita*, emojis). Maximo 3-4 lineas por restaurante. Se directo y util.',
-    });
-
-    const textBlock = response.content.find((b) => b.type === 'text');
-    return textBlock?.text ?? buildFallbackMessage(groups);
-  } catch (error) {
-    console.error('Claude API error, using fallback:', error);
-    return buildFallbackMessage(groups);
-  }
-}
+// No Claude API formatting — deterministic template is faster and more consistent
 
 // ============================================
 // Handler
@@ -461,11 +525,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 4. Call 4 RPCs in parallel
+  // 4. Call 5 RPCs in parallel
   const threshold = Number(process.env.ALERT_THRESHOLD ?? -20);
   console.log(`[daily-alerts] Calling RPCs with threshold=${threshold}`);
 
-  const [ordersResult, reviewsResult, adsResult, promosResult] = await Promise.all([
+  const [ordersResult, reviewsResult, adsResult, promosResult, deliveryResult] = await Promise.all([
     supabase.rpc('get_daily_order_anomalies', { p_threshold: threshold }),
     supabase.rpc('get_daily_review_anomalies', {
       p_min_reviews: 3,
@@ -482,20 +546,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       p_promo_spike_pct: 50,
       p_min_orders: 10,
     }),
+    supabase.rpc('get_daily_delivery_time_anomalies', {
+      p_max_minutes: 40,
+      p_min_orders: 5,
+    }),
   ]);
 
-  // 5. Check for errors
-  const errors = [
-    ordersResult.error && `Orders: ${ordersResult.error.message}`,
-    reviewsResult.error && `Reviews: ${reviewsResult.error.message}`,
-    adsResult.error && `Ads: ${adsResult.error.message}`,
-    promosResult.error && `Promos: ${promosResult.error.message}`,
-  ].filter(Boolean) as string[];
+  // 5. Check for errors — deduplicate by error message
+  const errorEntries = [
+    ordersResult.error && { label: 'Orders', msg: ordersResult.error.message },
+    reviewsResult.error && { label: 'Reviews', msg: reviewsResult.error.message },
+    adsResult.error && { label: 'Ads', msg: adsResult.error.message },
+    promosResult.error && { label: 'Promos', msg: promosResult.error.message },
+    deliveryResult.error && { label: 'Delivery', msg: deliveryResult.error.message },
+  ].filter(Boolean) as { label: string; msg: string }[];
 
-  if (errors.length > 0) {
-    console.error('[daily-alerts] RPC errors:', errors);
-    await sendSlack(`:warning: Errores en alertas diarias:\n${errors.join('\n')}`);
-    if (errors.length === 4) {
+  if (errorEntries.length > 0) {
+    // Deduplicate: group labels by error message
+    const byMessage = new Map<string, string[]>();
+    for (const { label, msg } of errorEntries) {
+      const existing = byMessage.get(msg) ?? [];
+      existing.push(label);
+      byMessage.set(msg, existing);
+    }
+    const deduped = Array.from(byMessage.entries()).map(
+      ([msg, labels]) => `\u2022 ${labels.join(', ')}: ${msg}`,
+    );
+    console.error('[daily-alerts] RPC errors:', errorEntries);
+    await sendSlack(`:warning: Errores en alertas diarias:\n${deduped.join('\n')}`);
+    if (errorEntries.length === 5) {
       return res.status(500).json({ error: 'Failed to fetch anomaly data' });
     }
   }
@@ -504,16 +583,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const reviewAnomalies: ReviewAnomaly[] = reviewsResult.data ?? [];
   const adsAnomalies: AdsAnomaly[] = adsResult.data ?? [];
   const promoAnomalies: PromoAnomaly[] = promosResult.data ?? [];
-  const totalAnomalies = orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length + promoAnomalies.length;
+  const deliveryTimeAnomalies: DeliveryTimeAnomaly[] = deliveryResult.data ?? [];
+  const totalAnomalies = orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length + promoAnomalies.length + deliveryTimeAnomalies.length;
 
   console.log(
-    `[daily-alerts] Found anomalies: orders=${orderAnomalies.length}, reviews=${reviewAnomalies.length}, ads=${adsAnomalies.length}, promos=${promoAnomalies.length}`,
+    `[daily-alerts] Found anomalies: orders=${orderAnomalies.length}, reviews=${reviewAnomalies.length}, ads=${adsAnomalies.length}, promos=${promoAnomalies.length}, delivery=${deliveryTimeAnomalies.length}`,
   );
 
   // 6. No anomalies → send "all ok"
   if (totalAnomalies === 0) {
     await sendSlack(
-      `:large_green_circle: *Alertas diarias — ${getYesterdayLabel()}*\nTodos los restaurantes dentro de rango normal ayer (pedidos, resenas, promos y ads).`,
+      `:large_green_circle: *Alertas — ${getYesterdayLabel()}*\nTodos los restaurantes dentro de rango normal ayer.`,
     );
     return res.status(200).json({ message: 'No anomalies', count: 0 });
   }
@@ -555,74 +635,108 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     reviewAnomalies,
     adsAnomalies,
     promoAnomalies,
+    deliveryTimeAnomalies,
     prefsMap,
   );
 
   console.log(`[daily-alerts] Grouped into ${Object.keys(groups).length} consultant groups`);
 
-  // 9. Format message with Claude API (fallback to template if unavailable)
-  console.log('[daily-alerts] Formatting message');
-  const message = await formatWithClaude(groups);
+  // 8b. Log slack_user_id mapping for diagnostics
+  for (const group of Object.values(groups)) {
+    console.log(
+      `[daily-alerts] Consultant: ${group.consultant.name} | email: ${group.consultant.email} | slack_user_id: ${group.consultant.slackUserId ?? 'NULL'}`,
+    );
+  }
 
-  // 10. Send to Slack
-  console.log('[daily-alerts] Sending to Slack');
-  await sendSlack(message);
+  // 9. Send one Slack message per consultant (with critical filter)
+  // Skip __unassigned__ group — no consultant to notify
+  console.log('[daily-alerts] Formatting and sending Slack messages per consultant');
+  let slackMessagesSent = 0;
 
-  // 10b. Send email to consultants who have email_enabled
+  for (const [groupId, group] of Object.entries(groups)) {
+    if (groupId === '__unassigned__') continue;
+    if (!group.wantsSlack) continue;
+    const filtered = filterCriticalAnomalies(group);
+    const criticalCount = filtered.orders.length + filtered.reviews.length + filtered.ads.length + filtered.promos.length + filtered.deliveryTime.length;
+    if (criticalCount === 0) continue;
+
+    const message = buildConsultantMessage(group);
+    if (message) {
+      await sendSlack(message);
+      slackMessagesSent++;
+    }
+  }
+
+  console.log(`[daily-alerts] Sent ${slackMessagesSent} Slack message(s)`);
+
+  // 10. Send email to consultants who have email_enabled
   let emailsSent = 0;
   for (const group of Object.values(groups)) {
     if (!group.wantsEmail || !group.consultant.email) continue;
-    const totalAnomalies = group.orders.length + group.reviews.length + group.ads.length + group.promos.length;
-    if (totalAnomalies === 0) continue;
+    const groupTotal = group.orders.length + group.reviews.length + group.ads.length + group.promos.length + group.deliveryTime.length;
+    if (groupTotal === 0) continue;
 
     // Group all anomalies by company name for card-based email
     const companyMap = new Map<string, { metrics: AlertCompanyData['metrics']; maxDeviation: number }>();
 
     for (const a of group.orders) {
-      const key = `${a.company_name} — ${a.store_name}`;
+      const key = `${a.company_name} \u2014 ${a.store_name}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
         label: 'Pedidos',
-        value: `${a.yesterday_orders} (media: ${a.avg_orders_baseline}) → ${a.orders_deviation_pct}%`,
-        threshold: '-20%',
+        value: `${a.yesterday_orders} (media: ${a.avg_orders_baseline}) \u2192 ${a.orders_deviation_pct}%`,
+        threshold: '-25%',
       });
       entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.orders_deviation_pct));
       companyMap.set(key, entry);
     }
 
     for (const a of group.reviews) {
-      const key = `${a.company_name} — ${a.store_name}`;
+      const key = `${a.company_name} \u2014 ${a.store_name}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
         label: 'Resenas',
         value: `Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`,
-        threshold: '3.5',
+        threshold: '4.0',
       });
       entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.rating_deviation_pct));
       companyMap.set(key, entry);
     }
 
     for (const a of group.promos) {
-      const key = `${a.company_name} — ${a.store_name}`;
+      const key = `${a.company_name} \u2014 ${a.store_name}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
         label: 'Promos',
-        value: `${a.yesterday_promos}\u20AC (${a.yesterday_promo_rate}% de ventas) → +${a.promo_spend_deviation_pct}%`,
-        threshold: '15%',
+        value: `${a.yesterday_promos}\u20AC (${a.yesterday_promo_rate}% de ventas) \u2192 +${a.promo_spend_deviation_pct}%`,
+        threshold: '30%',
       });
       entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.promo_spend_deviation_pct));
       companyMap.set(key, entry);
     }
 
     for (const a of group.ads) {
-      const key = `${a.company_name} — ${a.store_name}`;
+      const key = `${a.company_name} \u2014 ${a.store_name}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
         label: 'Publicidad',
         value: `ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`,
-        threshold: '3.0x',
+        threshold: '2.0x',
       });
       entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.roas_deviation_pct));
+      companyMap.set(key, entry);
+    }
+
+    for (const a of group.deliveryTime) {
+      const key = `${a.company_name} \u2014 ${a.store_name}`;
+      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
+      const baseline = a.baseline_avg_delivery_min != null ? ` (media: ${a.baseline_avg_delivery_min} min)` : '';
+      entry.metrics.push({
+        label: 'Delivery Time',
+        value: `${a.yesterday_avg_delivery_min} min${baseline} | ${a.yesterday_orders_with_time} pedidos`,
+        threshold: '40 min',
+      });
+      entry.maxDeviation = Math.max(entry.maxDeviation, a.yesterday_avg_delivery_min);
       companyMap.set(key, entry);
     }
 
@@ -645,7 +759,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const sent = await sendEmail({
       to: group.consultant.email,
-      subject: `Alertas diarias — ${getYesterdayLabel()}`,
+      subject: `Alertas diarias \u2014 ${getYesterdayLabel()}`,
       html,
     });
     if (sent) emailsSent++;
@@ -663,6 +777,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     review_anomalies: reviewAnomalies.length,
     ads_anomalies: adsAnomalies.length,
     promo_anomalies: promoAnomalies.length,
+    delivery_time_anomalies: deliveryTimeAnomalies.length,
+    slack_messages_sent: slackMessagesSent,
     consultants_notified: Object.keys(groups).length,
     emails_sent: emailsSent,
     preferences_loaded: prefsMap.size,

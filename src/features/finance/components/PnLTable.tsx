@@ -171,6 +171,9 @@ export const PnLTable = memo(function PnLTable({ data, displayFormat }: PnLTable
           </tbody>
         </table>
       </div>
+      <div className="px-4 py-2 border-t border-gray-100 text-[10px] text-gray-400">
+        * Cálculo aproximado. El ingreso real puede variar según ajustes de la plataforma.
+      </div>
     </div>
   );
 });
@@ -246,6 +249,9 @@ function LineRow({
           <span className="text-gray-400 mr-1">−</span>
         )}
         {line.label}
+        {line.disclaimer && (
+          <span className="ml-1 text-[10px] text-gray-400 font-normal" title={line.disclaimer}>*</span>
+        )}
       </td>
       {data.periods.map((period) => {
         const cell = data.byPeriod[period]?.[line.id as PnLLineId];

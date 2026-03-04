@@ -12,9 +12,9 @@ interface PnLChartProps {
 const SERIES_CONFIG: (StackedAreaSeriesConfig & { label: string })[] = [
   { key: 'net_revenue', name: 'Ventas netas', label: 'Ventas netas', color: '#095789', gradientOpacity: [0.8, 0.4] },
   { key: 'cogs', name: 'COGS', label: 'Coste producto', color: '#6bb8e0', gradientOpacity: [0.7, 0.3] },
-  { key: 'commissions', name: 'Comisiones', label: 'Comisiones', color: '#9dd0eb', gradientOpacity: [0.6, 0.25] },
-  { key: 'ads_promos', name: 'Ads / Promos', label: 'Ads / Promos', color: '#ffa166', gradientOpacity: [0.7, 0.3] },
-  { key: 'ads_visibility', name: 'Visibilidad', label: 'Visibilidad', color: '#ffc89e', gradientOpacity: [0.6, 0.25] },
+  { key: 'commissions', name: 'Comisiones APP', label: 'Comisiones APP', color: '#9dd0eb', gradientOpacity: [0.6, 0.25] },
+  { key: 'ads_promos', name: 'Dto. Promociones', label: 'Dto. Promociones', color: '#ffa166', gradientOpacity: [0.7, 0.3] },
+  { key: 'ads_visibility', name: 'Publicidad', label: 'Publicidad', color: '#ffc89e', gradientOpacity: [0.6, 0.25] },
   { key: 'refunds', name: 'Reembolsos', label: 'Reembolsos', color: '#c5e3f3', gradientOpacity: [0.5, 0.2] },
 ];
 

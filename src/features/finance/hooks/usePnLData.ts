@@ -264,6 +264,7 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       const adsPromos = agg.promos;
       const adsVisibility = adsByPeriod.get(period) || 0;
       const commissions = agg.commissionsWeighted;
+      const platformPayout = gmv - refunds - adsPromos - adsVisibility - commissions;
       const cogs = gmv * (foodCostPct / 100);
       const netRevenue = gmv - refunds - adsPromos - adsVisibility - commissions - cogs;
       const grossProfit = gmv - commissions - cogs;
@@ -275,6 +276,7 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       const prevAdsPromos = prevAgg?.promos ?? 0;
       const prevAdsVisibility = prevPeriod ? (adsByPeriod.get(prevPeriod) || 0) : 0;
       const prevCommissions = prevAgg?.commissionsWeighted ?? 0;
+      const prevPlatformPayout = prevGmv - prevRefunds - prevAdsPromos - prevAdsVisibility - prevCommissions;
       const prevCogs = prevGmv * (foodCostPct / 100);
       const prevNetRevenue = prevGmv - prevRefunds - prevAdsPromos - prevAdsVisibility - prevCommissions - prevCogs;
       const prevGrossProfit = prevGmv - prevCommissions - prevCogs;
@@ -292,6 +294,7 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
         ads_promos: buildCell(adsPromos, prevAdsPromos, false),
         ads_visibility: buildCell(adsVisibility, prevAdsVisibility, false),
         commissions: buildCell(commissions, prevCommissions, false),
+        platform_payout: buildCell(platformPayout, prevPlatformPayout, false),
         cogs: buildCell(cogs, prevCogs, false),
         net_revenue: buildCell(netRevenue, prevNetRevenue, false),
         gross_profit: buildCell(grossProfit, prevGrossProfit, false),

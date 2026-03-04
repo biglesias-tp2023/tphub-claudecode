@@ -19,6 +19,7 @@ export type PnLLineId =
   | 'ads_promos'
   | 'ads_visibility'
   | 'commissions'
+  | 'platform_payout'
   | 'cogs'
   | 'net_revenue'
   | 'gross_profit'
@@ -31,6 +32,7 @@ export interface PnLLineConfig {
   section: 'ventas' | 'costes' | 'resultado';
   isSubtraction: boolean;
   isPercentage: boolean;
+  disclaimer?: string;
 }
 
 /** All P&L lines in display order */
@@ -39,11 +41,12 @@ export const PNL_LINES: PnLLineConfig[] = [
   { id: 'gmv', label: 'Ventas brutas (GMV)', section: 'ventas', isSubtraction: false, isPercentage: false },
   { id: 'refunds', label: 'Reembolsos', section: 'ventas', isSubtraction: true, isPercentage: false },
   // COSTES
-  { id: 'ads_promos', label: 'Ads / Promos pagadas', section: 'costes', isSubtraction: true, isPercentage: false },
-  { id: 'ads_visibility', label: 'Visibilidad / Boost', section: 'costes', isSubtraction: true, isPercentage: false },
-  { id: 'commissions', label: 'Comisiones plataforma', section: 'costes', isSubtraction: true, isPercentage: false },
-  { id: 'cogs', label: 'Coste producto (COGS)', section: 'costes', isSubtraction: true, isPercentage: false },
+  { id: 'ads_promos', label: 'Dto. en Promociones', section: 'costes', isSubtraction: true, isPercentage: false },
+  { id: 'ads_visibility', label: 'Publicidad/Visibilidad', section: 'costes', isSubtraction: true, isPercentage: false },
+  { id: 'commissions', label: 'Comisiones APP', section: 'costes', isSubtraction: true, isPercentage: false },
   // RESULTADO
+  { id: 'platform_payout', label: 'Total a ingresar', section: 'resultado', isSubtraction: false, isPercentage: false, disclaimer: 'Cálculo aproximado. El ingreso real puede variar según ajustes de la plataforma.' },
+  { id: 'cogs', label: 'Coste producto (COGS)', section: 'resultado', isSubtraction: true, isPercentage: false },
   { id: 'net_revenue', label: 'Ventas netas', section: 'resultado', isSubtraction: false, isPercentage: false },
   { id: 'gross_profit', label: 'Beneficio bruto', section: 'resultado', isSubtraction: false, isPercentage: false },
   { id: 'net_margin', label: 'Margen neto %', section: 'resultado', isSubtraction: false, isPercentage: true },
@@ -89,7 +92,6 @@ export const PNL_CHANNEL_TABS: PnLChannelTabConfig[] = [
   { id: 'total', label: 'Total delivery' },
   { id: 'glovo', label: 'Glovo' },
   { id: 'ubereats', label: 'Uber Eats' },
-  { id: 'justeat', label: 'Just Eat' },
 ];
 
 // ============================================
