@@ -147,7 +147,7 @@ function SectionCard({
   const logo = SECTION_LOGOS[section.id];
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200">
       {/* Section header */}
       <button
         type="button"
@@ -306,9 +306,9 @@ function SectionCard({
 const ADS_STATES = ['Inactivo', 'Activo', 'Interesado en activarlo'] as const;
 
 const ADS_STATE_STYLES: Record<string, string> = {
-  'Activo': 'bg-green-600 text-white border-green-600',
-  'Inactivo': 'bg-white border-gray-200 text-gray-500',
-  'Interesado en activarlo': 'bg-amber-500 text-white border-amber-500',
+  'Activo': 'bg-green-500 text-white',
+  'Inactivo': 'bg-gray-200 text-gray-700',
+  'Interesado en activarlo': 'bg-amber-400 text-white',
 };
 
 interface BrandRowConfig {
@@ -320,6 +320,13 @@ interface BrandRowConfig {
 }
 
 const BRAND_ROWS: BrandRowConfig[] = [
+  {
+    textKey: 'google_my_business',
+    adsKey: 'google_ads_interest',
+    icon: '/images/platforms/google-my-business.png',
+    adsIcon: '/images/platforms/google-ads.png',
+    adsLabel: 'Google ADS',
+  },
   {
     textKey: 'instagram',
     adsKey: 'instagram_meta_ads',
@@ -337,10 +344,10 @@ const BRAND_ROWS: BrandRowConfig[] = [
 ];
 
 const BRAND_CUSTOM_KEYS = new Set([
+  'google_my_business', 'google_ads_interest',
   'instagram', 'instagram_meta_ads',
   'tiktok', 'tiktok_ads',
   'website',
-  'google_my_business', 'google_ads_interest',
 ]);
 
 interface BrandPresenceFieldsProps {
@@ -349,11 +356,6 @@ interface BrandPresenceFieldsProps {
   onFieldChange: (fieldKey: string, value: unknown) => void;
   disabled?: boolean;
   companyId?: string;
-}
-
-function cycleAdsState(current: string): string {
-  const idx = ADS_STATES.indexOf(current as typeof ADS_STATES[number]);
-  return ADS_STATES[(idx + 1) % ADS_STATES.length];
 }
 
 function BrandPresenceFields({
@@ -367,7 +369,7 @@ function BrandPresenceFields({
 
   return (
     <>
-      {/* Instagram + Meta ADS / TikTok + TikTok ADS */}
+      {/* GMB + Google ADS / Instagram + Meta ADS / TikTok + TikTok ADS */}
       {BRAND_ROWS.map(({ textKey, adsKey, icon, adsIcon, adsLabel }) => {
         const textField = section.fields.find((f) => f.key === textKey);
         if (!textField) return null;
@@ -397,24 +399,31 @@ function BrandPresenceFields({
                 />
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (disabled) return;
-                onFieldChange(adsKey, cycleAdsState(adsValue));
-              }}
-              disabled={disabled}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap mb-[1px]',
-                ADS_STATE_STYLES[adsValue] || ADS_STATE_STYLES['Inactivo'],
-                disabled && 'opacity-50 cursor-not-allowed'
-              )}
-              title={adsValue}
-            >
-              <img src={adsIcon} alt="" className="w-4 h-4 object-contain" />
-              <span>{adsLabel}</span>
-              <span className="text-[10px] opacity-80">({adsValue})</span>
-            </button>
+            <div className="space-y-1 flex-shrink-0">
+              <div className="flex items-center gap-1.5 justify-end">
+                <img src={adsIcon} alt="" className="w-3.5 h-3.5 object-contain" />
+                <span className="text-[11px] font-medium text-gray-500">{adsLabel}</span>
+              </div>
+              <div className="inline-flex rounded-lg overflow-hidden border border-gray-200">
+                {ADS_STATES.map((state) => (
+                  <button
+                    key={state}
+                    type="button"
+                    onClick={() => { if (!disabled) onFieldChange(adsKey, state); }}
+                    disabled={disabled}
+                    className={cn(
+                      'px-2 py-1.5 text-[10px] font-medium transition-all whitespace-nowrap',
+                      adsValue === state
+                        ? ADS_STATE_STYLES[state]
+                        : 'bg-white text-gray-300 hover:bg-gray-50',
+                      disabled && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    {state === 'Interesado en activarlo' ? 'Interesado' : state}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         );
       })}
@@ -431,58 +440,6 @@ function BrandPresenceFields({
             disabled={disabled}
             companyId={companyId}
           />
-        );
-      })()}
-
-      {/* Google My Business + Google ADS */}
-      {(() => {
-        const gmbField = section.fields.find((f) => f.key === 'google_my_business');
-        if (!gmbField) return null;
-        const gadsValue = (fieldData['google_ads_interest'] as string) || 'Inactivo';
-
-        return (
-          <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <img src="/images/platforms/google-my-business.png" alt="" className="w-4 h-4 object-contain" />
-                  <label className="text-sm font-medium text-gray-700">{gmbField.label}</label>
-                </div>
-                <input
-                  type="text"
-                  value={(fieldData['google_my_business'] as string) || ''}
-                  onChange={(e) => onFieldChange('google_my_business', e.target.value)}
-                  disabled={disabled}
-                  placeholder={gmbField.placeholder}
-                  className={cn(
-                    'w-full px-3 py-2.5 rounded-lg border text-sm transition-colors',
-                    'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
-                    disabled
-                      ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
-                      : 'bg-white border-gray-200 text-gray-900'
-                  )}
-                />
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (disabled) return;
-                onFieldChange('google_ads_interest', cycleAdsState(gadsValue));
-              }}
-              disabled={disabled}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap mb-[1px]',
-                ADS_STATE_STYLES[gadsValue] || ADS_STATE_STYLES['Inactivo'],
-                disabled && 'opacity-50 cursor-not-allowed'
-              )}
-              title={gadsValue}
-            >
-              <img src="/images/platforms/google-ads.png" alt="" className="w-4 h-4 object-contain" />
-              <span>Google ADS</span>
-              <span className="text-[10px] opacity-80">({gadsValue})</span>
-            </button>
-          </div>
         );
       })()}
 

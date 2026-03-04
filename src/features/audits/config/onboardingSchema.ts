@@ -111,21 +111,6 @@ function createPlatformProfileFields(prefix: string, platformName: string): Onbo
   ];
 }
 
-function createCampaignFields(prefix: string, n: number, platformName: string): OnboardingField[] {
-  return [
-    { key: `${prefix}_campaign_${n}_name`, label: `Campaña ${n} - Nombre`, type: 'text', required: false, placeholder: `Nombre de la campaña ${n} en ${platformName}` },
-    { key: `${prefix}_campaign_${n}_dates`, label: `Campaña ${n} - Fechas`, type: 'text', required: false, placeholder: 'Ej: 01/01 - 31/01' },
-    { key: `${prefix}_campaign_${n}_status`, label: `Campaña ${n} - Estado`, type: 'select', required: false, options: ['Activa', 'Pausada', 'Finalizada', 'Programada'] },
-    { key: `${prefix}_campaign_${n}_daily_budget`, label: `Campaña ${n} - Presupuesto diario`, type: 'number', required: false, suffix: '€' },
-    { key: `${prefix}_campaign_${n}_mode`, label: `Campaña ${n} - Modo`, type: 'select', required: false, options: ['CPC', 'CPM', 'CPA', 'Automático'] },
-    { key: `${prefix}_campaign_${n}_total_investment`, label: `Campaña ${n} - Inversión total`, type: 'number', required: false, suffix: '€' },
-    { key: `${prefix}_campaign_${n}_gross_sales`, label: `Campaña ${n} - Ventas brutas`, type: 'number', required: false, suffix: '€' },
-    { key: `${prefix}_campaign_${n}_orders`, label: `Campaña ${n} - Pedidos`, type: 'number', required: false },
-    { key: `${prefix}_campaign_${n}_clicks`, label: `Campaña ${n} - Clicks`, type: 'number', required: false },
-    { key: `${prefix}_campaign_${n}_impressions`, label: `Campaña ${n} - Impresiones`, type: 'number', required: false },
-  ];
-}
-
 // ============================================
 // SECTIONS
 // ============================================
@@ -192,76 +177,42 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
   },
 
   // ============================================
-  // SECTION 7: La Marca (Presencia Digital)
+  // SECTION 7: Marketing y Publicidad
+  // ============================================
+  {
+    id: 'marketing',
+    title: 'Marketing y Publicidad',
+    icon: Megaphone,
+    fields: [
+      { key: 'promo_discount_pct', label: '% de descuento', type: 'checkbox', required: false },
+      { key: 'promo_discount_pct_max', label: '% de descuento - Hasta cuánto', type: 'text', required: false, placeholder: 'Ej: hasta 30%' },
+      { key: 'promo_2x1', label: '2x1', type: 'checkbox', required: false },
+      { key: 'promo_free_delivery', label: 'Free delivery', type: 'checkbox', required: false },
+      { key: 'promo_full_menu_discount', label: 'Descuento en toda la carta', type: 'checkbox', required: false },
+      { key: 'promo_full_menu_discount_max', label: 'Descuento en toda la carta - Hasta cuánto', type: 'text', required: false, placeholder: 'Ej: hasta 20%' },
+      { key: 'promo_other', label: 'Otros', type: 'checkbox', required: false },
+      { key: 'promo_other_detail', label: 'Otros - Detalle', type: 'text', required: false, placeholder: 'Especificar otras promociones' },
+      { key: 'marketing_comments', label: 'Comentarios adicionales', type: 'textarea', required: false, placeholder: 'Comentarios sobre marketing y publicidad' },
+    ],
+  },
+
+  // ============================================
+  // SECTION 8: La Marca (Presencia Digital)
   // ============================================
   {
     id: 'brand_presence',
     title: 'La Marca',
     icon: Globe,
     fields: [
+      { key: 'google_my_business', label: 'Google My Business', type: 'text', required: false, placeholder: 'URL o N/A' },
+      { key: 'google_ads_interest', label: 'Google ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
       { key: 'instagram', label: 'Instagram', type: 'text', required: false, placeholder: '@handle o N/A' },
       { key: 'instagram_meta_ads', label: 'Meta ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
       { key: 'tiktok', label: 'TikTok', type: 'text', required: false, placeholder: '@handle o N/A' },
       { key: 'tiktok_ads', label: 'TikTok ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
       { key: 'website', label: 'Página web', type: 'text', required: false, placeholder: 'URL o N/A' },
-      { key: 'google_my_business', label: 'Google My Business', type: 'text', required: false, placeholder: 'URL o N/A' },
-      { key: 'google_ads_interest', label: 'Google ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
       { key: 'ecommerce', label: 'Canal de venta propio', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado a futuro'] },
       { key: 'loyalty_program', label: 'Programa de fidelización', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado a futuro'] },
-    ],
-  },
-
-  // ============================================
-  // SECTION 8: Marketing
-  // ============================================
-  {
-    id: 'marketing',
-    title: 'Marketing',
-    icon: Megaphone,
-    fields: [
-      // --- Campañas Glovo ---
-      ...createCampaignFields('glovo', 1, 'Glovo'),
-      ...createCampaignFields('glovo', 2, 'Glovo'),
-      ...createCampaignFields('glovo', 3, 'Glovo'),
-
-      // --- Campañas UberEats ---
-      ...createCampaignFields('ubereats', 1, 'UberEats'),
-      ...createCampaignFields('ubereats', 2, 'UberEats'),
-      ...createCampaignFields('ubereats', 3, 'UberEats'),
-
-      // --- Resumen ---
-      { key: 'total_spend', label: 'Inversión total', type: 'number', required: false, suffix: '€' },
-      { key: 'total_ad_sales', label: 'Ventas por ads totales', type: 'number', required: false, suffix: '€' },
-      { key: 'roas', label: 'ROAS', type: 'number', required: false },
-      { key: 'conversion_rate', label: 'Tasa de conversión', type: 'number', required: false, suffix: '%' },
-
-      // --- Acciones validadas Glovo ---
-      { key: 'validated_glovo_ads', label: 'Glovo - ADS validados', type: 'checkbox', required: false },
-      { key: 'validated_glovo_2x1', label: 'Glovo - 2x1 validado', type: 'checkbox', required: false },
-      { key: 'validated_glovo_discount', label: 'Glovo - Descuento validado', type: 'checkbox', required: false },
-      { key: 'validated_glovo_free_delivery', label: 'Glovo - Envío gratis validado', type: 'checkbox', required: false },
-      { key: 'validated_glovo_valley_hours', label: 'Glovo - Horas valle validado', type: 'checkbox', required: false },
-      { key: 'validated_glovo_free_item', label: 'Glovo - Producto gratis validado', type: 'checkbox', required: false },
-
-      // --- Acciones validadas UberEats ---
-      { key: 'validated_ubereats_ads', label: 'UberEats - ADS validados', type: 'checkbox', required: false },
-      { key: 'validated_ubereats_2x1', label: 'UberEats - 2x1 validado', type: 'checkbox', required: false },
-      { key: 'validated_ubereats_discount', label: 'UberEats - Descuento validado', type: 'checkbox', required: false },
-      { key: 'validated_ubereats_free_delivery', label: 'UberEats - Envío gratis validado', type: 'checkbox', required: false },
-      { key: 'validated_ubereats_valley_hours', label: 'UberEats - Horas valle validado', type: 'checkbox', required: false },
-      { key: 'validated_ubereats_free_item', label: 'UberEats - Producto gratis validado', type: 'checkbox', required: false },
-
-      // --- Acciones validadas JustEat ---
-      { key: 'validated_justeat_ads', label: 'JustEat - ADS validados', type: 'checkbox', required: false },
-      { key: 'validated_justeat_2x1', label: 'JustEat - 2x1 validado', type: 'checkbox', required: false },
-      { key: 'validated_justeat_discount', label: 'JustEat - Descuento validado', type: 'checkbox', required: false },
-      { key: 'validated_justeat_free_delivery', label: 'JustEat - Envío gratis validado', type: 'checkbox', required: false },
-      { key: 'validated_justeat_valley_hours', label: 'JustEat - Horas valle validado', type: 'checkbox', required: false },
-      { key: 'validated_justeat_free_item', label: 'JustEat - Producto gratis validado', type: 'checkbox', required: false },
-
-      // --- Promociones y próximos pasos ---
-      { key: 'active_promos', label: 'Promociones activas', type: 'textarea', required: false, placeholder: 'Describe las promociones activas actualmente' },
-      { key: 'next_steps', label: 'Próximos pasos', type: 'textarea', required: false, placeholder: 'Próximos pasos a seguir con el cliente' },
     ],
   },
 ];
