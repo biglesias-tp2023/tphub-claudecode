@@ -11,11 +11,11 @@
  */
 
 import { useMemo } from 'react';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, startOfMonth, startOfQuarter } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import { useCompanyIds, useBrandIds, useChannelIds, useDateFilters } from '@/stores/filtersStore';
+import { useCompanyIds, useBrandIds, useDateFilters } from '@/stores/filtersStore';
 import { useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useBrands } from '@/hooks/useBrands';
 import { useRestaurants } from '@/hooks/useRestaurants';
@@ -87,9 +87,12 @@ interface UsePnLDataParams {
 
 export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataParams) {
   // 1. Read from stores
+  // NOTE: We intentionally do NOT read channelIds from the store here.
+  // The Finance page hides the channel selector and uses its own channelTab control.
+  // Reading stale channelIds from the store (set on other pages like Controlling)
+  // would cause incorrect client-side filtering.
   const companyIds = useCompanyIds();
   const brandIds = useBrandIds();
-  const channelIds = useChannelIds();
   const { dateRange } = useDateFilters();
   const restaurantIds = useDashboardFiltersStore((s) => s.restaurantIds);
 
@@ -122,14 +125,12 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       [...companyIds].sort().join(','),
       expandedBrandIds.length > 0 ? [...expandedBrandIds].sort().join(',') : '',
       expandedRestaurantIds.length > 0 ? [...expandedRestaurantIds].sort().join(',') : '',
-      channelIds.length > 0 ? [...channelIds].sort().join(',') : '',
     ],
     queryFn: () =>
       fetchPnLPeriods({
         companyIds: companyIds.length > 0 ? companyIds : undefined,
         brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
         addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
-        channelIds: channelIds.length > 0 ? channelIds : undefined,
         startDate,
         endDate,
         granularity,
@@ -138,7 +139,6 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
     retry: false,
     staleTime: QUERY_STALE_SHORT,
     gcTime: QUERY_GC_SHORT,
-    placeholderData: keepPreviousData,
   });
 
   // 6. Fetch ads timeseries (daily) for ad spend
@@ -150,14 +150,12 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       [...companyIds].sort().join(','),
       expandedBrandIds.length > 0 ? [...expandedBrandIds].sort().join(',') : '',
       expandedRestaurantIds.length > 0 ? [...expandedRestaurantIds].sort().join(',') : '',
-      channelIds.length > 0 ? [...channelIds].sort().join(',') : '',
     ],
     queryFn: () =>
       fetchAdsTimeseries({
         companyIds: companyIds.length > 0 ? companyIds : undefined,
         brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
         addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
-        channelIds: channelIds.length > 0 ? channelIds : undefined,
         startDate,
         endDate,
       }),
@@ -165,7 +163,6 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
     retry: false,
     staleTime: QUERY_STALE_SHORT,
     gcTime: QUERY_GC_SHORT,
-    placeholderData: keepPreviousData,
   });
 
   // 7. Calculate weighted average commission rate
@@ -314,6 +311,7 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
   return {
     data,
     isLoading: pnlQuery.isLoading || adsQuery.isLoading,
+    isFetching: pnlQuery.isFetching || adsQuery.isFetching,
     error: pnlQuery.error || adsQuery.error,
     refetch: () => {
       pnlQuery.refetch();

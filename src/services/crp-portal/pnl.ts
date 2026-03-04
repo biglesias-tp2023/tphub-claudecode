@@ -11,7 +11,6 @@
  */
 
 import { supabase } from '../supabase';
-import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
 
 // ============================================
@@ -24,7 +23,6 @@ export interface PnLPeriodsParams {
   companyIds?: string[];
   brandIds?: string[];
   addressIds?: string[];
-  channelIds?: ChannelId[];
   startDate: string;
   endDate: string;
   granularity: PnLGranularity;
@@ -100,9 +98,9 @@ function mergeRows(allRows: PnLPeriodRow[]): PnLPeriodRow[] {
  * Single RPC call for a specific date range + company set.
  */
 async function fetchPnLPeriodsSingle(
-  params: Omit<PnLPeriodsParams, 'channelIds'> & { channelIds?: ChannelId[] }
+  params: Omit<PnLPeriodsParams, 'channelIds'>
 ): Promise<PnLPeriodRow[]> {
-  const { companyIds, brandIds, addressIds, channelIds, startDate, endDate, granularity } = params;
+  const { companyIds, brandIds, addressIds, startDate, endDate, granularity } = params;
 
   const { data, error } = await supabase.rpc('get_pnl_periods', {
     p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
@@ -118,7 +116,7 @@ async function fetchPnLPeriodsSingle(
   }
 
   // Map RPC results — portal_id contains channel names ('glovo', 'ubereats', 'other')
-  const rows = ((data || []) as Array<{
+  return ((data || []) as Array<{
     period_start: string;
     portal_id: string;
     revenue: number;
@@ -133,13 +131,6 @@ async function fetchPnLPeriodsSingle(
     refunds: Number(row.refunds) || 0,
     orderCount: Number(row.order_count) || 0,
   }));
-
-  // Client-side channel filter if specific channels selected
-  if (channelIds && channelIds.length > 0) {
-    return rows.filter((r) => channelIds.includes(r.channel as ChannelId));
-  }
-
-  return rows;
 }
 
 /**
