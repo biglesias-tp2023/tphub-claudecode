@@ -16,7 +16,7 @@
 const MAX_CONCURRENT = 2;
 
 /** Max companies per RPC call to avoid PostgreSQL statement timeouts */
-export const RPC_BATCH_SIZE = 20;
+export const RPC_BATCH_SIZE = 10;
 let running = 0;
 const queue: Array<() => void> = [];
 

@@ -35,6 +35,6 @@ Deploy TPHub to Vercel production environment.
 ## Important
 
 - Never deploy if `npm run build` fails
-- The production URL is `tphub.vercel.app`
+- The production URL is `hub.thinkpaladar.com`
 - If there are TypeScript errors, fix them before deploying (ask the user)
 - If there are uncommitted changes, warn the user but proceed if they confirm
