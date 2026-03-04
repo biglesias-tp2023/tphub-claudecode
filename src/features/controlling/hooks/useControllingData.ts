@@ -296,8 +296,11 @@ export function useControllingData() {
   // Fetch REAL order data for portfolio and channel metrics
   const ordersQuery = useOrdersData(filterParams);
 
+  // Defer reviews until core data (hierarchy + orders) has loaded
+  const coreDataReady = !hierarchyQuery.isLoading && !ordersQuery.isLoading;
+
   // Fetch reviews aggregation for avgDeliveryTime per channel
-  const reviewsAggQuery = useReviewsAggregation(filterParams);
+  const reviewsAggQuery = useReviewsAggregation({ ...filterParams, enabled: coreDataReady });
 
   // Compute final data
   const data = useMemo<ControllingData | undefined>(() => {

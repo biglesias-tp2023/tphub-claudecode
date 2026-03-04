@@ -33,6 +33,8 @@ export interface UseReviewsParams {
   channelIds?: ChannelId[];
   dateRange: DateRange;
   datePreset: DatePreset;
+  /** When false, the query is deferred (disabled). Defaults to true. */
+  enabled?: boolean;
 }
 
 export interface ReviewsAggregationResult {
@@ -46,7 +48,7 @@ export interface ReviewsAggregationResult {
 // ============================================
 
 export function useReviewsAggregation(params: UseReviewsParams) {
-  const { companyIds, brandIds, addressIds, channelIds, dateRange, datePreset } = params;
+  const { companyIds, brandIds, addressIds, channelIds, dateRange, datePreset, enabled } = params;
 
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);
@@ -78,7 +80,7 @@ export function useReviewsAggregation(params: UseReviewsParams) {
         { ...baseParams, startDate: previousStartDate, endDate: previousEndDate }
       );
     },
-    enabled: companyIds.length > 0,
+    enabled: companyIds.length > 0 && (enabled !== false),
     retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

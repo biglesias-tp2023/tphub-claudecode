@@ -32,7 +32,10 @@ export function ControllingPage() {
   const companyIds = useGlobalFiltersStore((s) => s.companyIds);
   const dateRange = useDashboardFiltersStore((s) => s.dateRange);
   const { data, isLoading, error, refetch } = useControllingData();
-  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, weeks, isLoading: weeklyRevenueLoading } = useWeeklyRevenue();
+
+  // Defer weekly revenue until core data has loaded to reduce concurrent RPC calls
+  const coreDataReady = !isLoading && !!data;
+  const { weeklyRevenue, channelWeeklyRevenue, weeklyMetrics, weeks, isLoading: weeklyRevenueLoading } = useWeeklyRevenue({ enabled: coreDataReady });
 
   // Detail panel state — persist selected row ID across navigation
   const [selectedRowId, setSelectedRowId] = useSessionState<string | null>('tphub-controlling-selectedRow', null);

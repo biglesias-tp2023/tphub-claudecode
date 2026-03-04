@@ -54,8 +54,15 @@ export interface WeekSegmentData {
   frequentCustomers: number;
 }
 
-/** Number of complete weeks to fetch for sparklines */
-const SPARKLINE_WEEKS = 8;
+/**
+ * Adaptive sparkline weeks based on company count.
+ * More companies = fewer weeks to reduce total RPC calls.
+ */
+function getSparklineWeeks(companyCount: number): number {
+  if (companyCount > 40) return 4;
+  if (companyCount > 20) return 6;
+  return 8;
+}
 
 interface AggregatedWeek {
   byRowId: Map<string, number>;
@@ -184,10 +191,11 @@ function aggregateAllMetricsByRowId(
  * @returns weekLabels - string[] with week labels (S1..S8)
  * @returns isLoading - Whether data is still loading
  */
-export function useWeeklyRevenue() {
+export function useWeeklyRevenue(options?: { enabled?: boolean }) {
   const companyIds = useCompanyIds();
+  const sparklineWeeks = useMemo(() => getSparklineWeeks(companyIds.length), [companyIds.length]);
 
-  const weeks = useMemo(() => getLastNWeeks(SPARKLINE_WEEKS), []);
+  const weeks = useMemo(() => getLastNWeeks(sparklineWeeks), [sparklineWeeks]);
 
   interface WeeklyRevenueData {
     byRowId: Map<string, number[]>;
@@ -196,7 +204,7 @@ export function useWeeklyRevenue() {
   }
 
   const query = useQuery<WeeklyRevenueData>({
-    queryKey: ['weekly-revenue', [...companyIds].sort().join(',')],
+    queryKey: ['weekly-revenue', [...companyIds].sort().join(','), sparklineWeeks],
     queryFn: async () => {
       // Fetch dimensions to build address ID remap (secondary → primary).
       // This ensures sparkline keys match grouped hierarchy row IDs.
@@ -272,7 +280,7 @@ export function useWeeklyRevenue() {
 
       return { byRowId, byChannel, metricsByRowId };
     },
-    enabled: companyIds.length > 0,
+    enabled: companyIds.length > 0 && (options?.enabled !== false),
     // Disable auto-retry: retrying expensive RPCs on timeout compounds DB load
     retry: false,
     staleTime: QUERY_STALE_MEDIUM,

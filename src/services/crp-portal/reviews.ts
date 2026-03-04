@@ -18,10 +18,7 @@ import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
-import { withRpcLimit } from './rpcLimiter';
-
-/** Max companies per RPC call to avoid PostgreSQL statement timeouts */
-const RPC_BATCH_SIZE = 5;
+import { withRpcLimit, RPC_BATCH_SIZE } from './rpcLimiter';
 
 // ============================================
 // TYPES
