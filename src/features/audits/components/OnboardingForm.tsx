@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { ContactSelectField } from './fields/ContactSelectField';
 import { MarginCalculatorField } from './fields/MarginCalculatorField';
 import { CompetitorCardField } from './fields/CompetitorCardField';
+import { PlatformCategoriesField } from './fields/PlatformCategoriesField';
 import {
   ONBOARDING_SECTIONS,
   calculateOnboardingCompletion,
@@ -108,6 +109,18 @@ export function OnboardingForm({
 // SECTION CARD
 // ============================================
 
+const SECTION_LOGOS: Record<string, string> = {
+  profile_glovo: '/images/platforms/glovo.png',
+  profile_ubereats: '/images/platforms/ubereats.png',
+  profile_justeat: '/images/platforms/justeat.webp',
+};
+
+const PLATFORM_PREFIXES: Record<string, string> = {
+  profile_glovo: 'glovo',
+  profile_ubereats: 'ubereats',
+  profile_justeat: 'justeat',
+};
+
 interface SectionCardProps {
   section: OnboardingSection;
   fieldData: Record<string, unknown>;
@@ -131,6 +144,7 @@ function SectionCard({
 }: SectionCardProps) {
   const { completed, total } = getOnboardingSectionCompletion(section, fieldData);
   const Icon = section.icon;
+  const logo = SECTION_LOGOS[section.id];
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -145,9 +159,15 @@ function SectionCard({
         )}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
-            <Icon className="w-5 h-5 text-primary-600" />
-          </div>
+          {logo ? (
+            <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
+              <img src={logo} alt={section.title} className="w-7 h-7 object-contain" />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
+              <Icon className="w-5 h-5 text-primary-600" />
+            </div>
+          )}
           <h3 className="font-semibold text-gray-900">{section.title}</h3>
         </div>
 
@@ -179,52 +199,305 @@ function SectionCard({
       {expanded && (
         <div className="border-t border-gray-100 p-4 space-y-5">
           {section.id === 'competition' ? (
-            <>
-              {/* Google Maps link field */}
-              {section.fields
-                .filter((f) => f.key === 'competitors_map_url')
-                .map((field) => (
-                  <FieldRenderer
-                    key={field.key}
-                    field={field}
-                    value={fieldData[field.key]}
-                    onChange={(value) => onFieldChange(field.key, value)}
-                    disabled={disabled}
-                    companyId={companyId}
-                  />
-                ))}
-              {/* Competitor cards */}
-              <CompetitorCardField
-                fieldData={fieldData}
-                onFieldChange={onFieldChange}
-                disabled={disabled}
-              />
-            </>
+            <CompetitorCardField
+              fieldData={fieldData}
+              onFieldChange={onFieldChange}
+              disabled={disabled}
+            />
+          ) : section.id === 'brand_presence' ? (
+            <BrandPresenceFields
+              section={section}
+              fieldData={fieldData}
+              onFieldChange={onFieldChange}
+              disabled={disabled}
+              companyId={companyId}
+            />
           ) : (
-            section.fields.map((field) =>
-              field.type === 'margin_calculator' ? (
-                <MarginCalculatorField
-                  key={field.key}
+            <>
+              {(() => {
+                const platformPrefix = PLATFORM_PREFIXES[section.id];
+                const logoKey = platformPrefix ? `${platformPrefix}_logo` : '';
+                const logoQualityKey = platformPrefix ? `${platformPrefix}_logo_quality` : '';
+                const suggestedKey = platformPrefix ? `${platformPrefix}_suggested_categories` : '';
+                const fields = section.fields.filter(
+                  (f) => f.key !== logoKey && f.key !== logoQualityKey && f.key !== suggestedKey
+                );
+
+                return (
+                  <>
+                    {fields.map((field) =>
+                      field.type === 'margin_calculator' ? (
+                        <MarginCalculatorField
+                          key={field.key}
+                          fieldData={fieldData}
+                          onFieldChange={onFieldChange}
+                          disabled={disabled}
+                          companyCommissions={companyCommissions ?? { glovo: null, ubereats: null }}
+                        />
+                      ) : field.key === (platformPrefix ? `${platformPrefix}_description` : '') ? (
+                        <React.Fragment key={field.key}>
+                          {/* Logo + Logo quality side by side */}
+                          {platformPrefix && (() => {
+                            const logoField = section.fields.find((f) => f.key === logoKey);
+                            const qualityField = section.fields.find((f) => f.key === logoQualityKey);
+                            if (!logoField || !qualityField) return null;
+                            return (
+                              <div className="grid grid-cols-2 gap-4">
+                                <FieldRenderer
+                                  field={logoField}
+                                  value={fieldData[logoField.key]}
+                                  onChange={(value) => onFieldChange(logoField.key, value)}
+                                  disabled={disabled}
+                                  companyId={companyId}
+                                />
+                                <FieldRenderer
+                                  field={qualityField}
+                                  value={fieldData[qualityField.key]}
+                                  onChange={(value) => onFieldChange(qualityField.key, value)}
+                                  disabled={disabled}
+                                  companyId={companyId}
+                                />
+                              </div>
+                            );
+                          })()}
+                          {/* Description field */}
+                          <FieldRenderer
+                            field={field}
+                            value={fieldData[field.key]}
+                            onChange={(value) => onFieldChange(field.key, value)}
+                            disabled={disabled}
+                            companyId={companyId}
+                          />
+                        </React.Fragment>
+                      ) : (
+                        <FieldRenderer
+                          key={field.key}
+                          field={field}
+                          value={fieldData[field.key]}
+                          onChange={(value) => onFieldChange(field.key, value)}
+                          disabled={disabled}
+                          companyId={companyId}
+                        />
+                      )
+                    )}
+                  </>
+                );
+              })()}
+              {PLATFORM_PREFIXES[section.id] && (
+                <PlatformCategoriesField
+                  prefix={PLATFORM_PREFIXES[section.id]}
                   fieldData={fieldData}
                   onFieldChange={onFieldChange}
                   disabled={disabled}
-                  companyCommissions={companyCommissions ?? { glovo: null, ubereats: null }}
                 />
-              ) : (
-                <FieldRenderer
-                  key={field.key}
-                  field={field}
-                  value={fieldData[field.key]}
-                  onChange={(value) => onFieldChange(field.key, value)}
-                  disabled={disabled}
-                  companyId={companyId}
-                />
-              )
-            )
+              )}
+            </>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+// ============================================
+// BRAND PRESENCE SECTION (La Marca)
+// ============================================
+
+const ADS_STATES = ['Inactivo', 'Activo', 'Interesado en activarlo'] as const;
+
+const ADS_STATE_STYLES: Record<string, string> = {
+  'Activo': 'bg-green-600 text-white border-green-600',
+  'Inactivo': 'bg-white border-gray-200 text-gray-500',
+  'Interesado en activarlo': 'bg-amber-500 text-white border-amber-500',
+};
+
+interface BrandRowConfig {
+  textKey: string;
+  adsKey: string;
+  icon: string;
+  adsIcon: string;
+  adsLabel: string;
+}
+
+const BRAND_ROWS: BrandRowConfig[] = [
+  {
+    textKey: 'instagram',
+    adsKey: 'instagram_meta_ads',
+    icon: '/images/platforms/instagram.png',
+    adsIcon: '/images/platforms/meta-ads.png',
+    adsLabel: 'Meta ADS',
+  },
+  {
+    textKey: 'tiktok',
+    adsKey: 'tiktok_ads',
+    icon: '/images/platforms/tiktok.webp',
+    adsIcon: '/images/platforms/tiktok.webp',
+    adsLabel: 'TikTok ADS',
+  },
+];
+
+const BRAND_CUSTOM_KEYS = new Set([
+  'instagram', 'instagram_meta_ads',
+  'tiktok', 'tiktok_ads',
+  'website',
+  'google_my_business', 'google_ads_interest',
+]);
+
+interface BrandPresenceFieldsProps {
+  section: OnboardingSection;
+  fieldData: Record<string, unknown>;
+  onFieldChange: (fieldKey: string, value: unknown) => void;
+  disabled?: boolean;
+  companyId?: string;
+}
+
+function cycleAdsState(current: string): string {
+  const idx = ADS_STATES.indexOf(current as typeof ADS_STATES[number]);
+  return ADS_STATES[(idx + 1) % ADS_STATES.length];
+}
+
+function BrandPresenceFields({
+  section,
+  fieldData,
+  onFieldChange,
+  disabled,
+  companyId,
+}: BrandPresenceFieldsProps) {
+  const remainingFields = section.fields.filter((f) => !BRAND_CUSTOM_KEYS.has(f.key));
+
+  return (
+    <>
+      {/* Instagram + Meta ADS / TikTok + TikTok ADS */}
+      {BRAND_ROWS.map(({ textKey, adsKey, icon, adsIcon, adsLabel }) => {
+        const textField = section.fields.find((f) => f.key === textKey);
+        if (!textField) return null;
+        const adsValue = (fieldData[adsKey] as string) || 'Inactivo';
+
+        return (
+          <div key={textKey} className="flex items-end gap-3">
+            <div className="flex-1">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <img src={icon} alt="" className="w-4 h-4 object-contain" />
+                  <label className="text-sm font-medium text-gray-700">{textField.label}</label>
+                </div>
+                <input
+                  type="text"
+                  value={(fieldData[textKey] as string) || ''}
+                  onChange={(e) => onFieldChange(textKey, e.target.value)}
+                  disabled={disabled}
+                  placeholder={textField.placeholder}
+                  className={cn(
+                    'w-full px-3 py-2.5 rounded-lg border text-sm transition-colors',
+                    'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
+                    disabled
+                      ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-white border-gray-200 text-gray-900'
+                  )}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (disabled) return;
+                onFieldChange(adsKey, cycleAdsState(adsValue));
+              }}
+              disabled={disabled}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap mb-[1px]',
+                ADS_STATE_STYLES[adsValue] || ADS_STATE_STYLES['Inactivo'],
+                disabled && 'opacity-50 cursor-not-allowed'
+              )}
+              title={adsValue}
+            >
+              <img src={adsIcon} alt="" className="w-4 h-4 object-contain" />
+              <span>{adsLabel}</span>
+              <span className="text-[10px] opacity-80">({adsValue})</span>
+            </button>
+          </div>
+        );
+      })}
+
+      {/* Página web */}
+      {(() => {
+        const webField = section.fields.find((f) => f.key === 'website');
+        if (!webField) return null;
+        return (
+          <FieldRenderer
+            field={webField}
+            value={fieldData[webField.key]}
+            onChange={(value) => onFieldChange(webField.key, value)}
+            disabled={disabled}
+            companyId={companyId}
+          />
+        );
+      })()}
+
+      {/* Google My Business + Google ADS */}
+      {(() => {
+        const gmbField = section.fields.find((f) => f.key === 'google_my_business');
+        if (!gmbField) return null;
+        const gadsValue = (fieldData['google_ads_interest'] as string) || 'Inactivo';
+
+        return (
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <img src="/images/platforms/google-my-business.png" alt="" className="w-4 h-4 object-contain" />
+                  <label className="text-sm font-medium text-gray-700">{gmbField.label}</label>
+                </div>
+                <input
+                  type="text"
+                  value={(fieldData['google_my_business'] as string) || ''}
+                  onChange={(e) => onFieldChange('google_my_business', e.target.value)}
+                  disabled={disabled}
+                  placeholder={gmbField.placeholder}
+                  className={cn(
+                    'w-full px-3 py-2.5 rounded-lg border text-sm transition-colors',
+                    'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
+                    disabled
+                      ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-white border-gray-200 text-gray-900'
+                  )}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (disabled) return;
+                onFieldChange('google_ads_interest', cycleAdsState(gadsValue));
+              }}
+              disabled={disabled}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap mb-[1px]',
+                ADS_STATE_STYLES[gadsValue] || ADS_STATE_STYLES['Inactivo'],
+                disabled && 'opacity-50 cursor-not-allowed'
+              )}
+              title={gadsValue}
+            >
+              <img src="/images/platforms/google-ads.png" alt="" className="w-4 h-4 object-contain" />
+              <span>Google ADS</span>
+              <span className="text-[10px] opacity-80">({gadsValue})</span>
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Remaining fields: ecommerce, loyalty_program */}
+      {remainingFields.map((field) => (
+        <FieldRenderer
+          key={field.key}
+          field={field}
+          value={fieldData[field.key]}
+          onChange={(value) => onFieldChange(field.key, value)}
+          disabled={disabled}
+          companyId={companyId}
+        />
+      ))}
+    </>
   );
 }
 

@@ -71,9 +71,19 @@ export const CATEGORY_EMOJIS: Record<string, string> = {
 // HELPERS FOR REPETITIVE BLOCKS
 // ============================================
 
+export const SALES_CHANNELS = ['Glovo', 'UberEats', 'JustEat'] as const;
+
+export const CHANNEL_LOGOS: Record<string, string> = {
+  'Glovo': '/images/platforms/glovo.png',
+  'UberEats': '/images/platforms/ubereats.png',
+  'JustEat': '/images/platforms/justeat.webp',
+};
+
 function createCompetitorFields(n: number): OnboardingField[] {
   return [
     { key: `competitor_${n}_name`, label: 'Nombre', type: 'text', required: false },
+    { key: `competitor_${n}_channels`, label: 'Canales de venta', type: 'multi_select', required: false,
+      options: [...SALES_CHANNELS] },
     { key: `competitor_${n}_categories`, label: 'Categorías', type: 'multi_select', required: false,
       options: COMPETITOR_CATEGORIES },
     { key: `competitor_${n}_price_min`, label: 'Precio mínimo', type: 'number', required: false, suffix: '€' },
@@ -83,19 +93,21 @@ function createCompetitorFields(n: number): OnboardingField[] {
     { key: `competitor_${n}_top_products`, label: 'Top ventas', type: 'text', required: false },
     { key: `competitor_${n}_actions`, label: 'Acciones', type: 'multi_select', required: false,
       options: ['ADS', 'Promos', '2x1', 'Descuento %', 'Envío gratis', 'Happy Hour', 'Producto gratis'] },
+    { key: `competitor_${n}_comments`, label: 'Comentarios', type: 'textarea', required: false },
   ];
 }
 
 function createPlatformProfileFields(prefix: string, platformName: string): OnboardingField[] {
   return [
-    { key: `${prefix}_category`, label: 'Categoría', type: 'text', required: false, placeholder: `Categoría en ${platformName}` },
+    { key: `${prefix}_status`, label: 'Estado', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Pendiente de cambio'] },
     { key: `${prefix}_logo`, label: 'Logo', type: 'select', required: false, options: ['Sí', 'No', 'N/A'] },
-    { key: `${prefix}_logo_quality`, label: 'Calidad del logo', type: 'select', required: false, options: ['Alta', 'Media', 'Baja'] },
-    { key: `${prefix}_description`, label: 'Descripción del perfil', type: 'select', required: false, options: ['Completa', 'Falta', 'N/A'] },
-    { key: `${prefix}_banner_quality`, label: 'Calidad del banner', type: 'select', required: false, options: ['Alta', 'Media', 'Baja', 'N/A'] },
-    { key: `${prefix}_product_photos`, label: 'Fotos de productos', type: 'select', required: false, options: ['Alta', 'Media', 'Baja', 'N/A'] },
-    { key: `${prefix}_prices`, label: 'Precios vs competencia', type: 'select', required: false, options: ['Similares competencia', 'Superior', 'Inferior'] },
+    { key: `${prefix}_logo_quality`, label: 'Calidad del logo', type: 'select', required: false, options: ['Alta', 'Media', 'Baja', 'Sin Logo'] },
+    { key: `${prefix}_description`, label: 'Descripción del perfil', type: 'select', required: false, options: ['Activa', 'Inactiva', 'Pendiente de cambio'] },
+    { key: `${prefix}_banner_quality`, label: 'Calidad del banner / Foto de portada', type: 'select', required: false, options: ['Profesional', 'Alta', 'Media', 'Pendiente de cambio'] },
+    { key: `${prefix}_product_photos`, label: 'Fotos de productos', type: 'select', required: false, options: ['Profesional', 'Alta', 'Media', 'Pendiente de cambio'] },
+    { key: `${prefix}_prices`, label: 'Precios vs competencia', type: 'select', required: false, options: ['Superiores', 'Inferiores', 'Similares'] },
     { key: `${prefix}_notes`, label: 'Observaciones', type: 'textarea', required: false, placeholder: `Observaciones sobre el perfil en ${platformName}` },
+    { key: `${prefix}_suggested_categories`, label: 'Categorías a incorporar', type: 'multi_select', required: false, options: COMPETITOR_CATEGORIES },
   ];
 }
 
@@ -141,7 +153,6 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
     title: 'Competencia',
     icon: Swords,
     fields: [
-      { key: 'competitors_map_url', label: 'Link Google Maps', type: 'text', required: false, placeholder: 'https://maps.google.com/...' },
       ...createCompetitorFields(1),
       ...createCompetitorFields(2),
       ...createCompetitorFields(3),
@@ -189,11 +200,14 @@ export const ONBOARDING_SECTIONS: OnboardingSection[] = [
     icon: Globe,
     fields: [
       { key: 'instagram', label: 'Instagram', type: 'text', required: false, placeholder: '@handle o N/A' },
+      { key: 'instagram_meta_ads', label: 'Meta ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
       { key: 'tiktok', label: 'TikTok', type: 'text', required: false, placeholder: '@handle o N/A' },
+      { key: 'tiktok_ads', label: 'TikTok ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
       { key: 'website', label: 'Página web', type: 'text', required: false, placeholder: 'URL o N/A' },
       { key: 'google_my_business', label: 'Google My Business', type: 'text', required: false, placeholder: 'URL o N/A' },
-      { key: 'ecommerce', label: 'E-commerce propio', type: 'select', required: false, options: ['Sí', 'No'] },
-      { key: 'loyalty_program', label: 'Programa de fidelización', type: 'select', required: false, options: ['Sí', 'No'] },
+      { key: 'google_ads_interest', label: 'Google ADS', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado en activarlo'] },
+      { key: 'ecommerce', label: 'Canal de venta propio', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado a futuro'] },
+      { key: 'loyalty_program', label: 'Programa de fidelización', type: 'select', required: false, options: ['Activo', 'Inactivo', 'Interesado a futuro'] },
     ],
   },
 
@@ -265,44 +279,46 @@ export function getOnboardingRequiredFields(): OnboardingField[] {
   );
 }
 
+// Field types that are virtual/container and should not count for completion
+const EXCLUDED_FIELD_TYPES: Set<OnboardingFieldType> = new Set([
+  'margin_calculator', 'competitor_card', 'contact_select',
+]);
+
+function isFieldFilled(fieldData: Record<string, unknown>, key: string): boolean {
+  const value = fieldData[key];
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'string' && value.trim() === '') return false;
+  if (Array.isArray(value) && value.length === 0) return false;
+  return true;
+}
+
 /**
- * Calculate completion percentage for the onboarding form
+ * Calculate completion percentage for the onboarding form.
+ * Counts ALL fillable fields (not just required ones).
  */
 export function calculateOnboardingCompletion(
   fieldData: Record<string, unknown>
 ): number {
-  const requiredFields = getOnboardingRequiredFields();
-  if (requiredFields.length === 0) return 100;
+  const allFields = ONBOARDING_SECTIONS.flatMap((s) =>
+    s.fields.filter((f) => !EXCLUDED_FIELD_TYPES.has(f.type))
+  );
+  if (allFields.length === 0) return 100;
 
-  const completedCount = requiredFields.filter((field) => {
-    const value = fieldData[field.key];
-    if (value === undefined || value === null) return false;
-    if (typeof value === 'string' && value.trim() === '') return false;
-    if (Array.isArray(value) && value.length === 0) return false;
-    return true;
-  }).length;
-
-  return Math.round((completedCount / requiredFields.length) * 100);
+  const filled = allFields.filter((f) => isFieldFilled(fieldData, f.key)).length;
+  return Math.round((filled / allFields.length) * 100);
 }
 
 /**
- * Get section completion stats
+ * Get section completion stats.
+ * Counts ALL fillable fields in the section.
  */
 export function getOnboardingSectionCompletion(
   section: OnboardingSection,
   fieldData: Record<string, unknown>
 ): { completed: number; total: number } {
-  const requiredFields = section.fields.filter((f) => f.required);
-  const total = requiredFields.length;
-
-  const completed = requiredFields.filter((field) => {
-    const value = fieldData[field.key];
-    if (value === undefined || value === null) return false;
-    if (typeof value === 'string' && value.trim() === '') return false;
-    if (Array.isArray(value) && value.length === 0) return false;
-    return true;
-  }).length;
-
+  const fields = section.fields.filter((f) => !EXCLUDED_FIELD_TYPES.has(f.type));
+  const total = fields.length;
+  const completed = fields.filter((f) => isFieldFilled(fieldData, f.key)).length;
   return { completed, total };
 }
 

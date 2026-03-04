@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Pencil, Check, X, Search, Plus } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { COMPETITOR_CATEGORIES, CATEGORY_EMOJIS } from '../../config/onboardingSchema';
+import { COMPETITOR_CATEGORIES, CATEGORY_EMOJIS, SALES_CHANNELS, CHANNEL_LOGOS } from '../../config/onboardingSchema';
 
 interface CompetitorCardFieldProps {
   fieldData: Record<string, unknown>;
@@ -29,7 +29,7 @@ export function CompetitorCardField({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   return (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {[1, 2, 3, 4, 5].map((n) => (
         <CompetitorCard
           key={n}
@@ -78,6 +78,8 @@ function CompetitorCard({
   const reviews = fieldData[`${prefix}_reviews`] as number | null | undefined;
   const topProducts = (fieldData[`${prefix}_top_products`] as string) || '';
   const actions = (fieldData[`${prefix}_actions`] as string[]) || [];
+  const comments = (fieldData[`${prefix}_comments`] as string) || '';
+  const channels = (fieldData[`${prefix}_channels`] as string[]) || [];
 
   const firstCategoryEmoji = categories.length > 0
     ? CATEGORY_EMOJIS[categories[0]] || '🏪'
@@ -119,6 +121,40 @@ function CompetitorCard({
                 : 'bg-white border-gray-200 text-gray-900'
             )}
           />
+        </div>
+
+        {/* Channels */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-gray-600">Canales de venta</label>
+          <div className="flex gap-2">
+            {SALES_CHANNELS.map((ch) => {
+              const isSelected = channels.includes(ch);
+              return (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return;
+                    const next = isSelected
+                      ? channels.filter((c) => c !== ch)
+                      : [...channels, ch];
+                    onFieldChange(`${prefix}_channels`, next);
+                  }}
+                  disabled={disabled}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all',
+                    isSelected
+                      ? 'bg-primary-50 border-primary-300 text-primary-700'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300',
+                    disabled && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <img src={CHANNEL_LOGOS[ch]} alt={ch} className="w-4 h-4 object-contain" />
+                  {ch}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Categories */}
@@ -220,25 +256,12 @@ function CompetitorCard({
           </div>
         </div>
 
-        {/* Top Products */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-gray-600">Top ventas</label>
-          <input
-            type="text"
-            value={topProducts}
-            onChange={(e) => onFieldChange(`${prefix}_top_products`, e.target.value)}
-            disabled={disabled}
-            placeholder="Smash Cookie (4.5€), Batido (6€)"
-            className={cn(
-              'w-full px-3 py-2 rounded-lg border text-sm transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
-              disabled
-                ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
-                : 'bg-white border-gray-200 text-gray-900'
-            )}
-          />
-          <p className="text-xs text-gray-400">Formato: Producto (precio), Producto (precio)</p>
-        </div>
+        {/* Top Products (tag input) */}
+        <TopProductsInput
+          value={topProducts}
+          onChange={(val) => onFieldChange(`${prefix}_top_products`, val)}
+          disabled={disabled}
+        />
 
         {/* Actions */}
         <div className="space-y-1.5">
@@ -272,6 +295,25 @@ function CompetitorCard({
             })}
           </div>
         </div>
+
+        {/* Comments */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-gray-600">Comentarios</label>
+          <textarea
+            value={comments}
+            onChange={(e) => onFieldChange(`${prefix}_comments`, e.target.value)}
+            disabled={disabled}
+            placeholder="Comentarios adicionales..."
+            rows={2}
+            className={cn(
+              'w-full px-3 py-2 rounded-lg border text-sm transition-colors resize-y',
+              'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
+              disabled
+                ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-white border-gray-200 text-gray-900'
+            )}
+          />
+        </div>
       </div>
     );
   }
@@ -282,11 +324,12 @@ function CompetitorCard({
 
   return (
     <div
+      onClick={!hasData && !disabled ? onEdit : undefined}
       className={cn(
         'rounded-xl border bg-white transition-all',
         hasData
           ? 'border-gray-200 shadow-sm'
-          : 'border-dashed border-gray-300'
+          : 'border-dashed border-gray-300 cursor-pointer hover:border-primary-300 hover:bg-primary-50/30'
       )}
     >
       <div className="p-4">
@@ -297,8 +340,22 @@ function CompetitorCard({
             <h4 className="text-sm font-semibold text-gray-900 truncate">
               {name || `Competidor ${index}`}
             </h4>
+            {/* Channel logos in header */}
+            {channels.length > 0 && (
+              <div className="flex items-center gap-1 ml-1">
+                {channels.map((ch) => (
+                  <img
+                    key={ch}
+                    src={CHANNEL_LOGOS[ch]}
+                    alt={ch}
+                    title={ch}
+                    className="w-4 h-4 object-contain"
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          {!disabled && (
+          {!disabled && hasData && (
             <button
               type="button"
               onClick={onEdit}
@@ -310,14 +367,9 @@ function CompetitorCard({
         </div>
 
         {!hasData ? (
-          <button
-            type="button"
-            onClick={disabled ? undefined : onEdit}
-            disabled={disabled}
-            className="w-full py-3 text-xs text-gray-400 hover:text-primary-600 transition-colors"
-          >
+          <p className="w-full py-3 text-xs text-gray-400 text-center">
             Click para añadir competidor
-          </button>
+          </p>
         ) : (
           <>
             {/* Categories as hashtags */}
@@ -395,6 +447,11 @@ function CompetitorCard({
                   </span>
                 ))}
               </div>
+            )}
+
+            {/* Comments */}
+            {comments && (
+              <p className="text-xs text-gray-500 italic mt-2">{comments}</p>
             )}
           </>
         )}
@@ -576,6 +633,102 @@ function CategoryMultiSelect({ value, onChange, disabled }: CategoryMultiSelectP
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================
+// TOP PRODUCTS TAG INPUT
+// ============================================
+
+interface TopProductsInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+function TopProductsInput({ value, onChange, disabled }: TopProductsInputProps) {
+  const [inputValue, setInputValue] = useState('');
+  const products = parseTopProducts(value);
+
+  const addProduct = useCallback(() => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    const updated = products.length > 0
+      ? [...products, trimmed].join(', ')
+      : trimmed;
+    onChange(updated);
+    setInputValue('');
+  }, [inputValue, products, onChange]);
+
+  const removeProduct = useCallback(
+    (idx: number) => {
+      if (disabled) return;
+      const updated = products.filter((_, i) => i !== idx).join(', ');
+      onChange(updated);
+    },
+    [products, onChange, disabled]
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-gray-600">Top ventas</label>
+      {products.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {products.map((product, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-700"
+            >
+              {product}
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => removeProduct(i)}
+                  className="ml-0.5 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      {!disabled && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addProduct();
+              }
+            }}
+            placeholder="Smash Cookie (4.5€)..."
+            className={cn(
+              'flex-1 px-3 py-2 rounded-lg border text-sm transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400',
+              'bg-white border-gray-200 text-gray-900'
+            )}
+          />
+          <button
+            type="button"
+            onClick={addProduct}
+            disabled={!inputValue.trim()}
+            className={cn(
+              'px-2.5 py-2 rounded-lg text-xs font-medium transition-colors',
+              inputValue.trim()
+                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+      <p className="text-xs text-gray-400">Pulsa Enter para añadir cada producto</p>
     </div>
   );
 }
