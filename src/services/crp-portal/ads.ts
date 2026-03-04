@@ -12,6 +12,7 @@ import type { ChannelId } from '@/types';
 import { PORTAL_IDS } from './types';
 import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
+import { withRpcLimit } from './rpcLimiter';
 
 /** Max companies per RPC call to avoid PostgreSQL statement timeouts */
 const RPC_BATCH_SIZE = 5;
@@ -106,14 +107,16 @@ async function fetchAdsTimeseriesSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_ads_daily_timeseries', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_ads_daily_timeseries', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchAdsTimeseries', error);
@@ -186,14 +189,16 @@ async function fetchAdsHourlyDistributionSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_ads_hourly_distribution', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_ads_hourly_distribution', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchAdsHourlyDistribution', error);
@@ -266,14 +271,16 @@ async function fetchAdsWeeklyHeatmapSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_ads_weekly_heatmap', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_ads_weekly_heatmap', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchAdsWeeklyHeatmap', error);

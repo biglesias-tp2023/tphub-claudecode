@@ -18,6 +18,7 @@ import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
+import { withRpcLimit } from './rpcLimiter';
 
 /** Max companies per RPC call to avoid PostgreSQL statement timeouts */
 const RPC_BATCH_SIZE = 5;
@@ -187,14 +188,16 @@ async function fetchCrpReviewsAggregatedSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_reviews_aggregation', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_reviews_aggregation', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchCrpReviewsAggregated', error);
@@ -413,14 +416,16 @@ async function fetchCrpReviewsHeatmapSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_reviews_heatmap', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_reviews_heatmap', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchCrpReviewsHeatmap', error);
@@ -480,11 +485,9 @@ export async function fetchCrpReviewsComparison(
   previous: ReviewsAggregation;
   changes: ReviewsChanges;
 }> {
-  // Parallel: current and previous query disjoint date ranges
-  const [current, previous] = await Promise.all([
-    fetchCrpReviewsAggregated(currentParams),
-    fetchCrpReviewsAggregated(previousParams),
-  ]);
+  // Sequential: the global RPC limiter controls concurrency across all hooks.
+  const current = await fetchCrpReviewsAggregated(currentParams);
+  const previous = await fetchCrpReviewsAggregated(previousParams);
 
   const calcChange = (curr: number, prev: number): number =>
     prev > 0 ? ((curr - prev) / prev) * 100 : 0;
@@ -569,15 +572,17 @@ async function fetchCrpReviewsRawSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_reviews_raw', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-    p_limit: limit,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_reviews_raw', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+      p_limit: limit,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchCrpReviewsRaw', error);

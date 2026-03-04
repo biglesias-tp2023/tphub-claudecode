@@ -31,6 +31,7 @@ import { PORTAL_IDS } from './types';
 import type { ChannelId } from '@/types';
 import { handleCrpError } from './errors';
 import { chunkedArray } from './utils';
+import { withRpcLimit } from './rpcLimiter';
 
 /** Max companies per RPC call to avoid PostgreSQL statement timeouts */
 const RPC_BATCH_SIZE = 5;
@@ -341,14 +342,16 @@ async function fetchCrpOrdersAggregatedSingle(
     portalIdsToFilter = channelIds.flatMap(channelIdToPortalIds);
   }
 
-  const { data, error } = await supabase.rpc('get_orders_aggregation', {
-    p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
-    p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
-    p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
-    p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
-    p_start_date: `${startDate}T00:00:00`,
-    p_end_date: `${endDate}T23:59:59`,
-  });
+  const { data, error } = await withRpcLimit(() =>
+    supabase.rpc('get_orders_aggregation', {
+      p_company_ids: companyIds && companyIds.length > 0 ? companyIds : null,
+      p_brand_ids: brandIds && brandIds.length > 0 ? brandIds : null,
+      p_address_ids: addressIds && addressIds.length > 0 ? addressIds : null,
+      p_channel_portal_ids: portalIdsToFilter && portalIdsToFilter.length > 0 ? portalIdsToFilter : null,
+      p_start_date: `${startDate}T00:00:00`,
+      p_end_date: `${endDate}T23:59:59`,
+    })
+  );
 
   if (error) {
     handleCrpError('fetchCrpOrdersAggregated', error);
@@ -616,12 +619,10 @@ export async function fetchCrpOrdersComparison(
   previous: OrdersAggregation;
   changes: OrdersChanges;
 }> {
-  // Parallel: current and previous query disjoint date ranges so they don't
-  // compete for the same rows. Each already batches internally (sequential).
-  const [current, previous] = await Promise.all([
-    fetchCrpOrdersAggregated(currentParams),
-    fetchCrpOrdersAggregated(previousParams),
-  ]);
+  // Sequential: the global RPC limiter controls concurrency across all hooks.
+  // Running these sequentially here avoids doubling the queued work.
+  const current = await fetchCrpOrdersAggregated(currentParams);
+  const previous = await fetchCrpOrdersAggregated(previousParams);
 
   // Helper function to calculate percentage change
   const calcChange = (curr: number, prev: number): number =>
@@ -736,11 +737,13 @@ export async function fetchControllingMetricsRPC(
 ): Promise<ControllingMetricsRow[]> {
   // Small request → single call
   if (companyIds.length <= RPC_BATCH_SIZE) {
-    const { data, error } = await supabase.rpc('get_controlling_metrics', {
-      p_company_ids: companyIds,
-      p_start_date: `${startDate}T00:00:00`,
-      p_end_date: `${endDate}T23:59:59`,
-    });
+    const { data, error } = await withRpcLimit(() =>
+      supabase.rpc('get_controlling_metrics', {
+        p_company_ids: companyIds,
+        p_start_date: `${startDate}T00:00:00`,
+        p_end_date: `${endDate}T23:59:59`,
+      })
+    );
 
     if (error) {
       throw error;
@@ -754,11 +757,13 @@ export async function fetchControllingMetricsRPC(
   const chunks = chunkedArray(companyIds, RPC_BATCH_SIZE);
   const batchResults: ControllingMetricsRow[][] = [];
   for (const chunk of chunks) {
-    const { data, error } = await supabase.rpc('get_controlling_metrics', {
-      p_company_ids: chunk,
-      p_start_date: `${startDate}T00:00:00`,
-      p_end_date: `${endDate}T23:59:59`,
-    });
+    const { data, error } = await withRpcLimit(() =>
+      supabase.rpc('get_controlling_metrics', {
+        p_company_ids: chunk,
+        p_start_date: `${startDate}T00:00:00`,
+        p_end_date: `${endDate}T23:59:59`,
+      })
+    );
 
     if (error) {
       throw error;

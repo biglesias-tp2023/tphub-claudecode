@@ -210,15 +210,11 @@ export function useWeeklyRevenue() {
         }
       }
 
-      // Fetch weeks with bounded parallelism (2 at a time) to reduce wall-clock
-      // time while avoiding too many concurrent RPC calls to the database
+      // Fetch weeks sequentially — the global RPC limiter (rpcLimiter.ts)
+      // controls concurrency across all hooks, so no need for local parallelism.
       const weeklyResults: ControllingMetricsRow[][] = [];
-      for (let i = 0; i < weeks.length; i += 2) {
-        const batch = weeks.slice(i, i + 2);
-        const results = await Promise.all(
-          batch.map(week => fetchControllingMetricsRPC(companyIds, week.start, week.end))
-        );
-        weeklyResults.push(...results);
+      for (const week of weeks) {
+        weeklyResults.push(await fetchControllingMetricsRPC(companyIds, week.start, week.end));
       }
 
       // Aggregate each week's data (revenue-only for sparklines)
