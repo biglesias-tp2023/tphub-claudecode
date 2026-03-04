@@ -294,7 +294,7 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
   const fetchCrpCompanyById = async (companyId: string): Promise<Company | null> => {
     const { data } = await supabase
       .from('crp_portal__dt_company')
-      .select('pk_id_company, des_company, des_key_account_manager, pct_commission_glovo, pct_commission_uber_eats, flg_deleted')
+      .select('pk_id_company, des_company_name, des_key_account_manager, pct_commission_glovo, pct_commission_uber_eats, flg_deleted')
       .eq('pk_id_company', Number(companyId))
       .order('pk_ts_month', { ascending: false })
       .limit(1);
@@ -303,7 +303,7 @@ export async function fetchAuditWithDetailsById(id: string): Promise<AuditWithDe
     if (mostRecent.flg_deleted !== 0) return null;
     return {
       id: String(mostRecent.pk_id_company),
-      name: mostRecent.des_company,
+      name: mostRecent.des_company_name,
       keyAccountManager: mostRecent.des_key_account_manager,
       commissionGlovo: mostRecent.pct_commission_glovo ?? null,
       commissionUbereats: mostRecent.pct_commission_uber_eats ?? null,
