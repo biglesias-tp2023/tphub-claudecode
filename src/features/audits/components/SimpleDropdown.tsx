@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -25,6 +26,20 @@ export function SimpleDropdown<T>({
 }: SimpleDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, [isOpen]);
 
   const filteredOptions = useMemo(() => {
     if (!search) return options;
@@ -39,6 +54,7 @@ export function SimpleDropdown<T>({
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
@@ -60,10 +76,13 @@ export function SimpleDropdown<T>({
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-50 w-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-64 overflow-hidden">
+          <div className="fixed inset-0 z-[60]" onClick={() => setIsOpen(false)} />
+          <div
+            style={dropdownStyle}
+            className="z-[61] bg-white rounded-lg border border-gray-200 shadow-lg max-h-64 overflow-hidden"
+          >
             {options.length > 5 && (
               <div className="p-2 border-b border-gray-100">
                 <input
@@ -109,7 +128,8 @@ export function SimpleDropdown<T>({
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
