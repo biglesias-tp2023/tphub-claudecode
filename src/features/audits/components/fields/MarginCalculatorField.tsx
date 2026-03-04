@@ -22,19 +22,29 @@ export function MarginCalculatorField({
     ? Math.round(companyCommissions.ubereats * 100)
     : null;
 
-  const feeJusteat = (fieldData.commission_justeat as number) ?? 30;
+  const feeJusteat = (fieldData.commission_justeat as number) ?? 0;
   const investmentAds = (fieldData.investment_ads as number) ?? 0;
   const investmentPromos = (fieldData.investment_promos as number) ?? 0;
 
-  const margin = useMemo(() => {
-    const sum =
-      (feeGlovo ?? 0) +
-      (feeUbereats ?? 0) +
-      feeJusteat +
-      investmentAds +
-      investmentPromos;
-    return 100 - sum;
-  }, [feeGlovo, feeUbereats, feeJusteat, investmentAds, investmentPromos]);
+  const activeFees = useMemo(
+    () =>
+      [
+        { name: 'Glovo', value: feeGlovo },
+        { name: 'UberEats', value: feeUbereats },
+        { name: 'JustEat', value: feeJusteat },
+      ].filter((f) => f.value != null && f.value > 0),
+    [feeGlovo, feeUbereats, feeJusteat]
+  );
+
+  const avgFee =
+    activeFees.length > 0
+      ? activeFees.reduce((a, b) => a + b.value!, 0) / activeFees.length
+      : 0;
+
+  const margin = useMemo(
+    () => Math.round((100 - avgFee - investmentAds - investmentPromos) * 100) / 100,
+    [avgFee, investmentAds, investmentPromos]
+  );
 
   const marginColor =
     margin >= 20
@@ -95,6 +105,13 @@ export function MarginCalculatorField({
           </span>
         </div>
       </div>
+
+      <p className="text-xs text-gray-500 mt-1">
+        {'ℹ️ '}
+        {activeFees.length > 0
+          ? `Comisión media de ${activeFees.length} plataforma${activeFees.length > 1 ? 's' : ''} activa${activeFees.length > 1 ? 's' : ''} (${activeFees.map((f) => `${f.name} ${f.value}%`).join(', ')}) = ${Math.round(avgFee * 100) / 100}%`
+          : 'Sin plataformas activas'}
+      </p>
     </div>
   );
 }
