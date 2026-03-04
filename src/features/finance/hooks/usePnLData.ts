@@ -264,11 +264,11 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       const adsPromos = agg.promos;
       const adsVisibility = adsByPeriod.get(period) || 0;
       const commissions = agg.commissionsWeighted;
-      const platformPayout = gmv - refunds - adsPromos - adsVisibility - commissions;
+      const ivaAdsCommissions = (adsVisibility + commissions) * 0.21;
+      const platformPayout = gmv - refunds - adsPromos - adsVisibility - commissions - ivaAdsCommissions;
       const cogs = gmv * (foodCostPct / 100);
-      const netRevenue = gmv - refunds - adsPromos - adsVisibility - commissions - cogs;
-      const grossProfit = gmv - commissions - cogs;
-      const netMargin = gmv > 0 ? (netRevenue / gmv) * 100 : 0;
+      const grossProfit = platformPayout - cogs;
+      const netMargin = gmv > 0 ? (grossProfit / gmv) * 100 : 0;
 
       // Previous period values for % change
       const prevGmv = prevAgg?.gmv ?? 0;
@@ -276,11 +276,11 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
       const prevAdsPromos = prevAgg?.promos ?? 0;
       const prevAdsVisibility = prevPeriod ? (adsByPeriod.get(prevPeriod) || 0) : 0;
       const prevCommissions = prevAgg?.commissionsWeighted ?? 0;
-      const prevPlatformPayout = prevGmv - prevRefunds - prevAdsPromos - prevAdsVisibility - prevCommissions;
+      const prevIvaAdsCommissions = (prevAdsVisibility + prevCommissions) * 0.21;
+      const prevPlatformPayout = prevGmv - prevRefunds - prevAdsPromos - prevAdsVisibility - prevCommissions - prevIvaAdsCommissions;
       const prevCogs = prevGmv * (foodCostPct / 100);
-      const prevNetRevenue = prevGmv - prevRefunds - prevAdsPromos - prevAdsVisibility - prevCommissions - prevCogs;
-      const prevGrossProfit = prevGmv - prevCommissions - prevCogs;
-      const prevNetMargin = prevGmv > 0 ? (prevNetRevenue / prevGmv) * 100 : 0;
+      const prevGrossProfit = prevPlatformPayout - prevCogs;
+      const prevNetMargin = prevGmv > 0 ? (prevGrossProfit / prevGmv) * 100 : 0;
 
       const buildCell = (value: number, prev: number, isPercentage: boolean): PnLCellData => ({
         value,
@@ -294,9 +294,9 @@ export function usePnLData({ granularity, channelTab, foodCostPct }: UsePnLDataP
         ads_promos: buildCell(adsPromos, prevAdsPromos, false),
         ads_visibility: buildCell(adsVisibility, prevAdsVisibility, false),
         commissions: buildCell(commissions, prevCommissions, false),
+        iva_ads_commissions: buildCell(ivaAdsCommissions, prevIvaAdsCommissions, false),
         platform_payout: buildCell(platformPayout, prevPlatformPayout, false),
         cogs: buildCell(cogs, prevCogs, false),
-        net_revenue: buildCell(netRevenue, prevNetRevenue, false),
         gross_profit: buildCell(grossProfit, prevGrossProfit, false),
         net_margin: {
           value: netMargin,

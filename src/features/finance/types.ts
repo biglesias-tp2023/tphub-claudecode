@@ -19,9 +19,9 @@ export type PnLLineId =
   | 'ads_promos'
   | 'ads_visibility'
   | 'commissions'
+  | 'iva_ads_commissions'
   | 'platform_payout'
   | 'cogs'
-  | 'net_revenue'
   | 'gross_profit'
   | 'net_margin';
 
@@ -44,10 +44,10 @@ export const PNL_LINES: PnLLineConfig[] = [
   { id: 'ads_promos', label: 'Dto. en Promociones', section: 'costes', isSubtraction: true, isPercentage: false },
   { id: 'ads_visibility', label: 'Publicidad/Visibilidad', section: 'costes', isSubtraction: true, isPercentage: false },
   { id: 'commissions', label: 'Comisiones APP', section: 'costes', isSubtraction: true, isPercentage: false },
+  { id: 'iva_ads_commissions', label: 'IVA s/ Publicidad y Comisiones (21%)', section: 'costes', isSubtraction: true, isPercentage: false },
   // RESULTADO
   { id: 'platform_payout', label: 'Total a ingresar', section: 'resultado', isSubtraction: false, isPercentage: false, disclaimer: 'Cálculo aproximado. El ingreso real puede variar según ajustes de la plataforma.' },
   { id: 'cogs', label: 'Coste producto (COGS)', section: 'resultado', isSubtraction: true, isPercentage: false },
-  { id: 'net_revenue', label: 'Ventas netas', section: 'resultado', isSubtraction: false, isPercentage: false },
   { id: 'gross_profit', label: 'Beneficio bruto', section: 'resultado', isSubtraction: false, isPercentage: false },
   { id: 'net_margin', label: 'Margen neto %', section: 'resultado', isSubtraction: false, isPercentage: true },
 ];

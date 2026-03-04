@@ -10,8 +10,9 @@ interface PnLChartProps {
 
 // Stacked layers: bottom → top. They sum up to GMV.
 const SERIES_CONFIG: (StackedAreaSeriesConfig & { label: string })[] = [
-  { key: 'net_revenue', name: 'Ventas netas', label: 'Ventas netas', color: '#095789', gradientOpacity: [0.8, 0.4] },
+  { key: 'platform_payout', name: 'Total a ingresar', label: 'Total a ingresar', color: '#095789', gradientOpacity: [0.8, 0.4] },
   { key: 'cogs', name: 'COGS', label: 'Coste producto', color: '#6bb8e0', gradientOpacity: [0.7, 0.3] },
+  { key: 'iva_ads_commissions', name: 'IVA 21%', label: 'IVA Pub.+Com.', color: '#b0b0b0', gradientOpacity: [0.5, 0.2] },
   { key: 'commissions', name: 'Comisiones APP', label: 'Comisiones APP', color: '#9dd0eb', gradientOpacity: [0.6, 0.25] },
   { key: 'ads_promos', name: 'Dto. Promociones', label: 'Dto. Promociones', color: '#ffa166', gradientOpacity: [0.7, 0.3] },
   { key: 'ads_visibility', name: 'Publicidad', label: 'Publicidad', color: '#ffc89e', gradientOpacity: [0.6, 0.25] },
@@ -24,12 +25,13 @@ export const PnLChart = memo(function PnLChart({ data }: PnLChartProps) {
 
     return data.periods.map((period, i) => {
       const pd = data.byPeriod[period];
-      if (!pd) return { label: data.periodLabels[i], net_revenue: 0, cogs: 0, commissions: 0, ads_promos: 0, ads_visibility: 0, refunds: 0 };
+      if (!pd) return { label: data.periodLabels[i], platform_payout: 0, cogs: 0, iva_ads_commissions: 0, commissions: 0, ads_promos: 0, ads_visibility: 0, refunds: 0 };
 
       return {
         label: data.periodLabels[i],
-        net_revenue: Math.max(0, pd.net_revenue.value),
+        platform_payout: Math.max(0, pd.platform_payout.value),
         cogs: Math.abs(pd.cogs.value),
+        iva_ads_commissions: Math.abs(pd.iva_ads_commissions.value),
         commissions: Math.abs(pd.commissions.value),
         ads_promos: Math.abs(pd.ads_promos.value),
         ads_visibility: Math.abs(pd.ads_visibility.value),
