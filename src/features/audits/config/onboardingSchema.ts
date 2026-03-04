@@ -19,7 +19,8 @@ export type OnboardingFieldType =
   | 'number'
   | 'checkbox'
   | 'contact_select'
-  | 'margin_calculator';
+  | 'margin_calculator'
+  | 'competitor_card';
 
 export interface OnboardingField {
   key: string;
@@ -39,17 +40,49 @@ export interface OnboardingSection {
 }
 
 // ============================================
+// COMPETITOR CATEGORIES & EMOJIS
+// ============================================
+
+export const COMPETITOR_CATEGORIES: string[] = [
+  'Hamburguesa', 'Americana', 'Snacks', 'Desayuno', 'Saludable', 'Pollo',
+  'Mediterránea', 'Asiática', 'Pizza', 'Japonesa', 'Mexicana', 'Dulces',
+  'Vegetariana', 'Poke', 'Bocadillos', 'Latina', 'Sushi', 'Alta Cocina',
+  'Italiana', 'Panadería', 'Internacional', 'Árabe', 'Española', 'Kebab',
+  'Tailandesa', 'Vegana', 'Milanesa', 'Peruana', 'Venezolana', 'Sin gluten',
+  'Té y café', 'Bebidas', 'India', 'Helado', 'Grill', 'Griega',
+  'Comida local', 'Alcohol', 'China', 'Vino', 'Marisco',
+];
+
+export const CATEGORY_EMOJIS: Record<string, string> = {
+  'Hamburguesa': '🍔', 'Americana': '🌭', 'Snacks': '🍿', 'Desayuno': '🥐',
+  'Saludable': '🥗', 'Pollo': '🍗', 'Mediterránea': '🫒', 'Asiática': '🍜',
+  'Pizza': '🍕', 'Japonesa': '🍣', 'Mexicana': '🌮', 'Dulces': '🍪',
+  'Vegetariana': '🥦', 'Poke': '🥙', 'Bocadillos': '🥖', 'Latina': '🫔',
+  'Sushi': '🍱', 'Alta Cocina': '👨‍🍳', 'Italiana': '🍝', 'Panadería': '🥐',
+  'Internacional': '🌍', 'Árabe': '🧆', 'Española': '🥘', 'Kebab': '🥙',
+  'Tailandesa': '🍛', 'Vegana': '🌱', 'Milanesa': '🥩', 'Peruana': '🐟',
+  'Venezolana': '🫓', 'Sin gluten': '🌾', 'Té y café': '☕', 'Bebidas': '🥤',
+  'India': '🍛', 'Helado': '🍦', 'Grill': '🔥', 'Griega': '🫒',
+  'Comida local': '🏠', 'Alcohol': '🍷', 'China': '🥡', 'Vino': '🍷',
+  'Marisco': '🦐',
+};
+
+// ============================================
 // HELPERS FOR REPETITIVE BLOCKS
 // ============================================
 
 function createCompetitorFields(n: number): OnboardingField[] {
   return [
-    { key: `competitor_${n}_name`, label: `Competidor ${n} - Nombre`, type: 'text', required: false, placeholder: 'Nombre del competidor' },
-    { key: `competitor_${n}_actions`, label: `Competidor ${n} - Acciones`, type: 'multi_select', required: false, options: ['ADS', 'Promos', '2x1', 'Descuento %', 'Envío gratis', 'Happy Hour', 'Producto gratis'] },
-    { key: `competitor_${n}_price_range`, label: `Competidor ${n} - Rango de precios`, type: 'text', required: false, placeholder: 'Ej: 8€ - 15€' },
-    { key: `competitor_${n}_category`, label: `Competidor ${n} - Categoría`, type: 'text', required: false, placeholder: 'Ej: Hamburguesas, Sushi...' },
-    { key: `competitor_${n}_reviews`, label: `Competidor ${n} - Nº reviews`, type: 'number', required: false, placeholder: 'Número de reseñas' },
-    { key: `competitor_${n}_top_product`, label: `Competidor ${n} - Top ventas`, type: 'text', required: false, placeholder: 'Producto más vendido' },
+    { key: `competitor_${n}_name`, label: 'Nombre', type: 'text', required: false },
+    { key: `competitor_${n}_categories`, label: 'Categorías', type: 'multi_select', required: false,
+      options: COMPETITOR_CATEGORIES },
+    { key: `competitor_${n}_price_min`, label: 'Precio mínimo', type: 'number', required: false, suffix: '€' },
+    { key: `competitor_${n}_price_max`, label: 'Precio máximo', type: 'number', required: false, suffix: '€' },
+    { key: `competitor_${n}_rating`, label: 'Valoración', type: 'number', required: false },
+    { key: `competitor_${n}_reviews`, label: 'Nº reseñas', type: 'number', required: false },
+    { key: `competitor_${n}_top_products`, label: 'Top ventas', type: 'text', required: false },
+    { key: `competitor_${n}_actions`, label: 'Acciones', type: 'multi_select', required: false,
+      options: ['ADS', 'Promos', '2x1', 'Descuento %', 'Envío gratis', 'Happy Hour', 'Producto gratis'] },
   ];
 }
 

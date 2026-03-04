@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { ContactSelectField } from './fields/ContactSelectField';
 import { MarginCalculatorField } from './fields/MarginCalculatorField';
+import { CompetitorCardField } from './fields/CompetitorCardField';
 import {
   ONBOARDING_SECTIONS,
   calculateOnboardingCompletion,
@@ -177,7 +178,30 @@ function SectionCard({
       {/* Section content */}
       {expanded && (
         <div className="border-t border-gray-100 p-4 space-y-5">
-          {section.fields.map((field) =>
+          {section.id === 'competition' ? (
+            <>
+              {/* Google Maps link field */}
+              {section.fields
+                .filter((f) => f.key === 'competitors_map_url')
+                .map((field) => (
+                  <FieldRenderer
+                    key={field.key}
+                    field={field}
+                    value={fieldData[field.key]}
+                    onChange={(value) => onFieldChange(field.key, value)}
+                    disabled={disabled}
+                    companyId={companyId}
+                  />
+                ))}
+              {/* Competitor cards */}
+              <CompetitorCardField
+                fieldData={fieldData}
+                onFieldChange={onFieldChange}
+                disabled={disabled}
+              />
+            </>
+          ) : (
+            section.fields.map((field) =>
               field.type === 'margin_calculator' ? (
                 <MarginCalculatorField
                   key={field.key}
@@ -196,6 +220,7 @@ function SectionCard({
                   companyId={companyId}
                 />
               )
+            )
           )}
         </div>
       )}
