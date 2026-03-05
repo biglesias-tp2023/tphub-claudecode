@@ -2,12 +2,14 @@ import { useSessionState } from '@/hooks/useSessionState';
 import { DashboardFilters } from '@/features/dashboard';
 import { DeliveryMarginCalc } from './DeliveryMarginCalc';
 import { PhotoSessionCalc } from './PhotoSessionCalc';
+import { DistributionCalc } from './DistributionCalc';
 
-type TabId = 'delivery' | 'photo';
+type TabId = 'delivery' | 'photo' | 'distrib';
 
 const tabs: { id: TabId; label: string }[] = [
   { id: 'delivery', label: 'Márgenes Delivery' },
   { id: 'photo', label: 'Sesión de Fotos' },
+  { id: 'distrib', label: 'Reparto' },
 ];
 
 export function CalculatorPage() {
@@ -48,6 +50,7 @@ export function CalculatorPage() {
       {/* Tab content */}
       {activeTab === 'delivery' && <DeliveryMarginCalc />}
       {activeTab === 'photo' && <PhotoSessionCalc />}
+      {activeTab === 'distrib' && <DistributionCalc />}
     </div>
   );
 }
