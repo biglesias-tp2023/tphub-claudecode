@@ -9,6 +9,7 @@ import { escapeHtml } from './auth.js';
 
 interface SendEmailParams {
   to: string;
+  cc?: string;
   subject: string;
   html: string;
 }
@@ -16,7 +17,7 @@ interface SendEmailParams {
 /**
  * Send an email via Resend API
  */
-export async function sendEmail({ to, subject, html }: SendEmailParams): Promise<boolean> {
+export async function sendEmail({ to, cc, subject, html }: SendEmailParams): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.log('[email] RESEND_API_KEY not configured, skipping email');
@@ -24,18 +25,21 @@ export async function sendEmail({ to, subject, html }: SendEmailParams): Promise
   }
 
   try {
+    const payload: Record<string, unknown> = {
+      from: 'TPHub Alertas <alertas@thinkpaladar.com>',
+      to,
+      subject,
+      html,
+    };
+    if (cc) payload.cc = cc;
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        from: 'TPHub Alertas <alertas@thinkpaladar.com>',
-        to,
-        subject,
-        html,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

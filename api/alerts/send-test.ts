@@ -18,9 +18,9 @@ function getYesterday(): Date {
 
 function getYesterdayLabel(): string {
   const d = getYesterday();
-  const days = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}, ${d.getFullYear()}`;
 }
 
 function getYesterdayLong(): string {
@@ -81,19 +81,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const TPHUB_URL = 'https://hub.thinkpaladar.com/controlling';
     const fallbackText = `Alerta de prueba — ${dateLabel}`;
     const blocks = [
-      { type: 'header', text: { type: 'plain_text', text: `\uD83E\uDDEA Alerta de prueba — ${dateLabel}`, emoji: true } },
+      { type: 'header', text: { type: 'plain_text', text: `\uD83E\uDDEA Alerta de prueba del ${dateLabel}`, emoji: true } },
       { type: 'section', text: { type: 'mrkdwn', text: `Buenos días, *${firstName}* :wave:\n\nEste es un mensaje de prueba enviado desde TPHub.\nSi ves este mensaje, tu integración de Slack está funcionando correctamente.` } },
       { type: 'divider' },
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: `*Il Capriccio Napoletano* · Glovo\n:chart_with_downwards_trend: 12 pedidos (media 35) → *-66%*` },
-        accessory: { type: 'button', text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true }, url: TPHUB_URL },
+        text: { type: 'mrkdwn', text: `*Il Capriccio Napoletano*  —  <${TPHUB_URL}|Ver en TPHub>\n:chart_with_downwards_trend: Glovo: 12 (media 35) → *-66%*\n:star: Glovo: 2.8 vs 4.2 · 3 negativas` },
       },
       { type: 'divider' },
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: `*Compa* · UberEats\n:star: 3.2 vs 4.1 · 5 negativas` },
-        accessory: { type: 'button', text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true }, url: TPHUB_URL },
+        text: { type: 'mrkdwn', text: `*Compa*  —  <${TPHUB_URL}|Ver en TPHub>\n:chart_with_downwards_trend: UberEats: 8 (media 22) → *-64%*\n:star: UberEats: 3.2 vs 4.1 · 5 negativas` },
       },
       { type: 'divider' },
       { type: 'context', elements: [{ type: 'mrkdwn', text: '_Mensaje de prueba desde TPHub Alertas_' }] },

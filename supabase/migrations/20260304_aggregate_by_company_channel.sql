@@ -42,12 +42,12 @@ AS $$
   active_companies AS (
     SELECT * FROM (
       SELECT DISTINCT ON (pk_id_company)
-        pk_id_company, des_company_name, des_key_account_manager
+        pk_id_company, des_company_name, des_key_account_manager, des_status
       FROM crp_portal__dt_company
       WHERE COALESCE(flg_deleted, 0) != 1
-        AND des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
       ORDER BY pk_id_company, pk_ts_month DESC
     ) deduped
+    WHERE des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
   ),
   yesterday_date AS (
     SELECT ((NOW() AT TIME ZONE 'Europe/Madrid')::date - 1) AS d
@@ -195,12 +195,12 @@ AS $$
   active_companies AS (
     SELECT * FROM (
       SELECT DISTINCT ON (pk_id_company)
-        pk_id_company, des_company_name, des_key_account_manager
+        pk_id_company, des_company_name, des_key_account_manager, des_status
       FROM crp_portal__dt_company
       WHERE COALESCE(flg_deleted, 0) != 1
-        AND des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
       ORDER BY pk_id_company, pk_ts_month DESC
     ) deduped
+    WHERE des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
   ),
   yesterday_date AS (
     SELECT ((NOW() AT TIME ZONE 'Europe/Madrid')::date - 1) AS d
@@ -363,12 +363,12 @@ AS $$
   active_companies AS (
     SELECT * FROM (
       SELECT DISTINCT ON (pk_id_company)
-        pk_id_company, des_company_name, des_key_account_manager
+        pk_id_company, des_company_name, des_key_account_manager, des_status
       FROM crp_portal__dt_company
       WHERE COALESCE(flg_deleted, 0) != 1
-        AND des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
       ORDER BY pk_id_company, pk_ts_month DESC
     ) deduped
+    WHERE des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
   ),
   yesterday_date AS (
     SELECT ((NOW() AT TIME ZONE 'Europe/Madrid')::date - 1) AS d
@@ -535,12 +535,12 @@ AS $$
   active_companies AS (
     SELECT * FROM (
       SELECT DISTINCT ON (pk_id_company)
-        pk_id_company, des_company_name, des_key_account_manager
+        pk_id_company, des_company_name, des_key_account_manager, des_status
       FROM crp_portal__dt_company
       WHERE COALESCE(flg_deleted, 0) != 1
-        AND des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
       ORDER BY pk_id_company, pk_ts_month DESC
     ) deduped
+    WHERE des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
   ),
   yesterday_date AS (
     SELECT ((NOW() AT TIME ZONE 'Europe/Madrid')::date - 1) AS d
@@ -699,12 +699,12 @@ AS $$
   active_companies AS (
     SELECT * FROM (
       SELECT DISTINCT ON (pk_id_company)
-        pk_id_company, des_company_name, des_key_account_manager
+        pk_id_company, des_company_name, des_key_account_manager, des_status
       FROM crp_portal__dt_company
       WHERE COALESCE(flg_deleted, 0) != 1
-        AND des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
       ORDER BY pk_id_company, pk_ts_month DESC
     ) deduped
+    WHERE des_status IN ('Onboarding', 'Cliente Activo', 'Stand By', 'PiP')
   ),
   yesterday_date AS (
     SELECT ((NOW() AT TIME ZONE 'Europe/Madrid')::date - 1) AS d

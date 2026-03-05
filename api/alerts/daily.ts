@@ -138,12 +138,15 @@ interface SlackBlock {
   type: string;
   text?: { type: string; text: string; emoji?: boolean };
   elements?: Array<{ type: string; text?: string | { type: string; text: string; emoji?: boolean }; url?: string }>;
-  accessory?: { type: string; text: { type: string; text: string; emoji?: boolean }; url: string };
+  accessory?: { type: string; text: { type: string; text: string; emoji?: boolean }; url: string; style?: string };
 }
 
 const TPHUB_URL = 'https://hub.thinkpaladar.com/controlling';
 
-async function sendSlack(text: string, blocks?: SlackBlock[]): Promise<void> {
+/** Max blocks per Slack message (Slack limit is 50) */
+const SLACK_MAX_BLOCKS = 48;
+
+async function sendSlackRaw(text: string, blocks?: SlackBlock[]): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) {
     console.error('SLACK_WEBHOOK_URL not configured');
@@ -155,13 +158,30 @@ async function sendSlack(text: string, blocks?: SlackBlock[]): Promise<void> {
     icon_url: 'https://hub.thinkpaladar.com/images/logo/logo.png',
   };
   if (blocks) payload.blocks = blocks;
+  const body = JSON.stringify(payload);
+  console.log(`[slack] Sending message: ${body.length} bytes, ${blocks?.length ?? 0} blocks`);
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body,
   });
   if (!response.ok) {
-    console.error(`Slack webhook failed: ${response.status} ${response.statusText}`);
+    const respBody = await response.text().catch(() => '');
+    console.error(`Slack webhook failed: ${response.status} ${response.statusText} — ${respBody}`);
+  }
+}
+
+/** Send to Slack, splitting into multiple messages if blocks exceed limit */
+async function sendSlack(text: string, blocks?: SlackBlock[]): Promise<void> {
+  if (!blocks || blocks.length <= SLACK_MAX_BLOCKS) {
+    return sendSlackRaw(text, blocks);
+  }
+
+  // Split blocks into chunks of SLACK_MAX_BLOCKS
+  for (let i = 0; i < blocks.length; i += SLACK_MAX_BLOCKS) {
+    const chunk = blocks.slice(i, i + SLACK_MAX_BLOCKS);
+    const partText = i === 0 ? text : `${text} (cont.)`;
+    await sendSlackRaw(partText, chunk);
   }
 }
 
@@ -189,12 +209,12 @@ function getYesterday(): Date {
   return d;
 }
 
-/** "martes 3 mar 2026" — for Slack */
+/** "miércoles, 4 de marzo, 2026" — for Slack header */
 function getYesterdayLabel(): string {
   const d = getYesterday();
-  const days = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]}, ${d.getFullYear()}`;
 }
 
 /** "Martes, 3 de marzo de 2026" — for email header */
@@ -214,10 +234,16 @@ function getYesterdayShort(): string {
   return `${days[d.getDay()]}, ${dd}/${mm}/${d.getFullYear()}`;
 }
 
+/** Strip diacritics: "María" → "Maria", "Inés" → "Ines" */
+function stripAccents(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 /**
  * Match a CRP key_account_manager name to a consultant profile.
  * Handles variations like "Bruno R. Iglesias" → "Bruno Iglesias",
  * "Inés Gallarde" → "Inés Gallarde Llevat".
+ * Accent-insensitive: "María" matches "Maria".
  */
 function matchConsultant(
   managerName: string | null,
@@ -226,11 +252,11 @@ function matchConsultant(
   if (!managerName) return null;
   const parts = managerName.trim().split(/\s+/).filter((p) => !/^[A-Z]\.?$/.test(p)); // remove initials like "R."
   if (parts.length < 2) return null;
-  const firstName = parts[0].toLowerCase();
-  const lastName = parts[parts.length - 1].toLowerCase();
+  const firstName = stripAccents(parts[0].toLowerCase());
+  const lastName = stripAccents(parts[parts.length - 1].toLowerCase());
 
   for (const p of profiles) {
-    const nameLower = p.full_name.toLowerCase();
+    const nameLower = stripAccents(p.full_name.toLowerCase());
     if (nameLower.includes(firstName) && nameLower.includes(lastName)) {
       return p;
     }
@@ -309,27 +335,11 @@ function groupAnomaliesByConsultant(
   for (const a of deliveryTimeAnomalies) route(a, 'deliveryTime');
   for (const a of noiseOrderAnomalies) route(a, 'noiseOrders');
 
-  // Bruno Iglesias receives ALL anomalies (global overview)
-  const brunoProfile = profiles.find((p) => p.slack_user_id === 'U06010KKQSX');
-  if (brunoProfile) {
-    const group = getOrCreateGroup(brunoProfile);
-    group.wantsEmail = true;
-    const dedup = <T extends { company_id: string; channel: string }>(
-      existing: T[],
-      all: T[],
-    ) => {
-      const keys = new Set(existing.map((a) => `${a.company_id}:${a.channel}`));
-      for (const a of all) {
-        const key = `${a.company_id}:${a.channel}`;
-        if (!keys.has(key)) { existing.push(a); keys.add(key); }
-      }
-    };
-    dedup(group.orders, orderAnomalies);
-    dedup(group.reviews, reviewAnomalies);
-    dedup(group.ads, adsAnomalies);
-    dedup(group.promos, promoAnomalies);
-    dedup(group.deliveryTime, deliveryTimeAnomalies);
-    dedup(group.noiseOrders, noiseOrderAnomalies);
+  // All consultants get email
+  for (const group of Object.values(groups)) {
+    if (group.consultant.email) {
+      group.wantsEmail = true;
+    }
   }
 
   return groups;
@@ -409,37 +419,31 @@ function buildConsultantMessage(group: ConsultantGroup): { text: string; blocks:
   const fallbackText = `Alertas — ${getYesterdayLabel()} | ${allItems.length} KPIs para revisar`;
 
   const blocks: SlackBlock[] = [
-    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDD14 Alertas — ${getYesterdayLabel()}`, emoji: true } },
+    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDD14 Alertas del ${getYesterdayLabel()}`, emoji: true } },
     { type: 'section', text: { type: 'mrkdwn', text: `<@${BRUNO_SLACK_ID}> _Buenos días, estos son los KPIs que deben ser revisados:_` } },
     { type: 'section', text: { type: 'mrkdwn', text: mention } },
     { type: 'divider' },
   ];
 
   for (const [companyName, items] of byCompany) {
-    // Group by channel within company
-    const byChannel = new Map<string, Item[]>();
-    for (const item of items) {
-      const existing = byChannel.get(item.channel) ?? [];
-      existing.push(item);
-      byChannel.set(item.channel, existing);
-    }
-
-    for (const [channel, chItems] of byChannel) {
-      const kpiLines = chItems.map(({ anomaly, type }) => formatKpiLine(anomaly, type));
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*${companyName}* · ${formatChannel(channel)}\n${kpiLines.join('\n')}`,
-        },
-        accessory: {
-          type: 'button',
-          text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true },
-          url: TPHUB_URL,
-        },
-      });
-      blocks.push({ type: 'divider' });
-    }
+    // All KPI lines for this company — channel included in each line
+    const kpiLines = items.map(({ anomaly, type, channel }) =>
+      `${formatKpiLine(anomaly, type)} _(${formatChannel(channel)})_`,
+    );
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*${companyName}*\n${kpiLines.join('\n')}`,
+      },
+      accessory: {
+        type: 'button',
+        text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true },
+        url: TPHUB_URL,
+        style: 'primary',
+      },
+    });
+    blocks.push({ type: 'divider' });
   }
 
   // Noise section: 0 orders with low baseline (informational)
@@ -563,7 +567,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (totalAnomalies === 0) {
     const okText = 'Alertas — No hay KPIs que revisar. Todo OK!';
     const okBlocks: SlackBlock[] = [
-      { type: 'header', text: { type: 'plain_text', text: `\uD83C\uDF89 Alertas — ${getYesterdayLabel()}`, emoji: true } },
+      { type: 'header', text: { type: 'plain_text', text: `\uD83C\uDF89 Alertas del ${getYesterdayLabel()}`, emoji: true } },
       { type: 'section', text: { type: 'mrkdwn', text: ':white_check_mark: Enhorabuena, no hay ningún KPI que revisar del día de ayer. *Todo OK!*' } },
       { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · 08:30' }] },
     ];
@@ -643,18 +647,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   console.log(`[daily-alerts] Sent ${slackMessagesSent} Slack message(s)`);
 
-  // 10. Send email to consultants who have email_enabled
+  // 10. Send email to each consultant (Bruno CC'd on all)
+  const BRUNO_EMAIL = 'biglesias@thinkpaladar.com';
   let emailsSent = 0;
-  for (const group of Object.values(groups)) {
+  for (const [groupId, group] of Object.entries(groups)) {
+    if (groupId === '__unassigned__') continue;
     if (!group.wantsEmail || !group.consultant.email) continue;
     // Email only includes: orders, reviews, delivery time (no ads/promos)
-    const groupTotal = group.orders.length + group.reviews.length + group.deliveryTime.length;
+    const filtered = filterCriticalAnomalies(group);
+    const groupTotal = filtered.orders.length + filtered.reviews.length + filtered.deliveryTime.length;
     if (groupTotal === 0) continue;
 
     // Group all anomalies by company name for card-based email
     const companyMap = new Map<string, { metrics: AlertCompanyData['metrics']; maxDeviation: number }>();
 
-    for (const a of group.orders) {
+    for (const a of filtered.orders) {
       const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
@@ -666,7 +673,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       companyMap.set(key, entry);
     }
 
-    for (const a of group.reviews) {
+    for (const a of filtered.reviews) {
       const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
@@ -678,7 +685,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       companyMap.set(key, entry);
     }
 
-    for (const a of group.deliveryTime) {
+    for (const a of filtered.deliveryTime) {
       const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       const baseline = a.baseline_avg_delivery_min != null ? ` (media: ${a.baseline_avg_delivery_min} min)` : '';
@@ -708,9 +715,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       emailCompanies
     );
 
+    // CC Bruno on all consultant emails (skip if this IS Bruno)
+    const cc = group.consultant.email !== BRUNO_EMAIL ? BRUNO_EMAIL : undefined;
     const sent = await sendEmail({
       to: group.consultant.email,
-      subject: `\u26A0\uFE0F TP Hub: tus alertas diarias (${getYesterdayShort()})`,
+      cc,
+      subject: `\u26A0\uFE0F TP Hub: alertas de ${group.consultant.name.split(' ')[0]} (${getYesterdayShort()})`,
       html,
     });
     if (sent) emailsSent++;
