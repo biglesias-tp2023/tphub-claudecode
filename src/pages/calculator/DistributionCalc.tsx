@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Store, Truck, MapPin } from 'lucide-react';
 import { Field, HeroKpi, WaterfallBreakdown, eur, pct, INPUT_CLASS } from './components';
 import type { WaterfallLine } from './components';
 import { useSessionState } from '@/hooks/useSessionState';
@@ -64,7 +63,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
     <button
       onClick={onClick}
       className={cn(
-        'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+        'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
         active
           ? 'bg-primary-600 text-white'
           : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
@@ -117,6 +116,41 @@ export function DistributionCalc() {
     }
   }, []);
 
+  // --- Validation ---
+
+  const errors = useMemo(() => {
+    const e: Partial<Record<keyof FormState, string>> = {};
+    if (form.ticketMedio <= 0) e.ticketMedio = 'Debe ser > 0';
+    if (form.pedidosHora <= 0 && form.fleetType === 'propia') e.pedidosHora = 'Debe ser > 0';
+    if (form.distMin < 0) e.distMin = 'No puede ser negativo';
+    if (form.distMax <= 0) e.distMax = 'Debe ser > 0';
+    if (form.distMin >= form.distMax) {
+      e.distMin = 'Mín. debe ser < Máx.';
+      e.distMax = 'Máx. debe ser > Mín.';
+    }
+    return e;
+  }, [form]);
+
+  const warns = useMemo(() => {
+    const w: Partial<Record<keyof FormState, string>> = {};
+    if (form.foodCost > 50) w.foodCost = 'Valor inusualmente alto';
+    if (form.feeMarketplace > 35) w.feeMarketplace = 'Valor inusualmente alto';
+    return w;
+  }, [form]);
+
+  const hasErrors = Object.keys(errors).length > 0;
+
+  const inputCn = useCallback(
+    (field: keyof FormState, extra?: string) =>
+      cn(
+        INPUT_CLASS,
+        errors[field] && 'border-red-300 focus:ring-red-400',
+        !errors[field] && warns[field] && 'border-amber-300 focus:ring-amber-400',
+        extra,
+      ),
+    [errors, warns],
+  );
+
   // --- Summary calculations ---
 
   const calc = useMemo(() => {
@@ -129,7 +163,6 @@ export function DistributionCalc() {
         ? form.riderCostHour / form.pedidosHora
         : 0;
 
-    // Average envío in user's distance range
     const rangeStart = Math.max(0, Math.ceil(form.distMin) - 1);
     const rangeEnd = Math.min(9, Math.floor(form.distMax) - 1);
     let midEnvio = 0;
@@ -158,9 +191,8 @@ export function DistributionCalc() {
     const speed = VEHICLE_SPEED[form.vehicle];
     const distMid = (form.distMin + form.distMax) / 2;
 
-    // Back-calculate fixed time (prep + pickup + dropoff) from user reference
     const totalTimeRef = form.pedidosHora > 0 ? 60 / form.pedidosHora : 20;
-    const travelTimeRef = (distMid * 2 / speed) * 60; // round trip in minutes
+    const travelTimeRef = (distMid * 2 / speed) * 60;
     const fixedTime = Math.max(1, totalTimeRef - travelTimeRef);
 
     const feeEur = form.ticketMedio * form.feeMarketplace / 100;
@@ -202,88 +234,87 @@ export function DistributionCalc() {
   // --- Render ---
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* ========== LEFT COLUMN (3/5) ========== */}
-        <div className="lg:col-span-3 space-y-4">
+    <div className="space-y-3">
 
-          {/* Card: Configuración */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-              <Store className="w-4 h-4 text-primary-500" />
-              Configuración
-            </h2>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-2">Plataforma</label>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(PLATFORMS) as Platform[]).map((p) => (
-                  <Pill key={p} active={form.platform === p} onClick={() => handlePlatformChange(p)}>
-                    {PLATFORMS[p].label}
-                  </Pill>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-2">Tipo de flota</label>
-              <div className="flex flex-wrap gap-2 items-center">
-                <Pill active={form.fleetType === 'propia'} onClick={() => set('fleetType', 'propia')}>
-                  Propia
+      {/* ===== CONFIG BAR (full width, inline) ===== */}
+      <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">Plataforma</span>
+            <div className="flex gap-1">
+              {(Object.keys(PLATFORMS) as Platform[]).map((p) => (
+                <Pill key={p} active={form.platform === p} onClick={() => handlePlatformChange(p)}>
+                  {PLATFORMS[p].label}
                 </Pill>
-                <Pill active={form.fleetType === 'externa'} onClick={() => set('fleetType', 'externa')}>
-                  Externa
-                </Pill>
-                {form.fleetType === 'externa' && (
-                  <select
-                    value={form.externalProvider}
-                    onChange={(e) => set('externalProvider', e.target.value)}
-                    className="ml-2 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    {EXTERNAL_PROVIDERS.map((prov) => (
-                      <option key={prov} value={prov}>{prov}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              {form.fleetType === 'externa' && (
-                <p className="text-[11px] text-amber-600 mt-1.5">
-                  Con flota externa, el coste del rider no se aplica directamente.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-500 mb-2">Vehículo</label>
-              <div className="flex flex-wrap gap-2">
-                <Pill active={form.vehicle === 'moto'} onClick={() => set('vehicle', 'moto')}>
-                  Moto ({VEHICLE_SPEED.moto} km/h)
-                </Pill>
-                <Pill active={form.vehicle === 'bici'} onClick={() => set('vehicle', 'bici')}>
-                  Bici ({VEHICLE_SPEED.bici} km/h)
-                </Pill>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Card: Datos del negocio */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-              <Truck className="w-4 h-4 text-primary-500" />
-              Datos del negocio
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="w-px h-5 bg-gray-200 hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">Flota</span>
+            <div className="flex gap-1">
+              <Pill active={form.fleetType === 'propia'} onClick={() => set('fleetType', 'propia')}>Propia</Pill>
+              <Pill active={form.fleetType === 'externa'} onClick={() => set('fleetType', 'externa')}>Externa</Pill>
+            </div>
+            {form.fleetType === 'externa' && (
+              <select
+                value={form.externalProvider}
+                onChange={(e) => set('externalProvider', e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1 text-[11px] text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {EXTERNAL_PROVIDERS.map((prov) => (
+                  <option key={prov} value={prov}>{prov}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="w-px h-5 bg-gray-200 hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">Vehículo</span>
+            <div className="flex gap-1">
+              <Pill active={form.vehicle === 'moto'} onClick={() => set('vehicle', 'moto')}>
+                Moto ({VEHICLE_SPEED.moto} km/h)
+              </Pill>
+              <Pill active={form.vehicle === 'bici'} onClick={() => set('vehicle', 'bici')}>
+                Bici ({VEHICLE_SPEED.bici} km/h)
+              </Pill>
+            </div>
+          </div>
+        </div>
+
+        {form.fleetType === 'externa' && (
+          <p className="text-[11px] text-amber-600 mt-2">
+            Con flota externa, el coste del rider no se aplica directamente.
+          </p>
+        )}
+      </div>
+
+      {/* ===== MAIN GRID ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+
+        {/* LEFT: Single parameters card */}
+        <div className="lg:col-span-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+            {/* Business data — 3 cols */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Field label="Ticket medio (€)">
-                <input type="number" step="0.01" value={form.ticketMedio} onChange={(e) => setNum('ticketMedio', e.target.value)} className={INPUT_CLASS} />
+                <input type="number" step="0.01" value={form.ticketMedio} onChange={(e) => setNum('ticketMedio', e.target.value)} className={inputCn('ticketMedio')} />
+                {errors.ticketMedio && <p className="text-[11px] text-red-500 mt-0.5">{errors.ticketMedio}</p>}
               </Field>
               <Field label="Pedidos / mes">
                 <input type="number" step="1" value={form.pedidosMes} onChange={(e) => setNum('pedidosMes', e.target.value)} className={INPUT_CLASS} />
               </Field>
               <Field label="Fee marketplace (%)">
-                <input type="number" step="0.1" value={form.feeMarketplace} onChange={(e) => setNum('feeMarketplace', e.target.value)} className={INPUT_CLASS} />
+                <input type="number" step="0.1" value={form.feeMarketplace} onChange={(e) => setNum('feeMarketplace', e.target.value)} className={inputCn('feeMarketplace')} />
+                {warns.feeMarketplace && <p className="text-[11px] text-amber-500 mt-0.5">{warns.feeMarketplace}</p>}
               </Field>
               <Field label="Food cost (%)">
-                <input type="number" step="0.1" value={form.foodCost} onChange={(e) => setNum('foodCost', e.target.value)} className={INPUT_CLASS} />
+                <input type="number" step="0.1" value={form.foodCost} onChange={(e) => setNum('foodCost', e.target.value)} className={inputCn('foodCost')} />
+                {warns.foodCost && <p className="text-[11px] text-amber-500 mt-0.5">{warns.foodCost}</p>}
               </Field>
               <Field label="Promos (%)">
                 <input type="number" step="0.1" value={form.promos} onChange={(e) => setNum('promos', e.target.value)} className={INPUT_CLASS} />
@@ -292,43 +323,43 @@ export function DistributionCalc() {
                 <input type="number" step="0.1" value={form.ads} onChange={(e) => setNum('ads', e.target.value)} className={INPUT_CLASS} />
               </Field>
             </div>
-          </div>
 
-          {/* Card: Reparto */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-primary-500" />
-              Reparto
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Coste rider (€/h)">
-                <input
-                  type="number"
-                  step="0.5"
-                  value={form.riderCostHour}
-                  onChange={(e) => setNum('riderCostHour', e.target.value)}
-                  className={cn(INPUT_CLASS, form.fleetType === 'externa' && 'opacity-50 cursor-not-allowed')}
-                  disabled={form.fleetType === 'externa'}
-                />
-              </Field>
-              <Field label="Pedidos / hora (ref.)">
-                <input type="number" step="0.5" value={form.pedidosHora} onChange={(e) => setNum('pedidosHora', e.target.value)} className={INPUT_CLASS} />
-              </Field>
-              <Field label="Distancia mín. (km)">
-                <input type="number" step="0.5" value={form.distMin} onChange={(e) => setNum('distMin', e.target.value)} className={INPUT_CLASS} />
-              </Field>
-              <Field label="Distancia máx. (km)">
-                <input type="number" step="0.5" value={form.distMax} onChange={(e) => setNum('distMax', e.target.value)} className={INPUT_CLASS} />
-              </Field>
-              <Field label="Margen objetivo (%)">
-                <input type="number" step="0.5" value={form.margenObjetivo} onChange={(e) => setNum('margenObjetivo', e.target.value)} className={INPUT_CLASS} />
-              </Field>
+            {/* Divider + Reparto section */}
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide mb-2">Reparto</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <Field label="Coste rider (€/h)">
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={form.riderCostHour}
+                    onChange={(e) => setNum('riderCostHour', e.target.value)}
+                    className={inputCn('riderCostHour', form.fleetType === 'externa' ? 'opacity-50 cursor-not-allowed' : undefined)}
+                    disabled={form.fleetType === 'externa'}
+                  />
+                </Field>
+                <Field label="Pedidos / hora (ref.)">
+                  <input type="number" step="0.5" value={form.pedidosHora} onChange={(e) => setNum('pedidosHora', e.target.value)} className={inputCn('pedidosHora')} />
+                  {errors.pedidosHora && <p className="text-[11px] text-red-500 mt-0.5">{errors.pedidosHora}</p>}
+                </Field>
+                <Field label="Margen objetivo (%)">
+                  <input type="number" step="0.5" value={form.margenObjetivo} onChange={(e) => setNum('margenObjetivo', e.target.value)} className={INPUT_CLASS} />
+                </Field>
+                <Field label="Distancia mín. (km)">
+                  <input type="number" step="0.5" value={form.distMin} onChange={(e) => setNum('distMin', e.target.value)} className={inputCn('distMin')} />
+                  {errors.distMin && <p className="text-[11px] text-red-500 mt-0.5">{errors.distMin}</p>}
+                </Field>
+                <Field label="Distancia máx. (km)">
+                  <input type="number" step="0.5" value={form.distMax} onChange={(e) => setNum('distMax', e.target.value)} className={inputCn('distMax')} />
+                  {errors.distMax && <p className="text-[11px] text-red-500 mt-0.5">{errors.distMax}</p>}
+                </Field>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ========== RIGHT COLUMN (2/5) ========== */}
-        <div className="lg:col-span-2 space-y-4">
+        {/* RIGHT: Results */}
+        <div className="lg:col-span-2 space-y-3">
 
           {/* Hero KPIs */}
           <div className="grid grid-cols-2 gap-3">
@@ -339,66 +370,80 @@ export function DistributionCalc() {
           {/* Waterfall breakdown */}
           <WaterfallBreakdown lines={waterfallLines} pctBase={form.ticketMedio} />
 
-          {/* Cumple / no cumple margen */}
+          {/* Combined: cumple + margen mensual */}
           <div className={cn(
             'rounded-xl border p-4',
-            calc.cumpleMargen ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200',
+            hasErrors
+              ? 'bg-gray-50 border-gray-200'
+              : calc.cumpleMargen
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-red-50 border-red-200',
           )}>
-            <div className="flex items-center gap-2">
-              <span className={cn('text-lg', calc.cumpleMargen ? 'text-emerald-600' : 'text-red-600')}>
-                {calc.cumpleMargen ? '✓' : '✗'}
-              </span>
-              <div>
-                <p className={cn('text-sm font-semibold', calc.cumpleMargen ? 'text-emerald-700' : 'text-red-700')}>
-                  {calc.cumpleMargen ? 'Cumple margen objetivo' : 'No cumple margen objetivo'}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Objetivo: {pct(form.margenObjetivo)} ({eur(calc.margenObjetivoEur)}/pedido)
-                </p>
+            {hasErrors ? (
+              <div className="flex items-center gap-2">
+                <span className="text-amber-500 text-base">!</span>
+                <p className="text-sm text-gray-500">Corrige los campos marcados para ver el resultado.</p>
               </div>
-            </div>
-          </div>
-
-          {/* Margen mensual */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-xs text-gray-500 mb-1">Margen mensual estimado</p>
-            <p className={cn(
-              'text-2xl font-bold tabular-nums',
-              calc.margenMensual >= 0 ? 'text-emerald-700' : 'text-red-700',
-            )}>
-              {eur(calc.margenMensual)}
-            </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              {form.pedidosMes} pedidos × {eur(calc.margenPedido)}
-            </p>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className={cn('text-lg', calc.cumpleMargen ? 'text-emerald-600' : 'text-red-600')}>
+                    {calc.cumpleMargen ? '✓' : '✗'}
+                  </span>
+                  <div>
+                    <p className={cn('text-sm font-semibold', calc.cumpleMargen ? 'text-emerald-700' : 'text-red-700')}>
+                      {calc.cumpleMargen ? 'Cumple margen objetivo' : 'No cumple margen objetivo'}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      Objetivo: {pct(form.margenObjetivo)} ({eur(calc.margenObjetivoEur)}/pedido)
+                    </p>
+                  </div>
+                </div>
+                <div className={cn(
+                  'mt-3 pt-3 text-center',
+                  calc.cumpleMargen ? 'border-t border-emerald-200' : 'border-t border-red-200',
+                )}>
+                  <p className="text-[11px] text-gray-500 mb-0.5">Margen mensual estimado</p>
+                  <p className={cn(
+                    'text-xl font-bold tabular-nums',
+                    calc.margenMensual >= 0 ? 'text-emerald-700' : 'text-red-700',
+                  )}>
+                    {eur(calc.margenMensual)}
+                  </p>
+                  <p className="text-[11px] text-gray-400">
+                    {form.pedidosMes} pedidos × {eur(calc.margenPedido)}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ========== FULL WIDTH: Projection Table ========== */}
+      {/* ===== FULL WIDTH: Projection Table ===== */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
+        <div className="px-4 py-2.5 border-b border-gray-100 flex items-baseline justify-between">
           <h3 className="text-sm font-semibold text-gray-700">
             Proyección por distancia (1–10 km)
           </h3>
-          <p className="text-[11px] text-gray-400 mt-0.5">
-            Edita el envío cobrado para simular diferentes escenarios
+          <p className="text-[11px] text-gray-400">
+            Edita el envío para simular escenarios
           </p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-2.5 text-left font-medium">KM</th>
-                <th className="px-3 py-2.5 text-right font-medium">Ped/h</th>
-                <th className="px-3 py-2.5 text-right font-medium">Rider €</th>
-                <th className="px-3 py-2.5 text-right font-medium">Coste total</th>
-                <th className="px-3 py-2.5 text-center font-medium">Tu envío €</th>
-                <th className="px-3 py-2.5 text-right font-medium">Margen €</th>
-                <th className="px-3 py-2.5 text-right font-medium">Margen %</th>
-                <th className="px-3 py-2.5 text-right font-medium">Mín. envío €</th>
-                <th className="px-3 py-2.5 w-24 font-medium" />
+              <tr className="border-b border-gray-100 text-[11px] text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2 text-left font-medium">KM</th>
+                <th className="px-2 py-2 text-right font-medium">Ped/h</th>
+                <th className="px-2 py-2 text-right font-medium">Rider</th>
+                <th className="px-2 py-2 text-right font-medium">Coste</th>
+                <th className="px-2 py-2 text-center font-medium">Tu envío</th>
+                <th className="px-2 py-2 text-right font-medium">Margen</th>
+                <th className="px-2 py-2 text-right font-medium">%</th>
+                <th className="px-2 py-2 text-right font-medium">Mín.</th>
+                <th className="px-2 py-2 w-20 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -424,42 +469,42 @@ export function DistributionCalc() {
                       row.inRange ? 'bg-primary-50/40' : 'hover:bg-gray-50/50',
                     )}
                   >
-                    <td className="px-4 py-2 font-medium text-gray-900">
-                      {row.inRange && <span className="mr-1 text-primary-500">★</span>}
+                    <td className="px-3 py-1.5 font-medium text-gray-900 text-xs">
+                      {row.inRange && <span className="mr-0.5 text-primary-500">★</span>}
                       {row.km}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-600 text-xs">
                       {row.pedidosHora.toFixed(1)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-600 text-xs">
                       {eur(row.riderCostPerOrder)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-600 text-xs">
                       {eur(row.costeTotal)}
                     </td>
-                    <td className="px-2 py-1.5 text-center">
+                    <td className="px-1 py-1 text-center">
                       <input
                         type="number"
                         step="0.1"
                         value={row.envio}
                         onChange={(e) => handleEnvioChange(idx, e.target.value)}
                         className={cn(
-                          'w-20 border rounded-lg px-2 py-1 text-sm text-center tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-primary-500',
-                          isBelow ? 'border-red-400 text-red-600' : 'border-gray-200 text-gray-700',
+                          'w-16 border rounded px-1.5 py-0.5 text-xs text-center tabular-nums bg-white focus:outline-none focus:ring-1 focus:ring-primary-500',
+                          isBelow ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-gray-700',
                         )}
                       />
                     </td>
-                    <td className={cn('px-3 py-2 text-right tabular-nums font-semibold', marginColor)}>
+                    <td className={cn('px-2 py-1.5 text-right tabular-nums font-semibold text-xs', marginColor)}>
                       {eur(row.margenEur)}
                     </td>
-                    <td className={cn('px-3 py-2 text-right tabular-nums font-semibold', marginColor)}>
+                    <td className={cn('px-2 py-1.5 text-right tabular-nums font-semibold text-xs', marginColor)}>
                       {pct(row.margenPct)}
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400 text-xs">
                       {eur(row.minEnvio)}
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <td className="px-2 py-1.5">
+                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className={cn('h-full rounded-full', barColor)}
                           style={{ width: `${barWidth}%` }}
@@ -474,18 +519,21 @@ export function DistributionCalc() {
         </div>
 
         {/* Legend */}
-        <div className="px-5 py-3 border-t border-gray-100 flex flex-wrap gap-4 text-[11px] text-gray-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-full bg-emerald-400 inline-block" /> ≥ Margen objetivo
+        <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap gap-4 text-[10px] text-gray-400">
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> ≥ Objetivo
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-full bg-amber-400 inline-block" /> Margen positivo
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Positivo
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-full bg-red-400 inline-block" /> Margen negativo
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-1.5 rounded-full bg-red-400 inline-block" /> Negativo
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="text-primary-500">★</span> En rango de distancia configurado
+          <span className="flex items-center gap-1">
+            <span className="text-primary-500 text-[11px]">★</span> Rango configurado
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-1.5 rounded border border-red-400 inline-block bg-red-50" /> Envío &lt; mínimo sugerido
           </span>
         </div>
       </div>
