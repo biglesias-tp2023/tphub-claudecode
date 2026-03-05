@@ -168,8 +168,7 @@ export interface Portal {
  * Maps internal portal IDs to channel names.
  */
 export const PORTAL_IDS = {
-  GLOVO: 'E22BC362',        // Glovo original
-  GLOVO_NEW: 'E22BC362-2',  // Glovo Nuevo (post-migración)
+  GLOVO: 'E22BC362-2',     // Glovo (post-migración; E22BC362 antiguo excluido)
   UBEREATS: '3CCD6861',
   // JUSTEAT ID pending - will return null in getPortalIdForPlatform
 } as const;

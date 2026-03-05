@@ -15,12 +15,10 @@ import type { ChannelId } from '@/types';
 
 /**
  * Maps portal ID from database to ChannelId.
- * Both Glovo IDs (original and new) map to 'glovo'.
  */
 function portalIdToChannelId(portalId: string): ChannelId | null {
-  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
+  if (portalId === PORTAL_IDS.GLOVO) return 'glovo';
   if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
-  // JUSTEAT pending
   return null;
 }
 

@@ -73,7 +73,7 @@ const CHANNELS_WITH_DATA: ChannelId[] = ['glovo', 'ubereats'];
 function channelIdToPortalIds(channelId: ChannelId): string[] {
   switch (channelId) {
     case 'glovo':
-      return [PORTAL_IDS.GLOVO, PORTAL_IDS.GLOVO_NEW];
+      return [PORTAL_IDS.GLOVO];
     case 'ubereats':
       return [PORTAL_IDS.UBEREATS];
     case 'justeat':

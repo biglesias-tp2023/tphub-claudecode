@@ -108,7 +108,7 @@ export interface ReviewsChanges {
 function channelIdToPortalIds(channelId: ChannelId): string[] {
   switch (channelId) {
     case 'glovo':
-      return [PORTAL_IDS.GLOVO, PORTAL_IDS.GLOVO_NEW];
+      return [PORTAL_IDS.GLOVO];
     case 'ubereats':
       return [PORTAL_IDS.UBEREATS];
     case 'justeat':
@@ -139,7 +139,7 @@ function createEmptyChannelAggregation(channel: ChannelId): ChannelReviewAggrega
 }
 
 export function portalIdToChannelId(portalId: string): ChannelId | null {
-  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
+  if (portalId === PORTAL_IDS.GLOVO) return 'glovo';
   if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
   return null;
 }

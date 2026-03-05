@@ -122,29 +122,24 @@ export interface OrdersAggregation {
 
 /**
  * Maps a portal ID to a channel ID.
- * Both Glovo IDs (original and new) map to 'glovo'.
- *
  * Exported for use by the hierarchy module.
  */
 export function portalIdToChannelId(portalId: string): ChannelId | null {
-  if (portalId === PORTAL_IDS.GLOVO || portalId === PORTAL_IDS.GLOVO_NEW) return 'glovo';
+  if (portalId === PORTAL_IDS.GLOVO) return 'glovo';
   if (portalId === PORTAL_IDS.UBEREATS) return 'ubereats';
-  // JustEat portal ID not yet configured
   return null;
 }
 
 /**
  * Maps a channel ID to portal IDs for filtering.
- * Glovo includes both original and new portal IDs.
  */
 function channelIdToPortalIds(channelId: ChannelId): string[] {
   switch (channelId) {
     case 'glovo':
-      return [PORTAL_IDS.GLOVO, PORTAL_IDS.GLOVO_NEW];
+      return [PORTAL_IDS.GLOVO];
     case 'ubereats':
       return [PORTAL_IDS.UBEREATS];
     case 'justeat':
-      // JustEat portal ID not yet configured
       return [];
     default:
       return [];

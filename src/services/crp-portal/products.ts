@@ -18,16 +18,10 @@ import { handleCrpError } from './errors';
 
 /**
  * Portal IDs para order_line
- *
- * GLOVO tiene DOS IDs debido al cambio de plataforma/scrapper:
- * - 'E22BC362'   → Glovo antiguo (original)
- * - 'E22BC362-2' → Glovo nuevo (post-migración)
- *
- * No hay solapamiento temporal, por lo que consultamos ambos
- * para tener el histórico completo de productos.
+ * E22BC362 (Glovo antiguo) excluido — stores migradas a E22BC362-2.
  */
 const ORDER_LINE_PORTAL_IDS = {
-  GLOVO: ['E22BC362', 'E22BC362-2'], // Ambos: antiguo + nuevo
+  GLOVO: ['E22BC362-2'],
   UBEREATS: ['3CCD6861'],
 } as const;
 

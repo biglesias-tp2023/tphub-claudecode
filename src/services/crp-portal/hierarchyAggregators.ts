@@ -106,7 +106,7 @@ export function aggregateRPCMetrics(rows: ControllingMetricsRow[]): AggregatedRP
     agg.clicks += row.clicks || 0;
     agg.adOrders += row.ad_orders || 0;
 
-    const isGlovo = row.pfk_id_portal === 'E22BC362' || row.pfk_id_portal === 'E22BC362-2';
+    const isGlovo = row.pfk_id_portal === 'E22BC362-2';
     const isUber = row.pfk_id_portal === '3CCD6861';
     const avgRating = row.avg_rating || 0;
     const totalReviews = row.total_reviews || 0;
