@@ -10,12 +10,32 @@ import { sendEmail, buildAlertEmailHtml } from './email.js';
  * POST body: { channel: 'slack' | 'email', consultantName: string }
  */
 
+function getYesterday(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d;
+}
+
 function getYesterdayLabel(): string {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+  const d = getYesterday();
   const days = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  return `${days[yesterday.getDay()]} ${yesterday.getDate()} ${months[yesterday.getMonth()]} ${yesterday.getFullYear()}`;
+  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function getYesterdayLong(): string {
+  const d = getYesterday();
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+function getYesterdayShort(): string {
+  const d = getYesterday();
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${days[d.getDay()]}, ${dd}/${mm}/${d.getFullYear()}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -88,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (channel === 'email') {
-    const html = buildAlertEmailHtml(firstName, dateLabel, [
+    const html = buildAlertEmailHtml(firstName, getYesterdayLong(), [
       {
         name: 'Il Capriccio Napoletano',
         severity: 'critical',
@@ -116,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const sent = await sendEmail({
       to: user.email!,
-      subject: `[PRUEBA] Alertas diarias — ${dateLabel}`,
+      subject: `[PRUEBA] \u26A0\uFE0F TP Hub: tus alertas diarias (${getYesterdayShort()})`,
       html,
     });
 
