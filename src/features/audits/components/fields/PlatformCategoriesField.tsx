@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, X, Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { COMPETITOR_CATEGORIES, CATEGORY_EMOJIS } from '../../config/onboardingSchema';
@@ -127,16 +128,45 @@ interface CategoryPickerProps {
 function CategoryPicker({ selected, onSelect }: CategoryPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
 
   const filtered = COMPETITOR_CATEGORIES.filter((cat) =>
     cat.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleToggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    setIsOpen(!isOpen);
+    if (isOpen) setSearch('');
+  };
+
+  // Close on click outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen]);
+
   return (
-    <div className="relative">
+    <div>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={cn(
           'w-full px-3 py-2 rounded-lg border text-xs text-left transition-colors',
           'flex items-center gap-2',
@@ -149,8 +179,12 @@ function CategoryPicker({ selected, onSelect }: CategoryPickerProps) {
         <span className="text-gray-400">Añadir categoría a incorporar...</span>
       </button>
 
-      {isOpen && (
-        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-50 rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
           <div className="sticky top-0 bg-white border-b border-gray-100 p-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -208,7 +242,8 @@ function CategoryPicker({ selected, onSelect }: CategoryPickerProps) {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
