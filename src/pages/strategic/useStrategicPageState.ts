@@ -286,10 +286,18 @@ export function useStrategicPageState() {
         return true;
       });
 
+    const sortByDeadline = (list: typeof objectivesByHorizon.short) =>
+      [...list].sort((a, b) => {
+        if (!a.evaluationDate && !b.evaluationDate) return 0;
+        if (!a.evaluationDate) return 1;
+        if (!b.evaluationDate) return -1;
+        return a.evaluationDate.localeCompare(b.evaluationDate);
+      });
+
     return {
-      short: filterList(objectivesByHorizon.short),
-      medium: filterList(objectivesByHorizon.medium),
-      long: filterList(objectivesByHorizon.long),
+      short: sortByDeadline(filterList(objectivesByHorizon.short)),
+      medium: sortByDeadline(filterList(objectivesByHorizon.medium)),
+      long: sortByDeadline(filterList(objectivesByHorizon.long)),
     };
   }, [objectivesByHorizon, selectedCategory, selectedStatus, searchQuery]);
 
@@ -460,9 +468,9 @@ export function useStrategicPageState() {
         : undefined;
 
       const statusLabels: Record<string, string> = {
-        pending: 'Pendiente',
         in_progress: 'En progreso',
         completed: 'Completado',
+        cancelled: 'Cancelado',
       };
 
       const responsibleLabels: Record<string, string> = {

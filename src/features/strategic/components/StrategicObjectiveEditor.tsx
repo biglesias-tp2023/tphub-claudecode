@@ -556,7 +556,7 @@ export function StrategicObjectiveEditor({
       category: formData.category,
       objectiveTypeId: formData.objectiveTypeId,
       horizon: calculatedHorizon,
-      status: isEditing ? objective?.status : 'pending',
+      status: isEditing ? objective?.status : 'in_progress',
       responsible: formData.responsible,
       fieldData: formData.fieldData,
       evaluationDate: formData.deadline || undefined,

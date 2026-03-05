@@ -258,13 +258,13 @@ function ObjectiveDisplay({ objective }: ObjectiveDisplayProps) {
             'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium',
             objective.status === 'completed' && 'bg-emerald-50 text-emerald-700',
             objective.status === 'in_progress' && 'bg-primary-50 text-primary-700',
-            objective.status === 'pending' && 'bg-gray-100 text-gray-700'
+            objective.status === 'cancelled' && 'bg-red-50 text-red-700'
           )}
         >
           {objective.status === 'completed' && <CheckCircle2 className="w-4 h-4" />}
           {objective.status === 'completed' && 'Completado'}
           {objective.status === 'in_progress' && 'En progreso'}
-          {objective.status === 'pending' && 'Pendiente'}
+          {objective.status === 'cancelled' && 'Cancelado'}
         </div>
       </div>
     </div>

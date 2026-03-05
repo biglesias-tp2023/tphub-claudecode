@@ -69,15 +69,14 @@ export function useStrategicObjectives(horizon?: ObjectiveHorizon) {
     const objectives = objectivesQuery.data || [];
     const completed = objectives.filter((o) => o.status === 'completed').length;
     const inProgress = objectives.filter((o) => o.status === 'in_progress').length;
-    const pending = objectives.filter((o) => o.status === 'pending').length;
+    const cancelled = objectives.filter((o) => o.status === 'cancelled').length;
     const total = objectives.length;
     const effectiveness = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return {
       completed,
       inProgress,
-      pending,
-      notCompleted: pending, // Alias for UI
+      cancelled,
       total,
       effectiveness,
     };

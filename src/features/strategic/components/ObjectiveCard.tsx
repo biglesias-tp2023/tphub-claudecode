@@ -69,9 +69,9 @@ interface ObjectiveCardProps {
 // ============================================
 
 const STATUS_OPTIONS: { value: ObjectiveStatus; label: string; color: string }[] = [
-  { value: 'pending', label: 'Pendiente', color: 'text-gray-500' },
   { value: 'in_progress', label: 'En progreso', color: 'text-primary-600' },
   { value: 'completed', label: 'Completado', color: 'text-emerald-600' },
+  { value: 'cancelled', label: 'Cancelado', color: 'text-red-500' },
 ];
 
 const RESPONSIBLE_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
@@ -136,7 +136,7 @@ function StatusDropdown({ currentStatus, onStatusChange, isOpen, onToggle, onClo
           'flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all',
           currentStatus === 'completed' && 'bg-emerald-50 text-emerald-600',
           currentStatus === 'in_progress' && 'bg-primary-50 text-primary-600',
-          currentStatus === 'pending' && 'bg-gray-50 text-gray-500',
+          currentStatus === 'cancelled' && 'bg-red-50 text-red-500',
           'hover:ring-1 hover:ring-gray-200'
         )}
       >
@@ -220,8 +220,8 @@ export const ObjectiveCard = memo(function ObjectiveCard({
     (progress.healthStatus === 'at_risk' || progress.healthStatus === 'off_track');
 
   // Days display
-  const isOverdue = progress.daysRemaining < 0;
-  const isUrgent = progress.daysRemaining >= 0 && progress.daysRemaining <= 7;
+  const isOverdue = progress.daysRemaining <= 2;
+  const isUrgent = progress.daysRemaining >= 3 && progress.daysRemaining <= 6;
 
   return (
     <div
@@ -404,7 +404,7 @@ export const ObjectiveCard = memo(function ObjectiveCard({
                         'w-14 h-14 rounded-full flex items-center justify-center relative',
                         objective.status === 'completed' && 'bg-emerald-100',
                         objective.status === 'in_progress' && 'bg-primary-100',
-                        objective.status === 'pending' && 'bg-gray-100'
+                        objective.status === 'cancelled' && 'bg-red-100'
                       )}>
                         {objective.status === 'in_progress' && (
                           <div className="absolute inset-0 rounded-full border-2 border-primary-300 border-t-primary-500 animate-spin" style={{ animationDuration: '2s' }} />
@@ -413,7 +413,7 @@ export const ObjectiveCard = memo(function ObjectiveCard({
                           'w-6 h-6',
                           objective.status === 'completed' && 'text-emerald-600',
                           objective.status === 'in_progress' && 'text-primary-600',
-                          objective.status === 'pending' && 'text-gray-400'
+                          objective.status === 'cancelled' && 'text-red-400'
                         )} />
                       </div>
                     )}

@@ -48,6 +48,9 @@ export function HorizonSection({
             )}
           </div>
           <span className="text-sm font-semibold text-gray-900">{horizonInfo.label}</span>
+          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600 tabular-nums">
+            {totalCount}
+          </span>
           <span className="text-xs text-gray-400">{horizonInfo.subtitle}</span>
         </div>
         {totalCount > 0 && (

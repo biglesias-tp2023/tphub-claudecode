@@ -25,9 +25,9 @@ export function getHorizonInfo(horizon: ObjectiveHorizon) {
  */
 export function getStatusInfo(status: ObjectiveStatus) {
   const info = {
-    pending: { label: 'Pendiente', color: 'yellow', bgColor: 'bg-yellow-100', textColor: 'text-yellow-800' },
     in_progress: { label: 'En Progreso', color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
     completed: { label: 'Cumplido', color: 'green', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+    cancelled: { label: 'Cancelado', color: 'red', bgColor: 'bg-red-100', textColor: 'text-red-800' },
   };
   return info[status];
 }

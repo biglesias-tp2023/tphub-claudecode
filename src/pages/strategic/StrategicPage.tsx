@@ -48,9 +48,9 @@ const CATEGORY_FILTERS: { value: ObjectiveCategory | 'all'; label: string; icon:
 
 const STATUS_FILTERS: { value: ObjectiveStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos' },
-  { value: 'pending', label: 'Pendiente' },
   { value: 'in_progress', label: 'En progreso' },
   { value: 'completed', label: 'Completado' },
+  { value: 'cancelled', label: 'Cancelado' },
 ];
 
 // ============================================
@@ -204,12 +204,6 @@ export function StrategicPage() {
             {/* Segmented bar */}
             {state.objectiveStats.total > 0 && (
               <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-100">
-                {state.objectiveStats.pending > 0 && (
-                  <div
-                    className="bg-gray-300 transition-all"
-                    style={{ width: `${(state.objectiveStats.pending / state.objectiveStats.total) * 100}%` }}
-                  />
-                )}
                 {state.objectiveStats.inProgress > 0 && (
                   <div
                     className="bg-primary-500 transition-all"
@@ -222,21 +216,17 @@ export function StrategicPage() {
                     style={{ width: `${(state.objectiveStats.completed / state.objectiveStats.total) * 100}%` }}
                   />
                 )}
+                {state.objectiveStats.cancelled > 0 && (
+                  <div
+                    className="bg-red-400 transition-all"
+                    style={{ width: `${(state.objectiveStats.cancelled / state.objectiveStats.total) * 100}%` }}
+                  />
+                )}
               </div>
             )}
 
             {/* Legend (clickable to filter by status) */}
             <div className="flex items-center gap-4 flex-wrap">
-              <button
-                onClick={() => state.setSelectedStatus(state.selectedStatus === 'pending' ? 'all' : 'pending')}
-                className={cn(
-                  'flex items-center gap-1.5 text-xs transition-colors',
-                  state.selectedStatus === 'pending' ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'
-                )}
-              >
-                <span className="w-2 h-2 rounded-full bg-gray-300" />
-                {state.objectiveStats.pending} Pendiente{state.objectiveStats.pending !== 1 ? 's' : ''}
-              </button>
               <button
                 onClick={() => state.setSelectedStatus(state.selectedStatus === 'in_progress' ? 'all' : 'in_progress')}
                 className={cn(
@@ -256,6 +246,16 @@ export function StrategicPage() {
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 {state.objectiveStats.completed} Completado{state.objectiveStats.completed !== 1 ? 's' : ''}
+              </button>
+              <button
+                onClick={() => state.setSelectedStatus(state.selectedStatus === 'cancelled' ? 'all' : 'cancelled')}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  state.selectedStatus === 'cancelled' ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <span className="w-2 h-2 rounded-full bg-red-400" />
+                {state.objectiveStats.cancelled} Cancelado{state.objectiveStats.cancelled !== 1 ? 's' : ''}
               </button>
             </div>
 

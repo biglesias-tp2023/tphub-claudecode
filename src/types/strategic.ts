@@ -3,7 +3,7 @@
 // ============================================
 
 export type ObjectiveHorizon = 'short' | 'medium' | 'long';
-export type ObjectiveStatus = 'pending' | 'in_progress' | 'completed';
+export type ObjectiveStatus = 'in_progress' | 'completed' | 'cancelled';
 
 // Health status for objective progress tracking
 export type HealthStatus = 'on_track' | 'at_risk' | 'off_track' | 'completed' | 'exceeded';
