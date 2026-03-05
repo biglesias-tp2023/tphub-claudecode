@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { Receipt, Bike, MapPinned } from 'lucide-react';
 import { Field, HeroKpi, WaterfallBreakdown, eur, pct, INPUT_CLASS } from './components';
 import type { WaterfallLine } from './components';
 import { useSessionState } from '@/hooks/useSessionState';
@@ -298,8 +299,11 @@ export function DistributionCalc() {
 
         {/* LEFT: Single parameters card */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-            {/* Business data — 3 cols */}
+          <div className="bg-gray-50/70 rounded-xl border border-gray-200 p-4 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-primary-500" />
+              Datos del negocio
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Field label="Ticket medio (€)">
                 <input type="number" step="0.01" value={form.ticketMedio} onChange={(e) => setNum('ticketMedio', e.target.value)} className={inputCn('ticketMedio')} />
@@ -326,7 +330,10 @@ export function DistributionCalc() {
 
             {/* Divider + Reparto section */}
             <div className="border-t border-gray-100 pt-3">
-              <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide mb-2">Reparto</p>
+              <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Bike className="w-3.5 h-3.5 text-primary-400" />
+                Reparto
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <Field label="Coste rider (€/h)">
                   <input
@@ -423,7 +430,8 @@ export function DistributionCalc() {
       {/* ===== FULL WIDTH: Projection Table ===== */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-2.5 border-b border-gray-100 flex items-baseline justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <MapPinned className="w-4 h-4 text-primary-500 shrink-0 relative top-px" />
             Proyección por distancia (1–10 km)
           </h3>
           <p className="text-[11px] text-gray-400">
