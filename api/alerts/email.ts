@@ -119,7 +119,7 @@ export function buildAlertEmailHtml(
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td align="center">
-            <img src="https://hub.thinkpaladar.com/images/logo/icon.svg" alt="TPHub" width="48" height="48" style="display: block; margin: 0 auto 12px;" />
+            <img src="https://hub.thinkpaladar.com/images/logo/logo.png" alt="TPHub" width="48" height="48" style="display: block; margin: 0 auto 12px; border-radius: 50%;" />
           </td>
         </tr>
       </table>
@@ -134,7 +134,7 @@ export function buildAlertEmailHtml(
     <!-- Body -->
     <div style="background-color: white; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb; border-top: none;">
       <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px;">
-        Hola ${escapeHtml(firstName)}, estas son las anomalias detectadas en tus empresas:
+        Hola ${escapeHtml(firstName)}, estos son los KPIs que deben ser revisados:
       </p>
 
       ${companyCards || '<p style="color: #9ca3af; font-size: 14px; text-align: center; padding: 20px 0;">Sin alertas</p>'}

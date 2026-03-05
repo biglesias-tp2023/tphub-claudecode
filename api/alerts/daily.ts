@@ -172,12 +172,35 @@ function filterCriticalAnomalies(group: ConsultantGroup): ConsultantGroup {
   };
 }
 
+function getYesterday(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d;
+}
+
+/** "martes 3 mar 2026" — for Slack */
 function getYesterdayLabel(): string {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
+  const d = getYesterday();
   const days = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  return `${days[yesterday.getDay()]} ${yesterday.getDate()} ${months[yesterday.getMonth()]} ${yesterday.getFullYear()}`;
+  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** "Martes, 3 de marzo de 2026" — for email header */
+function getYesterdayLong(): string {
+  const d = getYesterday();
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return `${days[d.getDay()]}, ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+/** "Martes, 03/03/2026" — for email subject */
+function getYesterdayShort(): string {
+  const d = getYesterday();
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${days[d.getDay()]}, ${dd}/${mm}/${d.getFullYear()}`;
 }
 
 /**
@@ -652,13 +675,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const html = buildAlertEmailHtml(
       group.consultant.name,
-      getYesterdayLabel(),
+      getYesterdayLong(),
       emailCompanies
     );
 
     const sent = await sendEmail({
       to: group.consultant.email,
-      subject: `Alertas diarias \u2014 ${getYesterdayLabel()}`,
+      subject: `\u26A0\uFE0F TP Hub: tus alertas diarias (${getYesterdayShort()})`,
       html,
     });
     if (sent) emailsSent++;
