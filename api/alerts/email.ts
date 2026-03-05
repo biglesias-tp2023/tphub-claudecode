@@ -119,7 +119,7 @@ export function buildAlertEmailHtml(
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td align="center">
-            <img src="https://hub.thinkpaladar.com/images/logo/logo.png" alt="TPHub" width="48" height="48" style="display: block; margin: 0 auto 12px; border-radius: 50%;" />
+            <img src="https://hub.thinkpaladar.com/images/logo/pictograma-blanc.png" alt="TPHub" width="48" height="48" style="display: block; margin: 0 auto 12px;" />
           </td>
         </tr>
       </table>
@@ -127,7 +127,7 @@ export function buildAlertEmailHtml(
         Daily Alerts TPHub
       </h1>
       <p style="color: rgba(255,255,255,0.8); font-size: 13px; margin: 4px 0 0;">
-        ${escapeHtml(dateLabel)}
+        Estas son las alertas del ${escapeHtml(dateLabel)}
       </p>
     </div>
 
