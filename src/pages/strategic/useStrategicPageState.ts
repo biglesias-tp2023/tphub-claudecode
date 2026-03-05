@@ -154,6 +154,14 @@ export function useStrategicPageState() {
     return null;
   }, [filterBrandIds]);
 
+  // Resolve primary address ID for address-level projection loading
+  const primaryAddressId = useMemo(() => {
+    if (filterRestaurantIds.length > 0) {
+      return filterRestaurantIds[0];
+    }
+    return null;
+  }, [filterRestaurantIds]);
+
   // Commissions from CRP Portal (for rentabilidad scorecard)
   const { data: allCompanies = [] } = useCompanies();
   const commissions = useMemo(() => {
@@ -177,12 +185,19 @@ export function useStrategicPageState() {
   // SALES PROJECTION (Supabase-backed)
   // ============================================
 
+  // Address-level projection (most specific)
+  const {
+    data: addressProjection = null,
+    isLoading: isLoadingAddressProjection,
+  } = useSalesProjection({ companyId: primaryCompanyId, brandId: primaryBrandId, addressId: primaryAddressId });
+
+  // Brand-level projection (mid-level)
   const {
     data: brandProjection = null,
     isLoading: isLoadingBrandProjection,
   } = useSalesProjection({ companyId: primaryCompanyId, brandId: primaryBrandId });
 
-  // Fallback: company-level projection when brand is selected but has no own projection
+  // Company-level projection (fallback)
   const {
     data: companyProjection = null,
     isLoading: isLoadingCompanyProjection,
@@ -191,9 +206,24 @@ export function useStrategicPageState() {
     brandId: null,
   });
 
-  const salesProjection = brandProjection ?? companyProjection;
-  const isLoadingProjection = isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false);
-  const isFallbackProjection = primaryBrandId !== null && brandProjection === null && companyProjection !== null;
+  const salesProjection = addressProjection ?? brandProjection ?? companyProjection;
+  const isLoadingProjection = isLoadingAddressProjection || isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false);
+
+  // Fallback info: which level is being shown vs which was requested
+  const fallbackInfo = useMemo(() => {
+    if (primaryAddressId) {
+      if (addressProjection) return null;
+      if (brandProjection) return { level: 'brand' as const, targetScope: 'address' as const };
+      if (companyProjection) return { level: 'company' as const, targetScope: 'address' as const };
+      return null;
+    }
+    if (primaryBrandId) {
+      if (brandProjection) return null;
+      if (companyProjection) return { level: 'company' as const, targetScope: 'brand' as const };
+      return null;
+    }
+    return null;
+  }, [primaryAddressId, primaryBrandId, addressProjection, brandProjection, companyProjection]);
 
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
@@ -347,6 +377,7 @@ export function useStrategicPageState() {
       await upsertProjection.mutateAsync({
         companyId: primaryCompanyId,
         brandId: primaryBrandId,
+        addressId: primaryAddressId,
         config,
         baselineRevenue,
         targetRevenue,
@@ -358,7 +389,7 @@ export function useStrategicPageState() {
     } catch {
       error('Error al crear proyección');
     }
-  }, [primaryCompanyId, primaryBrandId, upsertProjection, success, error]);
+  }, [primaryCompanyId, primaryBrandId, primaryAddressId, upsertProjection, success, error]);
 
   const handleUpdateTargetRevenue = useCallback((data: GridChannelMonthData) => {
     if (!salesProjection) return;
@@ -612,7 +643,7 @@ export function useStrategicPageState() {
     // Computed flags
     hasObjectives,
     hasSalesProjection,
-    isFallbackProjection,
+    fallbackInfo,
     daysRemaining,
 
     // Data
@@ -624,6 +655,7 @@ export function useStrategicPageState() {
     effectiveCompanyIds,
     primaryCompanyId,
     primaryBrandId,
+    primaryAddressId,
     allCompanies,
     allBrands,
     allRestaurants,
