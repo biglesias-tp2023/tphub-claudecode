@@ -122,6 +122,8 @@ interface ConsultantGroup {
   ads: AdsAnomaly[];
   promos: PromoAnomaly[];
   deliveryTime: DeliveryTimeAnomaly[];
+  /** Low-volume companies with 0 orders yesterday (baseline < minAvgOrders) — informational only */
+  noiseOrders: OrderAnomaly[];
   /** Whether this consultant wants Slack notifications (default true) */
   wantsSlack: boolean;
   /** Whether this consultant wants Email notifications */
@@ -164,10 +166,8 @@ function filterCriticalAnomalies(group: ConsultantGroup): ConsultantGroup {
     reviews: group.reviews.filter(
       (a) => a.yesterday_avg_rating < 4.0 || a.yesterday_negative_count >= 3,
     ),
-    ads: group.ads.filter(
-      (a) => a.yesterday_roas < 2.5 || (a.yesterday_ad_spent > 0 && a.yesterday_ad_orders === 0),
-    ),
-    promos: group.promos.filter((a) => (a.promo_rate_deviation_pct ?? 0) >= 30),
+    ads: [],      // disabled — not critical daily
+    promos: [],   // disabled — not critical daily
     deliveryTime: group.deliveryTime, // already filtered at RPC level (>45 min)
   };
 }
@@ -234,6 +234,7 @@ function groupAnomaliesByConsultant(
   adsAnomalies: AdsAnomaly[],
   promoAnomalies: PromoAnomaly[],
   deliveryTimeAnomalies: DeliveryTimeAnomaly[],
+  noiseOrderAnomalies: OrderAnomaly[],
   prefsMap: Map<string, DbAlertPreference>,
 ): Record<string, ConsultantGroup> {
   const groups: Record<string, ConsultantGroup> = {};
@@ -251,6 +252,7 @@ function groupAnomaliesByConsultant(
         ads: [],
         promos: [],
         deliveryTime: [],
+        noiseOrders: [],
         wantsSlack: true,
         wantsEmail: false,
       };
@@ -268,6 +270,7 @@ function groupAnomaliesByConsultant(
         ads: [],
         promos: [],
         deliveryTime: [],
+        noiseOrders: [],
         wantsSlack: true,
         wantsEmail: false,
       };
@@ -278,7 +281,7 @@ function groupAnomaliesByConsultant(
   // Route anomaly to consultant matched by key_account_manager name
   const route = <T extends { key_account_manager: string | null }>(
     anomaly: T,
-    target: keyof Pick<ConsultantGroup, 'orders' | 'reviews' | 'ads' | 'promos' | 'deliveryTime'>,
+    target: keyof Pick<ConsultantGroup, 'orders' | 'reviews' | 'ads' | 'promos' | 'deliveryTime' | 'noiseOrders'>,
   ) => {
     const consultant = matchConsultant(anomaly.key_account_manager, profiles);
     if (consultant) {
@@ -293,6 +296,7 @@ function groupAnomaliesByConsultant(
   for (const a of adsAnomalies) route(a, 'ads');
   for (const a of promoAnomalies) route(a, 'promos');
   for (const a of deliveryTimeAnomalies) route(a, 'deliveryTime');
+  for (const a of noiseOrderAnomalies) route(a, 'noiseOrders');
 
   // Bruno Iglesias receives ALL anomalies (global overview)
   const brunoProfile = profiles.find((p) => p.slack_user_id === 'U06010KKQSX');
@@ -314,6 +318,7 @@ function groupAnomaliesByConsultant(
     dedup(group.ads, adsAnomalies);
     dedup(group.promos, promoAnomalies);
     dedup(group.deliveryTime, deliveryTimeAnomalies);
+    dedup(group.noiseOrders, noiseOrderAnomalies);
   }
 
   return groups;
@@ -384,12 +389,15 @@ function buildConsultantMessage(group: ConsultantGroup): string {
     byCompany.set(item.companyName, existing);
   }
 
+  const BRUNO_SLACK_ID = 'U06010KKQSX';
   const mention = group.consultant.slackUserId
     ? `<@${group.consultant.slackUserId}>`
     : `*${group.consultant.name}*`;
 
   const lines: string[] = [
-    `:bell: *Alertas — ${getYesterdayLabel()}*\n`,
+    `<@${BRUNO_SLACK_ID}> :bell: *Alertas — ${getYesterdayLabel()}*`,
+    `Buenos días, estos son los KPIs que deben ser revisados:`,
+    '',
     mention,
     '',
   ];
@@ -410,6 +418,14 @@ function buildConsultantMessage(group: ConsultantGroup): string {
       }
     }
     lines.push('');
+  }
+
+  // Noise section: 0 orders with low baseline (informational)
+  if (group.noiseOrders.length > 0) {
+    const noiseItems = group.noiseOrders.map(
+      (a) => `${a.company_name} (${formatChannel(a.channel)})`,
+    );
+    lines.push(`_0 pedidos ayer pero media <3:_ ${noiseItems.join(', ')}`);
   }
 
   return lines.join('\n').trim();
@@ -446,40 +462,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 4. Call 5 RPCs in parallel
+  // 4. Call RPCs in parallel (orders, reviews, delivery + noise)
   const threshold = Number(process.env.ALERT_THRESHOLD ?? -20);
   const minAvgOrders = Number(process.env.ALERT_MIN_AVG_ORDERS ?? 3);
   console.log(`[daily-alerts] Calling RPCs with threshold=${threshold}, minAvgOrders=${minAvgOrders}`);
 
-  const [ordersResult, reviewsResult, adsResult, promosResult, deliveryResult] = await Promise.all([
+  const [ordersResult, reviewsResult, deliveryResult, noiseOrdersResult] = await Promise.all([
     supabase.rpc('get_daily_order_anomalies', { p_threshold: threshold, p_min_avg_orders: minAvgOrders }),
     supabase.rpc('get_daily_review_anomalies', {
       p_min_reviews: 3,
       p_rating_threshold: 3.5,
       p_negative_spike_pct: 50,
     }),
-    supabase.rpc('get_daily_ads_anomalies', {
-      p_roas_threshold: 3.0,
-      p_spend_threshold: 10,
-      p_spend_deviation_pct: 50,
-    }),
-    supabase.rpc('get_daily_promo_anomalies', {
-      p_promo_rate_threshold: 15,
-      p_promo_spike_pct: 50,
-      p_min_orders: 10,
-    }),
     supabase.rpc('get_daily_delivery_time_anomalies', {
       p_max_minutes: 45,
       p_min_orders: 5,
     }),
+    // Noise: 0-order companies with low baseline (media < minAvgOrders)
+    supabase.rpc('get_daily_order_anomalies', { p_threshold: -99, p_min_avg_orders: 0 }),
   ]);
 
   // 5. Check for errors — deduplicate by error message
   const errorEntries = [
     ordersResult.error && { label: 'Orders', msg: ordersResult.error.message },
     reviewsResult.error && { label: 'Reviews', msg: reviewsResult.error.message },
-    adsResult.error && { label: 'Ads', msg: adsResult.error.message },
-    promosResult.error && { label: 'Promos', msg: promosResult.error.message },
     deliveryResult.error && { label: 'Delivery', msg: deliveryResult.error.message },
   ].filter(Boolean) as { label: string; msg: string }[];
 
@@ -496,26 +502,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     console.error('[daily-alerts] RPC errors:', errorEntries);
     await sendSlack(`:warning: Errores en alertas diarias:\n${deduped.join('\n')}`);
-    if (errorEntries.length === 5) {
+    if (errorEntries.length === 3) {
       return res.status(500).json({ error: 'Failed to fetch anomaly data' });
     }
   }
 
   const orderAnomalies: OrderAnomaly[] = ordersResult.data ?? [];
   const reviewAnomalies: ReviewAnomaly[] = reviewsResult.data ?? [];
-  const adsAnomalies: AdsAnomaly[] = adsResult.data ?? [];
-  const promoAnomalies: PromoAnomaly[] = promosResult.data ?? [];
+  const adsAnomalies: AdsAnomaly[] = [];
+  const promoAnomalies: PromoAnomaly[] = [];
   const deliveryTimeAnomalies: DeliveryTimeAnomaly[] = deliveryResult.data ?? [];
-  const totalAnomalies = orderAnomalies.length + reviewAnomalies.length + adsAnomalies.length + promoAnomalies.length + deliveryTimeAnomalies.length;
+  // Noise: 0 orders yesterday + baseline < minAvgOrders (not in main results)
+  const noiseOrderAnomalies: OrderAnomaly[] = ((noiseOrdersResult.data ?? []) as OrderAnomaly[]).filter(
+    (a) => a.yesterday_orders === 0 && a.avg_orders_baseline < minAvgOrders,
+  );
+  const totalAnomalies = orderAnomalies.length + reviewAnomalies.length + deliveryTimeAnomalies.length;
 
   console.log(
-    `[daily-alerts] Found anomalies: orders=${orderAnomalies.length}, reviews=${reviewAnomalies.length}, ads=${adsAnomalies.length}, promos=${promoAnomalies.length}, delivery=${deliveryTimeAnomalies.length}`,
+    `[daily-alerts] Found anomalies: orders=${orderAnomalies.length}, reviews=${reviewAnomalies.length}, delivery=${deliveryTimeAnomalies.length}, noise=${noiseOrderAnomalies.length}`,
   );
 
   // 6. No anomalies → send "all ok"
   if (totalAnomalies === 0) {
     await sendSlack(
-      `:large_green_circle: *Alertas — ${getYesterdayLabel()}*\nTodos los restaurantes dentro de rango normal ayer.`,
+      `:tada: *Alertas — ${getYesterdayLabel()}*\n:white_check_mark: Enhorabuena, no hay ningún KPI que revisar del día de ayer. Todo OK!`,
     );
     return res.status(200).json({ message: 'No anomalies', count: 0 });
   }
@@ -558,6 +568,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     adsAnomalies,
     promoAnomalies,
     deliveryTimeAnomalies,
+    noiseOrderAnomalies,
     prefsMap,
   );
 
@@ -579,7 +590,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (groupId === '__unassigned__') continue;
     if (!group.wantsSlack) continue;
     const filtered = filterCriticalAnomalies(group);
-    const criticalCount = filtered.orders.length + filtered.reviews.length + filtered.ads.length + filtered.promos.length + filtered.deliveryTime.length;
+    const criticalCount = filtered.orders.length + filtered.reviews.length + filtered.deliveryTime.length;
     if (criticalCount === 0) continue;
 
     const message = buildConsultantMessage(group);
@@ -595,7 +606,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let emailsSent = 0;
   for (const group of Object.values(groups)) {
     if (!group.wantsEmail || !group.consultant.email) continue;
-    const groupTotal = group.orders.length + group.reviews.length + group.ads.length + group.promos.length + group.deliveryTime.length;
+    // Email only includes: orders, reviews, delivery time (no ads/promos)
+    const groupTotal = group.orders.length + group.reviews.length + group.deliveryTime.length;
     if (groupTotal === 0) continue;
 
     // Group all anomalies by company name for card-based email
@@ -622,30 +634,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         threshold: '4.0',
       });
       entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.rating_deviation_pct));
-      companyMap.set(key, entry);
-    }
-
-    for (const a of group.promos) {
-      const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
-      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
-      entry.metrics.push({
-        label: 'Promos',
-        value: `${a.yesterday_promos}\u20AC (${a.yesterday_promo_rate}% de ventas) \u2192 +${a.promo_spend_deviation_pct}%`,
-        threshold: '30%',
-      });
-      entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.promo_spend_deviation_pct));
-      companyMap.set(key, entry);
-    }
-
-    for (const a of group.ads) {
-      const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
-      const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
-      entry.metrics.push({
-        label: 'Publicidad',
-        value: `ROAS: ${a.yesterday_roas}x (media: ${a.baseline_avg_roas}x) | Gasto: ${a.yesterday_ad_spent}\u20AC`,
-        threshold: '2.5x',
-      });
-      entry.maxDeviation = Math.max(entry.maxDeviation, Math.abs(a.roas_deviation_pct));
       companyMap.set(key, entry);
     }
 

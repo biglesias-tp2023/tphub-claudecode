@@ -118,8 +118,8 @@ export function buildAlertEmailHtml(
     <div style="background-color: #095789; border-radius: 12px 12px 0 0; padding: 24px; text-align: center;">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td align="center">
-            <img src="https://hub.thinkpaladar.com/images/logo/pictograma-blanc.png" alt="TPHub" width="48" height="48" style="display: block; margin: 0 auto 12px;" />
+          <td align="center" style="background-color: #095789;">
+            <img src="https://hub.thinkpaladar.com/images/logo/pictograma-blanc.png" alt="TPHub" width="48" height="48" style="display: block; margin: 0 auto 12px; border: 0;" />
           </td>
         </tr>
       </table>
