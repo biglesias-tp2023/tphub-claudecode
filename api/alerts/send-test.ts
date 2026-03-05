@@ -78,24 +78,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'SLACK_WEBHOOK_URL not configured' });
     }
 
-    const message = [
-      `:test_tube: *Alerta de prueba — ${dateLabel}*`,
-      ``,
-      `Buenos dias, *${firstName}* :wave:`,
-      ``,
-      `Este es un mensaje de prueba enviado desde TPHub.`,
-      `Si ves este mensaje, tu integracion de Slack esta funcionando correctamente.`,
-      ``,
-      `:red_circle: *Ejemplo CRITICO* — Il Capriccio Napoletano | Gran Via (Glovo) — 12 pedidos (media: 35) → *-66%*`,
-      `:large_yellow_circle: *Ejemplo ATENCION* — Compa | Malasana (UberEats) — Rating: 3.2 (media: 4.1) → *-22%*`,
-      ``,
-      `_Mensaje de prueba desde TPHub Alertas_`,
-    ].join('\n');
+    const TPHUB_URL = 'https://hub.thinkpaladar.com/controlling';
+    const fallbackText = `Alerta de prueba — ${dateLabel}`;
+    const blocks = [
+      { type: 'header', text: { type: 'plain_text', text: `\uD83E\uDDEA Alerta de prueba — ${dateLabel}`, emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text: `Buenos días, *${firstName}* :wave:\n\nEste es un mensaje de prueba enviado desde TPHub.\nSi ves este mensaje, tu integración de Slack está funcionando correctamente.` } },
+      { type: 'divider' },
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `*Il Capriccio Napoletano* · Glovo\n:chart_with_downwards_trend: 12 pedidos (media 35) → *-66%*` },
+        accessory: { type: 'button', text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true }, url: TPHUB_URL },
+      },
+      { type: 'divider' },
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `*Compa* · UberEats\n:star: 3.2 vs 4.1 · 5 negativas` },
+        accessory: { type: 'button', text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true }, url: TPHUB_URL },
+      },
+      { type: 'divider' },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: '_Mensaje de prueba desde TPHub Alertas_' }] },
+    ];
 
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: message }),
+      body: JSON.stringify({ text: fallbackText, blocks }),
     });
 
     if (!response.ok) {

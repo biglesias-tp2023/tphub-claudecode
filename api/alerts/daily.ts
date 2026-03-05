@@ -134,20 +134,31 @@ interface ConsultantGroup {
 // Helpers
 // ============================================
 
-async function sendSlack(message: string): Promise<void> {
+interface SlackBlock {
+  type: string;
+  text?: { type: string; text: string; emoji?: boolean };
+  elements?: Array<{ type: string; text?: string | { type: string; text: string; emoji?: boolean }; url?: string }>;
+  accessory?: { type: string; text: { type: string; text: string; emoji?: boolean }; url: string };
+}
+
+const TPHUB_URL = 'https://hub.thinkpaladar.com/controlling';
+
+async function sendSlack(text: string, blocks?: SlackBlock[]): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) {
     console.error('SLACK_WEBHOOK_URL not configured');
     return;
   }
+  const payload: Record<string, unknown> = {
+    text,
+    username: 'TPHub Alertas',
+    icon_url: 'https://hub.thinkpaladar.com/images/logo/logo.png',
+  };
+  if (blocks) payload.blocks = blocks;
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: message,
-      username: 'TPHub Alertas',
-      icon_url: 'https://hub.thinkpaladar.com/images/logo/logo.png',
-    }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     console.error(`Slack webhook failed: ${response.status} ${response.statusText}`);
@@ -356,8 +367,8 @@ function formatKpiLine(anomaly: AnyAnomaly, type: string): string {
   }
 }
 
-/** Build a Slack message for a single consultant: Company → Channel → KPIs */
-function buildConsultantMessage(group: ConsultantGroup): string {
+/** Build a Block Kit Slack message for a single consultant: Company → Channel → KPIs */
+function buildConsultantMessage(group: ConsultantGroup): { text: string; blocks: SlackBlock[] } | null {
   const filtered = filterCriticalAnomalies(group);
   type Item = { companyName: string; channel: string; anomaly: AnyAnomaly; type: string };
   const allItems: Item[] = [];
@@ -379,7 +390,7 @@ function buildConsultantMessage(group: ConsultantGroup): string {
   collect(filtered.promos, 'promos');
   collect(filtered.deliveryTime, 'deliveryTime');
 
-  if (allItems.length === 0) return '';
+  if (allItems.length === 0) return null;
 
   // Group by company
   const byCompany = new Map<string, Item[]>();
@@ -394,12 +405,14 @@ function buildConsultantMessage(group: ConsultantGroup): string {
     ? `<@${group.consultant.slackUserId}>`
     : `*${group.consultant.name}*`;
 
-  const lines: string[] = [
-    `<@${BRUNO_SLACK_ID}> :bell: *Alertas — ${getYesterdayLabel()}*`,
-    `Buenos días, estos son los KPIs que deben ser revisados:`,
-    '',
-    mention,
-    '',
+  // Fallback text (notifications, screen readers)
+  const fallbackText = `Alertas — ${getYesterdayLabel()} | ${allItems.length} KPIs para revisar`;
+
+  const blocks: SlackBlock[] = [
+    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDD14 Alertas — ${getYesterdayLabel()}`, emoji: true } },
+    { type: 'section', text: { type: 'mrkdwn', text: `<@${BRUNO_SLACK_ID}> _Buenos días, estos son los KPIs que deben ser revisados:_` } },
+    { type: 'section', text: { type: 'mrkdwn', text: mention } },
+    { type: 'divider' },
   ];
 
   for (const [companyName, items] of byCompany) {
@@ -412,12 +425,21 @@ function buildConsultantMessage(group: ConsultantGroup): string {
     }
 
     for (const [channel, chItems] of byChannel) {
-      lines.push(`*${companyName}* · ${formatChannel(channel)}`);
-      for (const { anomaly, type } of chItems) {
-        lines.push(`  ${formatKpiLine(anomaly, type)}`);
-      }
+      const kpiLines = chItems.map(({ anomaly, type }) => formatKpiLine(anomaly, type));
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*${companyName}* · ${formatChannel(channel)}\n${kpiLines.join('\n')}`,
+        },
+        accessory: {
+          type: 'button',
+          text: { type: 'plain_text', text: 'Ver en TPHub', emoji: true },
+          url: TPHUB_URL,
+        },
+      });
+      blocks.push({ type: 'divider' });
     }
-    lines.push('');
   }
 
   // Noise section: 0 orders with low baseline (informational)
@@ -425,10 +447,19 @@ function buildConsultantMessage(group: ConsultantGroup): string {
     const noiseItems = group.noiseOrders.map(
       (a) => `${a.company_name} (${formatChannel(a.channel)})`,
     );
-    lines.push(`_0 pedidos ayer pero media <3:_ ${noiseItems.join(', ')}`);
+    blocks.push({
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `_0 pedidos ayer pero media <3:_ ${noiseItems.join(', ')}` }],
+    });
   }
 
-  return lines.join('\n').trim();
+  // Footer
+  blocks.push({
+    type: 'context',
+    elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · 08:30' }],
+  });
+
+  return { text: fallbackText, blocks };
 }
 
 // No Claude API formatting — deterministic template is faster and more consistent
@@ -501,7 +532,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ([msg, labels]) => `\u2022 ${labels.join(', ')}: ${msg}`,
     );
     console.error('[daily-alerts] RPC errors:', errorEntries);
-    await sendSlack(`:warning: Errores en alertas diarias:\n${deduped.join('\n')}`);
+    const errorText = `Errores en alertas diarias: ${deduped.join(' | ')}`;
+    const errorBlocks: SlackBlock[] = [
+      { type: 'header', text: { type: 'plain_text', text: '\u26A0\uFE0F Errores en alertas diarias', emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text: deduped.join('\n') } },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: `TPHub Alertas · ${getYesterdayLabel()}` }] },
+    ];
+    await sendSlack(errorText, errorBlocks);
     if (errorEntries.length === 3) {
       return res.status(500).json({ error: 'Failed to fetch anomaly data' });
     }
@@ -524,9 +561,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // 6. No anomalies → send "all ok"
   if (totalAnomalies === 0) {
-    await sendSlack(
-      `:tada: *Alertas — ${getYesterdayLabel()}*\n:white_check_mark: Enhorabuena, no hay ningún KPI que revisar del día de ayer. Todo OK!`,
-    );
+    const okText = 'Alertas — No hay KPIs que revisar. Todo OK!';
+    const okBlocks: SlackBlock[] = [
+      { type: 'header', text: { type: 'plain_text', text: `\uD83C\uDF89 Alertas — ${getYesterdayLabel()}`, emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text: ':white_check_mark: Enhorabuena, no hay ningún KPI que revisar del día de ayer. *Todo OK!*' } },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · 08:30' }] },
+    ];
+    await sendSlack(okText, okBlocks);
     return res.status(200).json({ message: 'No anomalies', count: 0 });
   }
 
@@ -593,9 +634,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const criticalCount = filtered.orders.length + filtered.reviews.length + filtered.deliveryTime.length;
     if (criticalCount === 0) continue;
 
-    const message = buildConsultantMessage(group);
-    if (message) {
-      await sendSlack(message);
+    const result = buildConsultantMessage(group);
+    if (result) {
+      await sendSlack(result.text, result.blocks);
       slackMessagesSent++;
     }
   }
