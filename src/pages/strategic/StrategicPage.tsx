@@ -61,13 +61,27 @@ export function StrategicPage() {
   const state = useStrategicPageState();
 
   // Breadcrumb labels
-  const companyName = state.allCompanies.find(c => c.id === state.primaryCompanyId)?.name;
-  const brandName = state.filterBrandIds.length > 0
-    ? state.allBrands.find(b => b.id === state.filterBrandIds[0])?.name
-    : null;
-  const addressName = state.filterRestaurantIds.length > 0
-    ? state.allRestaurants.find(r => r.id === state.filterRestaurantIds[0])?.name
-    : null;
+  const companyLabel = (() => {
+    const selected = state.companyIds.length;
+    const total = state.allCompanies.length;
+    if (selected === 0) return null;
+    if (selected === 1) return state.allCompanies.find(c => c.id === state.companyIds[0])?.name || null;
+    return `Compañías (${selected}/${total})`;
+  })();
+  const brandName = (() => {
+    const selected = state.filterBrandIds.length;
+    const total = state.allBrands.length;
+    if (selected === 0) return null;
+    if (selected === 1) return state.allBrands.find(b => b.id === state.filterBrandIds[0])?.name || null;
+    return `Marcas (${selected}/${total})`;
+  })();
+  const addressName = (() => {
+    const selected = state.filterRestaurantIds.length;
+    const total = state.allRestaurants.length;
+    if (selected === 0) return null;
+    if (selected === 1) return state.allRestaurants.find(r => r.id === state.filterRestaurantIds[0])?.name || null;
+    return `Direcciones (${selected}/${total})`;
+  })();
 
   if (state.error) {
     return (
@@ -102,9 +116,9 @@ export function StrategicPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Estrategia</h1>
-          {companyName && (
+          {companyLabel && (
             <p className="text-sm text-gray-500 mt-0.5">
-              {companyName}
+              {companyLabel}
               {' › '}
               {brandName || 'Todas las marcas'}
               {' › '}
@@ -418,7 +432,7 @@ export function StrategicPage() {
         brandIds={state.expandedBrandIds}
         addressIds={state.expandedRestaurantIds}
         existingProjection={state.salesProjection}
-        scopeLabel={[companyName, brandName, addressName].filter(Boolean).join(' > ')}
+        scopeLabel={[companyLabel, brandName, addressName].filter(Boolean).join(' > ')}
       />
 
       <SalesProjectionWarning
