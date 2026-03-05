@@ -188,7 +188,7 @@ export async function createStrategicObjective(
       category: input.category,
       objectiveTypeId: input.objectiveTypeId || '',
       horizon: input.horizon,
-      status: input.status || 'pending',
+      status: (input.status || 'in_progress') as ObjectiveStatus,
       responsible: input.responsible || 'thinkpaladar',
       kpiType: input.kpiType || null,
       kpiCurrentValue: input.kpiCurrentValue || null,
