@@ -480,7 +480,10 @@ function TargetsStep({
 
       {hasActualData && (
         <div className="flex items-center gap-2 text-[10px] text-gray-400 justify-center">
-          <span className="w-2 h-2 rounded-sm bg-emerald-400" />
+          <span className="relative flex w-2 h-2">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+            <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-400" />
+          </span>
           <span>Datos reales del CRP Portal (mes actual hasta ayer)</span>
         </div>
       )}

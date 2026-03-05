@@ -1,4 +1,4 @@
-import { TrendingUp, Sparkles } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 interface StrategicEmptyStateProps {
   onSetupClick: () => void;
@@ -8,7 +8,7 @@ export function StrategicEmptyState({ onSetupClick }: StrategicEmptyStateProps) 
   return (
     <div className="flex flex-col items-center justify-center py-16 px-8">
       <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
-        <Sparkles className="w-10 h-10 text-white" />
+        <TrendingUp className="w-10 h-10 text-white" />
       </div>
       <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
         Todavía no tienes ningún objetivo
