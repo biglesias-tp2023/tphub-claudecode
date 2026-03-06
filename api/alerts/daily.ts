@@ -469,34 +469,96 @@ function buildConsultantMessage(group: ConsultantGroup): { text: string; blocks:
 // No Claude API formatting — deterministic template is faster and more consistent
 
 // ============================================
-// Handler
+// Alert Type Detection
 // ============================================
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log('[daily-alerts] Starting execution');
+type AlertType = 'daily' | 'weekly' | 'monthly';
 
-  // 1. Accept GET (Vercel Cron) and POST (manual trigger)
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+/**
+ * Determine alert type based on current date (Spain timezone UTC+1/+2):
+ * - Day 1 of month → monthly summary (worst accounts)
+ * - Monday (not 1st) → weekly summary (previous week)
+ * - Tue-Fri → daily alerts (yesterday anomalies)
+ */
+function detectAlertType(): AlertType {
+  // Use Spain timezone (CET/CEST)
+  const now = new Date();
+  const spainDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+  const dayOfMonth = spainDate.getDate();
+  const dayOfWeek = spainDate.getDay(); // 0=Sun, 1=Mon, ...
 
-  // 2. Verify auth (timing-safe comparison)
-  if (!verifyCronSecret(req.headers.authorization as string | undefined)) {
-    console.log('[daily-alerts] Unauthorized request');
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (dayOfMonth === 1) return 'monthly';
+  if (dayOfWeek === 1) return 'weekly'; // Monday
+  return 'daily';
+}
 
-  // 3. Create Supabase client with service role key
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// ============================================
+// Weekly Alert (Monday — previous week summary)
+// ============================================
 
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('[daily-alerts] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-    return res.status(500).json({ error: 'Missing Supabase configuration' });
-  }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAny = any;
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
+async function handleWeeklyAlert(
+  supabase: SupabaseAny,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  console.log('[weekly-alerts] Starting weekly summary');
 
+  // Calculate previous week range (Mon-Sun)
+  const now = new Date();
+  const spainNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+  const prevMonday = new Date(spainNow);
+  prevMonday.setDate(spainNow.getDate() - 7);
+  while (prevMonday.getDay() !== 1) prevMonday.setDate(prevMonday.getDate() - 1);
+  const prevSunday = new Date(prevMonday);
+  prevSunday.setDate(prevMonday.getDate() + 6);
+
+  const weekLabel = `${prevMonday.getDate()}/${prevMonday.getMonth() + 1} - ${prevSunday.getDate()}/${prevSunday.getMonth() + 1}`;
+
+  const blocks: SlackBlock[] = [
+    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDCCA Resumen semanal (${weekLabel})`, emoji: true } },
+    { type: 'section', text: { type: 'mrkdwn', text: ':construction: _Resumen semanal en desarrollo. Próximamente incluirá: pedidos, revenue, reseñas y delivery time de la semana anterior por consultor._' } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · Resumen semanal' }] },
+  ];
+  await sendSlack(`Resumen semanal ${weekLabel}`, blocks);
+  console.log('[weekly-alerts] Done (placeholder)');
+  return { status: 200, body: { message: 'Weekly summary sent (placeholder)', week: weekLabel } };
+}
+
+// ============================================
+// Monthly Alert (Day 1 — worst accounts of previous month)
+// ============================================
+
+async function handleMonthlyAlert(
+  supabase: SupabaseAny,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  console.log('[monthly-alerts] Starting monthly summary');
+
+  const now = new Date();
+  const spainNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+  // Previous month
+  const prevMonth = new Date(spainNow);
+  prevMonth.setMonth(spainNow.getMonth() - 1);
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const monthLabel = `${months[prevMonth.getMonth()]} ${prevMonth.getFullYear()}`;
+
+  const blocks: SlackBlock[] = [
+    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDCC5 Resumen mensual — ${monthLabel}`, emoji: true } },
+    { type: 'section', text: { type: 'mrkdwn', text: ':construction: _Resumen mensual en desarrollo. Próximamente incluirá: las cuentas con peor rendimiento del mes, tendencias y comparativa con el mes anterior._' } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · Resumen mensual' }] },
+  ];
+  await sendSlack(`Resumen mensual — ${monthLabel}`, blocks);
+  console.log('[monthly-alerts] Done (placeholder)');
+  return { status: 200, body: { message: 'Monthly summary sent (placeholder)', month: monthLabel } };
+}
+
+// ============================================
+// Daily Alert (Tue-Fri — yesterday anomalies)
+// ============================================
+
+async function handleDailyAlert(
+  supabase: SupabaseAny,
+): Promise<{ status: number; body: Record<string, unknown> }> {
   // 4. Call RPCs in parallel (orders, reviews, delivery + noise)
   const threshold = Number(process.env.ALERT_THRESHOLD ?? -20);
   const minAvgOrders = Number(process.env.ALERT_MIN_AVG_ORDERS ?? 3);
@@ -544,7 +606,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ];
     await sendSlack(errorText, errorBlocks);
     if (errorEntries.length === 3) {
-      return res.status(500).json({ error: 'Failed to fetch anomaly data' });
+      return { status: 500, body: { error: 'Failed to fetch anomaly data' } };
     }
   }
 
@@ -572,7 +634,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · 08:30' }] },
     ];
     await sendSlack(okText, okBlocks);
-    return res.status(200).json({ message: 'No anomalies', count: 0 });
+    return { status: 200, body: { message: 'No anomalies', count: 0 } };
   }
 
   // 7. Fetch consultant profiles
@@ -658,14 +720,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const groupTotal = filtered.orders.length + filtered.reviews.length + filtered.deliveryTime.length;
     if (groupTotal === 0) continue;
 
-    // Group all anomalies by company name for card-based email
+    // Group all anomalies by company name (unified — channel in each metric line)
     const companyMap = new Map<string, { metrics: AlertCompanyData['metrics']; maxDeviation: number }>();
 
     for (const a of filtered.orders) {
-      const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
+      const key = a.company_name;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
-        label: 'Pedidos',
+        label: `Pedidos (${formatChannel(a.channel)})`,
         value: `${a.yesterday_orders} (media: ${a.avg_orders_baseline}) \u2192 ${a.orders_deviation_pct}%`,
         threshold: '-25%',
       });
@@ -674,10 +736,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     for (const a of filtered.reviews) {
-      const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
+      const key = a.company_name;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       entry.metrics.push({
-        label: 'Resenas',
+        label: `Resenas (${formatChannel(a.channel)})`,
         value: `Rating: ${a.yesterday_avg_rating} (media: ${a.baseline_avg_rating}) | ${a.yesterday_negative_count} negativas`,
         threshold: '4.0',
       });
@@ -686,11 +748,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     for (const a of filtered.deliveryTime) {
-      const key = `${a.company_name} \u2014 ${formatChannel(a.channel)}`;
+      const key = a.company_name;
       const entry = companyMap.get(key) ?? { metrics: [], maxDeviation: 0 };
       const baseline = a.baseline_avg_delivery_min != null ? ` (media: ${a.baseline_avg_delivery_min} min)` : '';
       entry.metrics.push({
-        label: 'Delivery Time',
+        label: `Delivery Time (${formatChannel(a.channel)})`,
         value: `${a.yesterday_avg_delivery_min} min${baseline} | ${a.yesterday_orders_with_time} pedidos`,
         threshold: '40 min',
       });
@@ -730,18 +792,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[daily-alerts] Sent ${emailsSent} email(s)`);
   }
 
-  // 11. Respond
+  // 11. Done
   console.log('[daily-alerts] Done');
-  return res.status(200).json({
-    message: 'Alerts sent',
-    order_anomalies: orderAnomalies.length,
-    review_anomalies: reviewAnomalies.length,
-    ads_anomalies: adsAnomalies.length,
-    promo_anomalies: promoAnomalies.length,
-    delivery_time_anomalies: deliveryTimeAnomalies.length,
-    slack_messages_sent: slackMessagesSent,
-    consultants_notified: Object.keys(groups).length,
-    emails_sent: emailsSent,
-    preferences_loaded: prefsMap.size,
-  });
+  return {
+    status: 200,
+    body: {
+      message: 'Alerts sent',
+      order_anomalies: orderAnomalies.length,
+      review_anomalies: reviewAnomalies.length,
+      ads_anomalies: adsAnomalies.length,
+      promo_anomalies: promoAnomalies.length,
+      delivery_time_anomalies: deliveryTimeAnomalies.length,
+      slack_messages_sent: slackMessagesSent,
+      consultants_notified: Object.keys(groups).length,
+      emails_sent: emailsSent,
+      preferences_loaded: prefsMap.size,
+    },
+  };
+}
+
+// ============================================
+// Handler (entry point — routes to daily/weekly/monthly)
+// ============================================
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('[alerts] Starting execution');
+
+  // 1. Accept GET (Vercel Cron) and POST (manual trigger)
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // 2. Verify auth (timing-safe comparison)
+  if (!verifyCronSecret(req.headers.authorization as string | undefined)) {
+    console.log('[alerts] Unauthorized request');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // 3. Create Supabase client with service role key
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[alerts] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    return res.status(500).json({ error: 'Missing Supabase configuration' });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // 4. Allow manual override via query param: ?type=daily|weekly|monthly
+  const manualType = req.query?.type as string | undefined;
+  const alertType: AlertType = (manualType === 'daily' || manualType === 'weekly' || manualType === 'monthly')
+    ? manualType
+    : detectAlertType();
+
+  console.log(`[alerts] Alert type: ${alertType} (manual=${!!manualType})`);
+
+  // 5. Route to handler
+  let result: { status: number; body: Record<string, unknown> };
+  switch (alertType) {
+    case 'monthly':
+      result = await handleMonthlyAlert(supabase);
+      break;
+    case 'weekly':
+      result = await handleWeeklyAlert(supabase);
+      break;
+    default:
+      result = await handleDailyAlert(supabase);
+  }
+
+  return res.status(result.status).json(result.body);
 }
