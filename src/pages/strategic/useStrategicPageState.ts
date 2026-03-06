@@ -257,12 +257,35 @@ export function useStrategicPageState() {
   }, [allCompanies, effectiveCompanyIds]);
 
   // Real revenue, promos, and ads by month for the SalesProjection grid rows and scorecards
-  const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth({
+  const revenueParams = {
     companyIds: effectiveCompanyIds,
     brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
     addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
-    monthOffsets: [-2, -1, 0, 1, 2, 3],
-  });
+    monthOffsets: [-2, -1, 0, 1, 2, 3] as number[],
+  };
+  const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth(revenueParams);
+
+  // DEBUG: diagnóstico de filtrado de datos reales
+  useEffect(() => {
+    console.group('[Strategic] Diagnóstico datos reales');
+    console.log('filterBrandIds (store):', filterBrandIds);
+    console.log('filterRestaurantIds (store):', filterRestaurantIds);
+    console.log('expandedBrandIds:', expandedBrandIds);
+    console.log('expandedRestaurantIds:', expandedRestaurantIds);
+    console.log('→ RPC params:', {
+      companyIds: revenueParams.companyIds,
+      brandIds: revenueParams.brandIds ?? '(null — sin filtro marca)',
+      addressIds: revenueParams.addressIds ?? '(null — sin filtro dirección)',
+    });
+    if (Object.keys(realRevenueByMonth).length > 0) {
+      const totals: Record<string, number> = {};
+      for (const [month, entry] of Object.entries(realRevenueByMonth)) {
+        totals[month] = (entry.glovo || 0) + (entry.ubereats || 0) + (entry.justeat || 0);
+      }
+      console.log('→ Revenue por mes:', totals);
+    }
+    console.groupEnd();
+  }, [filterBrandIds, filterRestaurantIds, expandedBrandIds, expandedRestaurantIds, revenueParams.companyIds, revenueParams.brandIds, revenueParams.addressIds, realRevenueByMonth]);
 
   // ============================================
   // SALES PROJECTION (Supabase-backed)
