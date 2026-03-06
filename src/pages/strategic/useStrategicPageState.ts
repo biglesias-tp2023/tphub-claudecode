@@ -73,7 +73,10 @@ export function useStrategicPageState() {
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
 
   // State for sales projection modals
-  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  // setupScope tracks the intended scope when the wizard opens:
+  //   null = closed, { brandId: null, addressId: null } = company-level, etc.
+  const [setupScope, setSetupScope] = useState<{ brandId: string | null; addressId: string | null } | null>(null);
+  const isSetupOpen = setupScope !== null;
   const [isWarningOpen, setIsWarningOpen] = useState(false);
 
   // Persisted filter states
@@ -373,23 +376,45 @@ export function useStrategicPageState() {
     targetRevenue: GridChannelMonthData,
     baselineRevenue: ChannelMonthEntry
   ) => {
+    if (!setupScope) return;
     try {
       await upsertProjection.mutateAsync({
         companyId: primaryCompanyId,
-        brandId: primaryBrandId,
-        addressId: primaryAddressId,
+        brandId: setupScope.brandId,
+        addressId: setupScope.addressId,
         config,
         baselineRevenue,
         targetRevenue,
         targetAds: {},
         targetPromos: {},
       });
-      setIsSetupOpen(false);
+      setSetupScope(null);
       success('Proyección de ventas creada');
     } catch {
       error('Error al crear proyección');
     }
-  }, [primaryCompanyId, primaryBrandId, primaryAddressId, upsertProjection, success, error]);
+  }, [setupScope, primaryCompanyId, upsertProjection, success, error]);
+
+  // Open setup wizard with explicit scope
+  const openSetupForCompany = useCallback(() => {
+    setSetupScope({ brandId: null, addressId: null });
+  }, []);
+
+  const openSetupForBrand = useCallback(() => {
+    setSetupScope({ brandId: primaryBrandId, addressId: null });
+  }, [primaryBrandId]);
+
+  const openSetupForAddress = useCallback(() => {
+    setSetupScope({ brandId: primaryBrandId, addressId: primaryAddressId });
+  }, [primaryBrandId, primaryAddressId]);
+
+  const openSetupForExisting = useCallback(() => {
+    if (salesProjection) {
+      setSetupScope({ brandId: salesProjection.brandId, addressId: salesProjection.addressId });
+    }
+  }, [salesProjection]);
+
+  const closeSetup = useCallback(() => setSetupScope(null), []);
 
   const handleUpdateTargetRevenue = useCallback((data: GridChannelMonthData) => {
     if (!salesProjection) return;
@@ -409,8 +434,12 @@ export function useStrategicPageState() {
 
   const handleCreateNewFromWarning = useCallback(() => {
     setIsWarningOpen(false);
-    setIsSetupOpen(true);
-  }, []);
+    // Renew at the same scope as the current projection
+    setSetupScope({
+      brandId: salesProjection?.brandId ?? null,
+      addressId: salesProjection?.addressId ?? null,
+    });
+  }, [salesProjection]);
 
   // ============================================
   // HANDLERS - Objectives
@@ -713,7 +742,11 @@ export function useStrategicPageState() {
 
     // Modal state - Sales Projection
     isSetupOpen,
-    setIsSetupOpen,
+    openSetupForCompany,
+    openSetupForBrand,
+    openSetupForAddress,
+    openSetupForExisting,
+    closeSetup,
     isWarningOpen,
     handleSetupComplete,
     handleUpdateTargetRevenue,

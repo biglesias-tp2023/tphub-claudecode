@@ -144,7 +144,7 @@ export function StrategicPage() {
       {/* Show empty state or sales projection + objectives */}
       {!state.hasSalesProjection && !state.hasObjectives ? (
         <Card padding="none" className="border-gray-100">
-          <StrategicEmptyState onSetupClick={() => state.setIsSetupOpen(true)} />
+          <StrategicEmptyState onSetupClick={state.openSetupForCompany} />
         </Card>
       ) : (
         <>
@@ -165,7 +165,7 @@ export function StrategicPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => state.setIsSetupOpen(true)}
+                      onClick={targetScope === 'address' ? state.openSetupForAddress : state.openSetupForBrand}
                       className="text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors whitespace-nowrap"
                     >
                       Crear para {targetName}
@@ -177,7 +177,7 @@ export function StrategicPage() {
                 config={state.salesProjection.config}
                 targetRevenue={state.salesProjection.targetRevenue}
                 onTargetChange={state.handleUpdateTargetRevenue}
-                onEditConfig={() => state.setIsSetupOpen(true)}
+                onEditConfig={state.openSetupForExisting}
                 realRevenueByMonth={state.realRevenueByMonth}
                 realPromosByMonth={state.realPromosByMonth}
                 realAdsByMonth={state.realAdsByMonth}
@@ -186,7 +186,7 @@ export function StrategicPage() {
             </>
           ) : (
             <button
-              onClick={() => state.setIsSetupOpen(true)}
+              onClick={state.openSetupForCompany}
               className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-dashed border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 transition-colors group"
             >
               <div className="flex items-center gap-3">
@@ -195,11 +195,7 @@ export function StrategicPage() {
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-medium text-gray-900">Proyeccion de ventas</p>
-                  <p className="text-xs text-gray-500">
-                    {brandName
-                      ? `Configura objetivos para ${brandName}`
-                      : 'Configura objetivos de facturacion por canal'}
-                  </p>
+                  <p className="text-xs text-gray-500">Configura objetivos de facturacion por canal</p>
                 </div>
               </div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 rounded-lg group-hover:bg-primary-100 transition-colors">
@@ -432,7 +428,7 @@ export function StrategicPage() {
       {/* Modals */}
       <SalesProjectionSetup
         isOpen={state.isSetupOpen}
-        onClose={() => state.setIsSetupOpen(false)}
+        onClose={state.closeSetup}
         onComplete={state.handleSetupComplete}
         companyIds={state.effectiveCompanyIds}
         brandIds={state.expandedBrandIds}
