@@ -1,10 +1,11 @@
 /**
  * Sales Projections data operations
  *
- * Follows the same pattern as strategic-objectives.ts
+ * Always uses Supabase (no localStorage fallback) so projections
+ * persist across environments and are queryable for analytics.
  */
 
-import { supabase, handleQueryError, isDevMode } from './shared';
+import { supabase, handleQueryError } from './shared';
 import type {
   SalesProjectionData,
   SalesProjectionInput,
@@ -13,25 +14,6 @@ import type {
   ChannelMonthEntry,
   GridChannelMonthData,
 } from '@/types';
-
-// ============================================
-// LOCAL STORAGE (dev mode fallback)
-// ============================================
-
-const LOCAL_STORAGE_KEY = 'tphub_sales_projections';
-
-function getLocalProjections(): SalesProjectionData[] {
-  try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalProjections(projections: SalesProjectionData[]): void {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(projections));
-}
 
 // ============================================
 // HELPERS
@@ -93,17 +75,6 @@ export async function fetchSalesProjection(
 ): Promise<SalesProjectionData | null> {
   const { companyId, brandId, addressId } = params;
 
-  // Dev mode: local storage
-  if (isDevMode) {
-    const all = getLocalProjections();
-    return all.find(
-      (p) =>
-        p.companyId === companyId &&
-        (p.brandId ?? null) === (brandId ?? null) &&
-        (p.addressId ?? null) === (addressId ?? null)
-    ) ?? null;
-  }
-
   let query = supabase
     .from('sales_projections')
     .select('*')
@@ -138,17 +109,6 @@ export async function fetchSalesProjectionsByCompanyIds(
 ): Promise<SalesProjectionData[]> {
   if (companyIds.length === 0) return [];
 
-  // Dev mode: local storage
-  if (isDevMode) {
-    const all = getLocalProjections();
-    return all.filter(
-      (p) =>
-        companyIds.includes(p.companyId) &&
-        p.brandId === null &&
-        p.addressId === null
-    );
-  }
-
   const { data, error } = await supabase
     .from('sales_projections')
     .select('*')
@@ -174,42 +134,6 @@ export async function upsertSalesProjection(
   input: SalesProjectionInput
 ): Promise<SalesProjectionData> {
   const { companyId, brandId, addressId, config, baselineRevenue, targetRevenue, targetAds, targetPromos } = input;
-
-  // Dev mode: local storage
-  if (isDevMode) {
-    const all = getLocalProjections();
-    const existingIdx = all.findIndex(
-      (p) =>
-        p.companyId === companyId &&
-        (p.brandId ?? null) === (brandId ?? null) &&
-        (p.addressId ?? null) === (addressId ?? null)
-    );
-
-    const now = new Date().toISOString();
-    const projection: SalesProjectionData = {
-      id: existingIdx >= 0 ? all[existingIdx].id : crypto.randomUUID(),
-      companyId,
-      brandId: brandId ?? null,
-      addressId: addressId ?? null,
-      config,
-      baselineRevenue,
-      targetRevenue,
-      targetAds: targetAds ?? {},
-      targetPromos: targetPromos ?? {},
-      createdBy: existingIdx >= 0 ? all[existingIdx].createdBy : 'dev-user-001',
-      updatedBy: 'dev-user-001',
-      createdAt: existingIdx >= 0 ? all[existingIdx].createdAt : now,
-      updatedAt: now,
-    };
-
-    if (existingIdx >= 0) {
-      all[existingIdx] = projection;
-    } else {
-      all.push(projection);
-    }
-    saveLocalProjections(all);
-    return projection;
-  }
 
   // Check if one already exists
   const existing = await fetchSalesProjection({ companyId, brandId, addressId });
@@ -276,23 +200,6 @@ export async function updateSalesProjectionTargets(
   id: string,
   updates: SalesProjectionTargetUpdates
 ): Promise<SalesProjectionData> {
-  // Dev mode: local storage
-  if (isDevMode) {
-    const all = getLocalProjections();
-    const idx = all.findIndex((p) => p.id === id);
-    if (idx < 0) throw new Error(`Projection not found: ${id}`);
-
-    const now = new Date().toISOString();
-    if (updates.targetRevenue !== undefined) all[idx].targetRevenue = updates.targetRevenue;
-    if (updates.targetAds !== undefined) all[idx].targetAds = updates.targetAds;
-    if (updates.targetPromos !== undefined) all[idx].targetPromos = updates.targetPromos;
-    all[idx].updatedAt = now;
-    all[idx].updatedBy = 'dev-user-001';
-
-    saveLocalProjections(all);
-    return all[idx];
-  }
-
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id || null;
 
@@ -320,16 +227,6 @@ export async function updateSalesProjectionTargets(
  * Delete a sales projection by ID.
  */
 export async function deleteSalesProjection(id: string): Promise<void> {
-  // Dev mode: local storage
-  if (isDevMode) {
-    const all = getLocalProjections();
-    const idx = all.findIndex((p) => p.id === id);
-    if (idx < 0) throw new Error(`Projection not found: ${id}`);
-    all.splice(idx, 1);
-    saveLocalProjections(all);
-    return;
-  }
-
   const { error } = await supabase
     .from('sales_projections')
     .delete()

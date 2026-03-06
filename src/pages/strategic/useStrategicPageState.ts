@@ -27,7 +27,6 @@ import {
   useUpdateSalesProjectionTargets,
 } from '@/features/strategic/hooks';
 import { upsertSalesProjection as upsertSalesProjectionService } from '@/services/supabase-data';
-import { queryKeys } from '@/constants/queryKeys';
 import {
   exportObjectivesToPDF,
   exportObjectivesToExcel,
@@ -53,7 +52,8 @@ import type {
 // CONSTANTS
 // ============================================
 
-const LEGACY_SALES_PROJECTION_KEY = 'tphub_sales_projection';
+const LEGACY_PROJECTION_KEY = 'tphub_sales_projection';       // v1: single projection
+const LEGACY_PROJECTIONS_KEY = 'tphub_sales_projections';     // v2: dev-mode array
 const WARNING_DISMISSED_KEY = 'tphub_warning_dismissed';
 
 // ============================================
@@ -311,9 +311,10 @@ export function useStrategicPageState() {
   // Multi company: use aggregated projection from all company-level projections
   const singleCompanyProjection = addressProjection ?? brandProjection ?? companyProjection;
   const salesProjection = isMultiCompany ? aggregatedProjection : singleCompanyProjection;
-  const isLoadingProjection = isMultiCompany
+  const _isLoadingProjection = isMultiCompany
     ? isLoadingBulk
     : (isLoadingAddressProjection || isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false));
+  void _isLoadingProjection; // reserved for future use
 
   // Fallback info: which level is being shown vs which was requested
   const fallbackInfo = useMemo(() => {
@@ -335,46 +336,74 @@ export function useStrategicPageState() {
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
 
-  // One-time migration: localStorage → Supabase
+  // One-time migration: localStorage → Supabase (both legacy keys)
   const migrationDone = useRef(false);
   useEffect(() => {
-    if (migrationDone.current || !primaryCompanyId || isLoadingProjection) return;
-    if (salesProjection) {
-      // Already has a Supabase projection — no migration needed
-      migrationDone.current = true;
-      return;
+    if (migrationDone.current || !primaryCompanyId) return;
+    migrationDone.current = true;
+
+    const upserts: Promise<unknown>[] = [];
+
+    // v1: single legacy projection (tphub_sales_projection)
+    const v1 = localStorage.getItem(LEGACY_PROJECTION_KEY);
+    if (v1) {
+      try {
+        const legacy = JSON.parse(v1);
+        upserts.push(
+          upsertSalesProjectionService({
+            companyId: primaryCompanyId,
+            config: legacy.config,
+            baselineRevenue: legacy.baselineRevenue ?? { glovo: 0, ubereats: 0, justeat: 0 },
+            targetRevenue: legacy.targetRevenue ?? {},
+            targetAds: legacy.targetAds ?? {},
+            targetPromos: legacy.targetPromos ?? {},
+          }).then(() => localStorage.removeItem(LEGACY_PROJECTION_KEY))
+        );
+      } catch { /* ignore corrupt data */ }
     }
 
-    const stored = localStorage.getItem(LEGACY_SALES_PROJECTION_KEY);
-    if (!stored) {
-      migrationDone.current = true;
-      return;
-    }
-
-    try {
-      const legacy = JSON.parse(stored);
-      // Migrate to Supabase (use service directly, not hook, since this is fire-and-forget in effect)
-      upsertSalesProjectionService({
-        companyId: primaryCompanyId,
-        config: legacy.config,
-        baselineRevenue: legacy.baselineRevenue ?? { glovo: 0, ubereats: 0, justeat: 0 },
-        targetRevenue: legacy.targetRevenue ?? {},
-        targetAds: legacy.targetAds ?? {},
-        targetPromos: legacy.targetPromos ?? {},
-      }).then(() => {
-        localStorage.removeItem(LEGACY_SALES_PROJECTION_KEY);
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.salesProjections.byScope(primaryCompanyId),
+    // v2: dev-mode array (tphub_sales_projections)
+    const v2 = localStorage.getItem(LEGACY_PROJECTIONS_KEY);
+    if (v2) {
+      try {
+        const projections: SalesProjectionData[] = JSON.parse(v2);
+        for (const p of projections) {
+          upserts.push(
+            upsertSalesProjectionService({
+              companyId: p.companyId,
+              brandId: p.brandId,
+              addressId: p.addressId,
+              config: p.config,
+              baselineRevenue: p.baselineRevenue ?? { glovo: 0, ubereats: 0, justeat: 0 },
+              targetRevenue: p.targetRevenue ?? {},
+              targetAds: p.targetAds ?? {},
+              targetPromos: p.targetPromos ?? {},
+            })
+          );
+        }
+        // Remove after all succeed
+        Promise.all(upserts).then(() => {
+          localStorage.removeItem(LEGACY_PROJECTIONS_KEY);
+          // Refresh all projection queries
+          queryClient.invalidateQueries({ queryKey: ['sales-projections'] });
+          if (import.meta.env.DEV) console.log(`[migration] Migrated ${projections.length} projections to Supabase`);
+        }).catch(() => {
+          // Partial failure — keep localStorage, will retry next time
+          migrationDone.current = false;
         });
-        migrationDone.current = true;
-      }).catch(() => {
-        // Migration failed — keep localStorage, will retry next time
-        migrationDone.current = true;
-      });
-    } catch {
-      migrationDone.current = true;
+        return; // v2 handles its own invalidation
+      } catch { /* ignore corrupt data */ }
     }
-  }, [primaryCompanyId, salesProjection, isLoadingProjection]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // If only v1 ran, invalidate
+    if (upserts.length > 0) {
+      Promise.all(upserts).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['sales-projections'] });
+      }).catch(() => {
+        migrationDone.current = false;
+      });
+    }
+  }, [primaryCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check for 60-day warning
   useEffect(() => {
