@@ -44,6 +44,7 @@ export { useActualRevenueByMonth } from './useActualRevenueByMonth';
 // Sales Projections (Supabase-backed)
 export {
   useSalesProjection,
+  useSalesProjectionsBulk,
   useUpsertSalesProjection,
   useUpdateSalesProjectionTargets,
   useDeleteSalesProjection,

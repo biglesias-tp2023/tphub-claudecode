@@ -131,12 +131,12 @@ export function StrategicPage() {
       {/* Dashboard Filters */}
       <DashboardFilters hideChannels hideDateRange />
 
-      {/* Multi-company disclaimer */}
-      {state.companyIds.length > 1 && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <Info className="w-4 h-4 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800">
-            Por favor, selecciona una única compañía para poder trabajar con una única proyección de ventas.
+      {/* Multi-company info: how many have projections */}
+      {state.isMultiCompany && state.multiCompanyProjectionCount > 0 && state.multiCompanyProjectionCount < state.effectiveCompanyIds.length && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-primary-50 border border-primary-200 rounded-xl">
+          <Info className="w-4 h-4 text-primary-600 shrink-0" />
+          <p className="text-sm text-primary-800">
+            {state.multiCompanyProjectionCount} de {state.effectiveCompanyIds.length} compañías tienen proyección configurada. Los datos mostrados agregan solo las que tienen proyección.
           </p>
         </div>
       )}
@@ -144,7 +144,7 @@ export function StrategicPage() {
       {/* Show empty state or sales projection + objectives */}
       {!state.hasSalesProjection && !state.hasObjectives ? (
         <Card padding="none" className="border-gray-100">
-          <StrategicEmptyState onSetupClick={state.openSetupForCompany} />
+          <StrategicEmptyState onSetupClick={state.isMultiCompany ? undefined : state.openSetupForCompany} />
         </Card>
       ) : (
         <>
@@ -176,14 +176,28 @@ export function StrategicPage() {
               <SalesProjection
                 config={state.salesProjection.config}
                 targetRevenue={state.salesProjection.targetRevenue}
-                onTargetChange={state.handleUpdateTargetRevenue}
-                onEditConfig={state.openSetupForExisting}
+                onTargetChange={state.isMultiCompany ? undefined : state.handleUpdateTargetRevenue}
+                onEditConfig={state.isMultiCompany ? undefined : state.openSetupForExisting}
                 realRevenueByMonth={state.realRevenueByMonth}
                 realPromosByMonth={state.realPromosByMonth}
                 realAdsByMonth={state.realAdsByMonth}
                 commissions={state.commissions}
               />
             </>
+          ) : state.isMultiCompany ? (
+            <div className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-dashed border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">
+                  <BarChart3 className="w-4.5 h-4.5 text-gray-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Proyección de ventas</p>
+                  <p className="text-xs text-gray-500">
+                    Ninguna de las {state.effectiveCompanyIds.length} compañías seleccionadas tiene proyección. Selecciona una compañía para configurar.
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : (
             <button
               onClick={state.openSetupForCompany}
@@ -431,8 +445,8 @@ export function StrategicPage() {
         onClose={state.closeSetup}
         onComplete={state.handleSetupComplete}
         companyIds={state.effectiveCompanyIds}
-        brandIds={state.expandedBrandIds}
-        addressIds={state.expandedRestaurantIds}
+        brandIds={state.wizardBrandIds}
+        addressIds={state.wizardAddressIds}
         existingProjection={state.salesProjection}
         scopeLabel={[companyLabel, brandName, addressName].filter(Boolean).join(' > ')}
       />

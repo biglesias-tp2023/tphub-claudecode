@@ -22,6 +22,7 @@ import {
   useProfiles,
   useActualRevenueByMonth,
   useSalesProjection,
+  useSalesProjectionsBulk,
   useUpsertSalesProjection,
   useUpdateSalesProjectionTargets,
 } from '@/features/strategic/hooks';
@@ -43,6 +44,7 @@ import type {
   ObjectiveCategory,
   ObjectiveStatus,
   SalesProjectionConfig,
+  SalesProjectionData,
   GridChannelMonthData,
   ChannelMonthEntry,
 } from '@/types';
@@ -53,6 +55,72 @@ import type {
 
 const LEGACY_SALES_PROJECTION_KEY = 'tphub_sales_projection';
 const WARNING_DISMISSED_KEY = 'tphub_warning_dismissed';
+
+// ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Aggregate multiple SalesProjectionData into a single virtual projection.
+ * Sums targetRevenue, targetAds, targetPromos and baselineRevenue across all projections.
+ * Takes the union of active channels and the widest date range.
+ */
+function aggregateSalesProjections(projections: SalesProjectionData[]): SalesProjectionData {
+  const sumGrid = (grids: GridChannelMonthData[]): GridChannelMonthData => {
+    const result: GridChannelMonthData = {};
+    for (const grid of grids) {
+      for (const [monthKey, entry] of Object.entries(grid)) {
+        if (!result[monthKey]) {
+          result[monthKey] = { glovo: 0, ubereats: 0, justeat: 0 };
+        }
+        result[monthKey].glovo += entry.glovo;
+        result[monthKey].ubereats += entry.ubereats;
+        result[monthKey].justeat += entry.justeat;
+      }
+    }
+    return result;
+  };
+
+  const sumBaseline = (baselines: ChannelMonthEntry[]): ChannelMonthEntry => {
+    const result: ChannelMonthEntry = { glovo: 0, ubereats: 0, justeat: 0 };
+    for (const b of baselines) {
+      result.glovo += b.glovo;
+      result.ubereats += b.ubereats;
+      result.justeat += b.justeat;
+    }
+    return result;
+  };
+
+  // Union of active channels
+  const allChannels = new Set(projections.flatMap(p => p.config.activeChannels));
+
+  // Widest date range
+  const startDates = projections.map(p => p.config.startDate).filter(Boolean).sort();
+  const endDates = projections.map(p => p.config.endDate).filter(Boolean).sort();
+
+  return {
+    id: '__aggregated__',
+    companyId: '__multi__',
+    brandId: null,
+    addressId: null,
+    config: {
+      activeChannels: Array.from(allChannels),
+      investmentMode: 'global',
+      maxAdsPercent: 0,
+      maxPromosPercent: 0,
+      startDate: startDates[0] || '',
+      endDate: endDates[endDates.length - 1] || '',
+    },
+    baselineRevenue: sumBaseline(projections.map(p => p.baselineRevenue)),
+    targetRevenue: sumGrid(projections.map(p => p.targetRevenue)),
+    targetAds: sumGrid(projections.map(p => p.targetAds)),
+    targetPromos: sumGrid(projections.map(p => p.targetPromos)),
+    createdBy: null,
+    updatedBy: null,
+    createdAt: '',
+    updatedAt: '',
+  };
+}
 
 // ============================================
 // HOOK
@@ -135,6 +203,18 @@ export function useStrategicPageState() {
     [filterRestaurantIds, allRestaurants]
   );
 
+  // Scope-aware IDs for the wizard: derived from setupScope, not global filters.
+  // This ensures the baseline revenue matches the scope being configured.
+  const wizardBrandIds = useMemo(() => {
+    if (!setupScope?.brandId) return undefined;
+    return expandBrandIds([setupScope.brandId], allBrands);
+  }, [setupScope, allBrands]);
+
+  const wizardAddressIds = useMemo(() => {
+    if (!setupScope?.addressId) return undefined;
+    return expandRestaurantIds([setupScope.addressId], allRestaurants);
+  }, [setupScope, allRestaurants]);
+
   // Resolve primary company: when a brand is selected, use its parent company
   // so the projection lookup matches even with 2+ companies selected.
   const primaryCompanyId = useMemo(() => {
@@ -209,11 +289,35 @@ export function useStrategicPageState() {
     brandId: null,
   });
 
-  const salesProjection = addressProjection ?? brandProjection ?? companyProjection;
-  const isLoadingProjection = isLoadingAddressProjection || isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false);
+  // ============================================
+  // MULTI-COMPANY AGGREGATION
+  // ============================================
+
+  const isMultiCompany = effectiveCompanyIds.length > 1;
+
+  const { data: bulkProjections = [], isLoading: isLoadingBulk } =
+    useSalesProjectionsBulk(isMultiCompany ? effectiveCompanyIds : []);
+
+  // Aggregate all company-level projections: sum targets per month×channel
+  const aggregatedProjection = useMemo((): SalesProjectionData | null => {
+    if (!isMultiCompany || bulkProjections.length === 0) return null;
+    return aggregateSalesProjections(bulkProjections);
+  }, [isMultiCompany, bulkProjections]);
+
+  // How many selected companies have a projection (for UI feedback)
+  const multiCompanyProjectionCount = isMultiCompany ? bulkProjections.length : 0;
+
+  // Single company: use fallback chain (address → brand → company)
+  // Multi company: use aggregated projection from all company-level projections
+  const singleCompanyProjection = addressProjection ?? brandProjection ?? companyProjection;
+  const salesProjection = isMultiCompany ? aggregatedProjection : singleCompanyProjection;
+  const isLoadingProjection = isMultiCompany
+    ? isLoadingBulk
+    : (isLoadingAddressProjection || isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false));
 
   // Fallback info: which level is being shown vs which was requested
   const fallbackInfo = useMemo(() => {
+    if (isMultiCompany) return null; // No fallback info in multi-company mode
     if (primaryAddressId) {
       if (addressProjection) return null;
       if (brandProjection) return { level: 'brand' as const, targetScope: 'address' as const };
@@ -226,7 +330,7 @@ export function useStrategicPageState() {
       return null;
     }
     return null;
-  }, [primaryAddressId, primaryBrandId, addressProjection, brandProjection, companyProjection]);
+  }, [isMultiCompany, primaryAddressId, primaryBrandId, addressProjection, brandProjection, companyProjection]);
 
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
@@ -674,6 +778,8 @@ export function useStrategicPageState() {
     hasSalesProjection,
     fallbackInfo,
     daysRemaining,
+    isMultiCompany,
+    multiCompanyProjectionCount,
 
     // Data
     objectives,
@@ -692,6 +798,8 @@ export function useStrategicPageState() {
     filterRestaurantIds,
     expandedBrandIds,
     expandedRestaurantIds,
+    wizardBrandIds,
+    wizardAddressIds,
     profiles,
     tasksByDate,
     sortedDates,

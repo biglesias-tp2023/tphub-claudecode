@@ -1,7 +1,7 @@
 import { TrendingUp } from 'lucide-react';
 
 interface StrategicEmptyStateProps {
-  onSetupClick: () => void;
+  onSetupClick?: () => void;
 }
 
 export function StrategicEmptyState({ onSetupClick }: StrategicEmptyStateProps) {
@@ -14,15 +14,20 @@ export function StrategicEmptyState({ onSetupClick }: StrategicEmptyStateProps) 
         Todavía no tienes ningún objetivo
       </h2>
       <p className="text-sm text-gray-500 mb-8 text-center max-w-md">
-        Es el momento de empezar a definir tu estrategia de ventas. Configura tus canales, inversiones y objetivos mensuales.
+        {onSetupClick
+          ? 'Es el momento de empezar a definir tu estrategia de ventas. Configura tus canales, inversiones y objetivos mensuales.'
+          : 'Selecciona una compañía para configurar su proyección de ventas.'
+        }
       </p>
-      <button
-        onClick={onSetupClick}
-        className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-600/25 transition-all hover:shadow-xl hover:shadow-primary-600/30"
-      >
-        <TrendingUp className="w-5 h-5" />
-        Configurar proyección de ventas
-      </button>
+      {onSetupClick && (
+        <button
+          onClick={onSetupClick}
+          className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-600/25 transition-all hover:shadow-xl hover:shadow-primary-600/30"
+        >
+          <TrendingUp className="w-5 h-5" />
+          Configurar proyección de ventas
+        </button>
+      )}
     </div>
   );
 }

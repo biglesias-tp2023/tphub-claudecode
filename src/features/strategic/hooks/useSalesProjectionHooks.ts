@@ -7,6 +7,7 @@ import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { queryKeys } from '@/constants/queryKeys';
 import {
   fetchSalesProjection,
+  fetchSalesProjectionsByCompanyIds,
   upsertSalesProjection,
   updateSalesProjectionTargets,
   deleteSalesProjection,
@@ -32,6 +33,20 @@ export function useSalesProjection({ companyId, brandId, addressId }: UseSalesPr
     queryKey: queryKeys.salesProjections.byScope(companyId, brandId, addressId),
     queryFn: () => fetchSalesProjection({ companyId, brandId, addressId }),
     enabled: !!companyId,
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
+  });
+}
+
+/**
+ * Fetch company-level projections for multiple companies (for aggregation).
+ * Only enabled when there are 2+ company IDs.
+ */
+export function useSalesProjectionsBulk(companyIds: string[]) {
+  return useQuery({
+    queryKey: queryKeys.salesProjections.bulk(companyIds),
+    queryFn: () => fetchSalesProjectionsByCompanyIds(companyIds),
+    enabled: companyIds.length > 1,
     staleTime: QUERY_STALE_MEDIUM,
     gcTime: QUERY_GC_MEDIUM,
   });

@@ -129,6 +129,39 @@ export async function fetchSalesProjection(
   return mapDbSalesProjection(data as DbSalesProjection);
 }
 
+/**
+ * Fetch all company-level projections for the given company IDs.
+ * Used for multi-company aggregation.
+ */
+export async function fetchSalesProjectionsByCompanyIds(
+  companyIds: string[]
+): Promise<SalesProjectionData[]> {
+  if (companyIds.length === 0) return [];
+
+  // Dev mode: local storage
+  if (isDevMode) {
+    const all = getLocalProjections();
+    return all.filter(
+      (p) =>
+        companyIds.includes(p.companyId) &&
+        p.brandId === null &&
+        p.addressId === null
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('sales_projections')
+    .select('*')
+    .in('company_id', companyIds)
+    .is('brand_id', null)
+    .is('address_id', null);
+
+  if (error) handleQueryError(error, 'No se pudieron cargar las proyecciones');
+  if (!data) return [];
+
+  return data.map((row) => mapDbSalesProjection(row as DbSalesProjection));
+}
+
 // ============================================
 // UPSERT
 // ============================================
