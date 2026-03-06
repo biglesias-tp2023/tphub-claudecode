@@ -1,5 +1,6 @@
 import { useSessionState } from '@/hooks/useSessionState';
 import { DashboardFilters } from '@/features/dashboard';
+import { CalcErrorBoundary } from './components';
 import { DeliveryMarginCalc } from './DeliveryMarginCalc';
 import { PhotoSessionCalc } from './PhotoSessionCalc';
 import { DistributionCalc } from './DistributionCalc';
@@ -30,10 +31,12 @@ export function CalculatorPage() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-6">
+        <nav className="flex gap-6" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === tab.id
@@ -48,9 +51,11 @@ export function CalculatorPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'delivery' && <DeliveryMarginCalc />}
-      {activeTab === 'photo' && <PhotoSessionCalc />}
-      {activeTab === 'distrib' && <DistributionCalc />}
+      <CalcErrorBoundary>
+        {activeTab === 'delivery' && <DeliveryMarginCalc />}
+        {activeTab === 'photo' && <PhotoSessionCalc />}
+        {activeTab === 'distrib' && <DistributionCalc />}
+      </CalcErrorBoundary>
     </div>
   );
 }

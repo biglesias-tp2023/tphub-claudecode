@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Receipt, Bike, MapPinned } from 'lucide-react';
-import { Field, HeroKpi, WaterfallBreakdown, eur, pct, INPUT_CLASS } from './components';
+import { Field, HeroKpi, WaterfallBreakdown, Pill, eur, pct, INPUT_CLASS } from './components';
 import type { WaterfallLine } from './components';
 import { useSessionState } from '@/hooks/useSessionState';
 import { cn } from '@/utils/cn';
@@ -20,6 +20,11 @@ const PLATFORMS: Record<Platform, { label: string; fee: number; promos: number; 
 const VEHICLE_SPEED: Record<Vehicle, number> = { moto: 25, bici: 15 };
 const DEFAULT_ENVIOS = [1.5, 1.9, 2.3, 2.7, 3.1, 3.5, 3.9, 4.3, 4.7, 5.1];
 const EXTERNAL_PROVIDERS = ['Catcher', 'GlovoBusiness', 'UberDirect', 'Otros'];
+const MINUTES_PER_HOUR = 60;
+const DEFAULT_TOTAL_TIME_MIN = 20;
+const MIN_FIXED_TIME_MIN = 1;
+const MAX_KM = 10;
+const ROUND_TRIP_FACTOR = 2;
 
 interface FormState {
   platform: Platform;
@@ -56,24 +61,6 @@ const defaultForm: FormState = {
   distMax: 5,
   margenObjetivo: 10,
 };
-
-// --- Helpers ---
-
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-        active
-          ? 'bg-primary-600 text-white'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 // --- Component ---
 
@@ -192,9 +179,9 @@ export function DistributionCalc() {
     const speed = VEHICLE_SPEED[form.vehicle];
     const distMid = (form.distMin + form.distMax) / 2;
 
-    const totalTimeRef = form.pedidosHora > 0 ? 60 / form.pedidosHora : 20;
-    const travelTimeRef = (distMid * 2 / speed) * 60;
-    const fixedTime = Math.max(1, totalTimeRef - travelTimeRef);
+    const totalTimeRef = form.pedidosHora > 0 ? MINUTES_PER_HOUR / form.pedidosHora : DEFAULT_TOTAL_TIME_MIN;
+    const travelTimeRef = (distMid * ROUND_TRIP_FACTOR / speed) * MINUTES_PER_HOUR;
+    const fixedTime = Math.max(MIN_FIXED_TIME_MIN, totalTimeRef - travelTimeRef);
 
     const feeEur = form.ticketMedio * form.feeMarketplace / 100;
     const promosEur = form.ticketMedio * form.promos / 100;
@@ -202,10 +189,10 @@ export function DistributionCalc() {
     const foodCostEur = form.ticketMedio * form.foodCost / 100;
     const margenObjetivoEur = form.ticketMedio * form.margenObjetivo / 100;
 
-    return Array.from({ length: 10 }, (_, i) => {
+    return Array.from({ length: MAX_KM }, (_, i) => {
       const km = i + 1;
-      const travelTime = (km * 2 / speed) * 60;
-      const pedidosHora = 60 / (fixedTime + travelTime);
+      const travelTime = (km * ROUND_TRIP_FACTOR / speed) * MINUTES_PER_HOUR;
+      const pedidosHora = MINUTES_PER_HOUR / (fixedTime + travelTime);
       const riderCostPerOrder =
         form.fleetType === 'propia' ? form.riderCostHour / pedidosHora : 0;
       const costeTotal = feeEur + promosEur + adsEur + foodCostEur + riderCostPerOrder;

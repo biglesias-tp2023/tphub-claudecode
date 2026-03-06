@@ -1,5 +1,22 @@
+import { Component } from 'react';
 import type { ReactNode } from 'react';
 import { cn } from '@/utils/cn';
+
+export function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+        active
+          ? 'bg-primary-600 text-white'
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -150,3 +167,32 @@ export const pct = (v: number) => `${v.toFixed(1)}%`;
 
 export const INPUT_CLASS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+
+export class CalcErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-sm font-medium text-red-700 mb-1">Error en la calculadora</p>
+          <p className="text-xs text-red-500">{this.state.error.message}</p>
+          <button
+            onClick={() => this.setState({ error: null })}
+            className="mt-3 px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50"
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}

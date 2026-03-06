@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Plus, Trash2, X, Package, Percent, Coins, ShoppingBag } from 'lucide-react';
 import { Field, HeroKpi, WaterfallBreakdown, eur, INPUT_CLASS } from './components';
 import type { WaterfallLine } from './components';
@@ -53,8 +53,6 @@ interface CalculatedRow {
 
 // --- Helpers ---
 
-const STORAGE_KEY = 'tphub-calculator-products';
-
 const promoLabel = (tipo: PromoType, val: number) => {
   if (tipo === 'pct') return `-${val}%`;
   if (tipo === '2x1') return '2x1';
@@ -80,28 +78,11 @@ const defaultForm: FormState = {
   multFee: 1,
 };
 
-function loadRows(): CalculatedRow[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveRows(rows: CalculatedRow[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-}
-
 // --- Component ---
 
 export function DeliveryMarginCalc() {
   const [form, setForm] = useSessionState<FormState>('tphub-calc-delivery', defaultForm);
-  const [rows, setRows] = useState<CalculatedRow[]>(loadRows);
-
-  // Persist rows to localStorage
-  useEffect(() => {
-    saveRows(rows);
-  }, [rows]);
+  const [rows, setRows] = useSessionState<CalculatedRow[]>('tphub-calc-delivery-rows', []);
 
   // Update a single form field
   const set = useCallback(
@@ -589,7 +570,7 @@ export function DeliveryMarginCalc() {
 
         {/* Hint */}
         <p className="text-xs text-gray-400 px-1">
-          Los productos se guardan en tu navegador (localStorage).
+          Los productos se guardan en tu sesión de navegador.
         </p>
       </div>
     </div>
