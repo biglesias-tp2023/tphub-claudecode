@@ -237,11 +237,26 @@ export function buildHierarchyFromRPCMetrics(
     });
   }
 
-  // 2. STORE rows — skip stores with no data in either period
+  // Helper to sum store metrics across all portal-specific IDs
+  const sumStoreMetrics = (
+    allStoreIds: string[], companyId: string,
+    agg: AggregatedRPCMetrics
+  ): RPCBaseMetrics | undefined => {
+    let result: RPCBaseMetrics | undefined;
+    for (const storeId of allStoreIds) {
+      const m = agg.byStore.get(`${companyId}::${storeId}`);
+      if (m) {
+        if (!result) result = createEmptyRPCBase();
+        addMetrics(result, m);
+      }
+    }
+    return result;
+  };
+
+  // 2. STORE rows — sum across allIds (multi-portal dedup)
   for (const store of stores) {
-    const storeKey = `${store.companyId}::${store.id}`;
-    const currentStoreMetrics = currentAgg.byStore.get(storeKey);
-    const previousStoreMetrics = previousAgg.byStore.get(storeKey);
+    const currentStoreMetrics = sumStoreMetrics(store.allIds, store.companyId, currentAgg);
+    const previousStoreMetrics = sumStoreMetrics(store.allIds, store.companyId, previousAgg);
     if (!currentStoreMetrics && !previousStoreMetrics) continue;
 
     rows.push({
@@ -255,13 +270,16 @@ export function buildHierarchyFromRPCMetrics(
     });
   }
 
-  // Helper to sum RPCBaseMetrics from multiple address IDs
+  // Helpers use addressToStoreMap per addrId so each address ID is looked up
+  // with ITS OWN portal-specific store ID, not a fixed one.
   const sumAddressMetrics = (
-    allIds: string[], companyId: string, storeId: string,
+    allIds: string[], companyId: string,
     agg: AggregatedRPCMetrics
   ): RPCBaseMetrics | undefined => {
     let result: RPCBaseMetrics | undefined;
     for (const addrId of allIds) {
+      const storeId = addressToStoreMap.get(addrId);
+      if (!storeId) continue;
       const m = agg.byAddress.get(`${companyId}::${storeId}::${addrId}`);
       if (m) {
         if (!result) result = createEmptyRPCBase();
@@ -272,11 +290,13 @@ export function buildHierarchyFromRPCMetrics(
   };
 
   const sumPortalMetrics = (
-    allIds: string[], companyId: string, storeId: string, portalId: string,
+    allIds: string[], companyId: string, portalId: string,
     agg: AggregatedRPCMetrics
   ): RPCBaseMetrics | undefined => {
     let result: RPCBaseMetrics | undefined;
     for (const addrId of allIds) {
+      const storeId = addressToStoreMap.get(addrId);
+      if (!storeId) continue;
       const m = agg.byPortal.get(`${companyId}::${storeId}::${addrId}::${portalId}`);
       if (m) {
         if (!result) result = createEmptyRPCBase();
@@ -297,13 +317,14 @@ export function buildHierarchyFromRPCMetrics(
     if (!mappedStoreId) mappedStoreId = address.storeId;
 
     if (mappedStoreId) {
-      const parentStore = stores.find(s => s.id === mappedStoreId && s.companyId === address.companyId);
+      // Find parent store via allIds (mappedStoreId may not be the primary)
+      const parentStore = stores.find(s => s.allIds.includes(mappedStoreId!) && s.companyId === address.companyId);
       const parentId = parentStore
         ? `brand::${parentStore.companyId}::${parentStore.id}`
         : `company-${address.companyId}`;
 
-      const currentAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, currentAgg);
-      const previousAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, mappedStoreId, previousAgg);
+      const currentAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, currentAgg);
+      const previousAddrMetrics = sumAddressMetrics(address.allIds, address.companyId, previousAgg);
 
       if (!currentAddrMetrics && !previousAddrMetrics) continue;
 
@@ -319,8 +340,8 @@ export function buildHierarchyFromRPCMetrics(
 
       // PORTAL rows
       for (const portal of portals) {
-        const portalCurrent = sumPortalMetrics(address.allIds, address.companyId, mappedStoreId, portal.id, currentAgg);
-        const portalPrevious = sumPortalMetrics(address.allIds, address.companyId, mappedStoreId, portal.id, previousAgg);
+        const portalCurrent = sumPortalMetrics(address.allIds, address.companyId, portal.id, currentAgg);
+        const portalPrevious = sumPortalMetrics(address.allIds, address.companyId, portal.id, previousAgg);
         const channelId = portalIdToChannelId(portal.id);
 
         if (portalCurrent || portalPrevious) {

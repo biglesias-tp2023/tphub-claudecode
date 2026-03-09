@@ -21,6 +21,7 @@ export interface CompanyDim {
 
 export interface StoreDim {
   id: string;
+  allIds: string[];
   name: string;
   companyId: string;
   deleted?: boolean;
@@ -119,12 +120,28 @@ export async function fetchAllDimensions(
     storesResult.data || [],
     s => String(s.pk_id_store)
   );
-  const stores: StoreDim[] = uniqueStores.map(s => ({
-    id: String(s.pk_id_store),
-    name: s.des_store,
-    companyId: String(s.pfk_id_company),
-    deleted: s.flg_deleted === 1,
-  }));
+
+  // Group stores by name within the same company (like addresses).
+  // The same brand can have multiple pk_id_store values across portals
+  // (Glovo/UberEats/JustEat). We merge them into a single row with allIds.
+  const storeGroups = new Map<string, typeof uniqueStores>();
+  for (const store of uniqueStores) {
+    const key = `${store.pfk_id_company}::${(store.des_store || '').toLowerCase().trim()}`;
+    if (!storeGroups.has(key)) storeGroups.set(key, []);
+    storeGroups.get(key)!.push(store);
+  }
+
+  const stores: StoreDim[] = [];
+  for (const [, group] of storeGroups) {
+    const primary = group[0]; // Most recent due to ORDER BY pk_ts_month DESC
+    stores.push({
+      id: String(primary.pk_id_store),
+      allIds: group.map(s => String(s.pk_id_store)),
+      name: primary.des_store,
+      companyId: String(primary.pfk_id_company),
+      deleted: primary.flg_deleted === 1,
+    });
+  }
 
   const uniqueAddresses = deduplicateBy(
     addressesResult.data || [],
@@ -367,9 +384,28 @@ export function buildHierarchyFromDimensions(
     });
   }
 
-  // 2. STORE rows
+  // Helper to sum store metrics across all portal-specific IDs
+  const sumStoreBase = (
+    allStoreIds: string[], companyId: string,
+    metricsMap: Map<string, BaseMetrics>
+  ): BaseMetrics | undefined => {
+    let result: BaseMetrics | undefined;
+    for (const storeId of allStoreIds) {
+      const m = metricsMap.get(`${companyId}::${storeId}`);
+      if (m) {
+        if (!result) result = createEmptyBase();
+        result.ventas += m.ventas;
+        result.pedidos += m.pedidos;
+        result.nuevos += m.nuevos;
+      }
+    }
+    return result;
+  };
+
+  // 2. STORE rows — sum across allIds (multi-portal dedup)
   for (const store of stores) {
-    const storeKey = `${store.companyId}::${store.id}`;
+    const currentM = sumStoreBase(store.allIds, store.companyId, currentByStore);
+    const previousM = sumStoreBase(store.allIds, store.companyId, previousByStore);
     rows.push({
       id: `brand::${store.companyId}::${store.id}`,
       level: 'brand',
@@ -377,17 +413,20 @@ export function buildHierarchyFromDimensions(
       parentId: `company-${store.companyId}`,
       companyId: String(store.companyId),
       brandId: store.id,
-      metrics: toFinalMetrics(currentByStore.get(storeKey), previousByStore.get(storeKey)),
+      metrics: toFinalMetrics(currentM, previousM),
     });
   }
 
-  // Helpers for multi-ID address metrics
+  // Helpers for multi-ID address metrics — use addressToStoreMap per addrId
+  // so each address ID is looked up with ITS OWN store ID (portal-specific).
   const sumMetricsFromAllIds = (
-    allIds: string[], companyId: string, storeId: string,
+    allIds: string[], companyId: string,
     metricsMap: Map<string, BaseMetrics>
   ): BaseMetrics => {
     const sum = createEmptyBase();
     for (const addrId of allIds) {
+      const storeId = addressToStoreMap.get(addrId);
+      if (!storeId) continue;
       const m = metricsMap.get(`${companyId}::${storeId}::${addrId}`);
       if (m) { sum.ventas += m.ventas; sum.pedidos += m.pedidos; sum.nuevos += m.nuevos; }
     }
@@ -395,11 +434,13 @@ export function buildHierarchyFromDimensions(
   };
 
   const sumPortalMetricsFromAllIds = (
-    allIds: string[], companyId: string, storeId: string,
+    allIds: string[], companyId: string,
     portalId: string, metricsMap: Map<string, BaseMetrics>
   ): BaseMetrics => {
     const sum = createEmptyBase();
     for (const addrId of allIds) {
+      const storeId = addressToStoreMap.get(addrId);
+      if (!storeId) continue;
       const m = metricsMap.get(`${companyId}::${storeId}::${addrId}::${portalId}`);
       if (m) { sum.ventas += m.ventas; sum.pedidos += m.pedidos; sum.nuevos += m.nuevos; }
     }
@@ -408,6 +449,7 @@ export function buildHierarchyFromDimensions(
 
   // 3. ADDRESS rows + 4. PORTAL rows
   for (const address of addresses) {
+    // Find any mapped store ID to determine parent
     let mappedStoreId: string | undefined;
     for (const addrId of address.allIds) {
       const storeId = addressToStoreMap.get(addrId);
@@ -415,10 +457,10 @@ export function buildHierarchyFromDimensions(
     }
 
     if (mappedStoreId) {
-      const parentStore = stores.find(s => s.id === mappedStoreId && s.companyId === address.companyId);
-      const actualStoreId = parentStore?.id || mappedStoreId;
-      const current = sumMetricsFromAllIds(address.allIds, address.companyId, actualStoreId, currentByAddress);
-      const previous = sumMetricsFromAllIds(address.allIds, address.companyId, actualStoreId, previousByAddress);
+      // Find parent store via allIds (the mappedStoreId may not be the primary)
+      const parentStore = stores.find(s => s.allIds.includes(mappedStoreId!) && s.companyId === address.companyId);
+      const current = sumMetricsFromAllIds(address.allIds, address.companyId, currentByAddress);
+      const previous = sumMetricsFromAllIds(address.allIds, address.companyId, previousByAddress);
       const parentId = parentStore
         ? `brand::${parentStore.companyId}::${parentStore.id}`
         : `company-${address.companyId}`;
@@ -437,8 +479,8 @@ export function buildHierarchyFromDimensions(
       });
 
       for (const portal of portals) {
-        const portalCurrent = sumPortalMetricsFromAllIds(address.allIds, address.companyId, actualStoreId, portal.id, currentByPortal);
-        const portalPrevious = sumPortalMetricsFromAllIds(address.allIds, address.companyId, actualStoreId, portal.id, previousByPortal);
+        const portalCurrent = sumPortalMetricsFromAllIds(address.allIds, address.companyId, portal.id, currentByPortal);
+        const portalPrevious = sumPortalMetricsFromAllIds(address.allIds, address.companyId, portal.id, previousByPortal);
         const channelId = portalIdToChannelId(portal.id);
         rows.push({
           id: `channel::${address.companyId}::${address.id}::${portal.id}`,

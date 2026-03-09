@@ -81,6 +81,7 @@ interface AggregatedWeekMetrics {
 function aggregateRevenueByRowId(
   rows: ControllingMetricsRow[],
   addressRemap: Map<string, string>,
+  storeRemap: Map<string, string>,
 ): AggregatedWeek {
   const byRowId = new Map<string, number>();
   const byChannel = new Map<ChannelId, number>();
@@ -92,9 +93,10 @@ function aggregateRevenueByRowId(
   for (const row of rows) {
     const revenue = row.ventas || 0;
     const companyId = row.pfk_id_company;
-    const storeId = row.pfk_id_store;
+    const rawStoreId = row.pfk_id_store;
     const rawAddressId = row.pfk_id_store_address;
     const portalId = row.pfk_id_portal;
+    const storeId = storeRemap.get(rawStoreId) || rawStoreId;
     const addressId = addressRemap.get(rawAddressId) || rawAddressId;
 
     addRow(`company-${companyId}`, revenue);
@@ -129,6 +131,7 @@ function emptyMetrics(): Omit<WeekMetrics, 'weekLabel' | 'weekStart'> {
 function aggregateAllMetricsByRowId(
   rows: ControllingMetricsRow[],
   addressRemap: Map<string, string>,
+  storeRemap: Map<string, string>,
 ): AggregatedWeekMetrics {
   const byRowId = new Map<string, Omit<WeekMetrics, 'weekLabel' | 'weekStart'>>();
 
@@ -163,9 +166,10 @@ function aggregateAllMetricsByRowId(
 
   for (const row of rows) {
     const companyId = row.pfk_id_company;
-    const storeId = row.pfk_id_store;
+    const rawStoreId = row.pfk_id_store;
     const rawAddressId = row.pfk_id_store_address;
     const portalId = row.pfk_id_portal;
+    const storeId = storeRemap.get(rawStoreId) || rawStoreId;
     const addressId = addressRemap.get(rawAddressId) || rawAddressId;
     const channelId = portalIdToChannelId(portalId);
 
@@ -206,7 +210,7 @@ export function useWeeklyRevenue(options?: { enabled?: boolean }) {
   const query = useQuery<WeeklyRevenueData>({
     queryKey: ['weekly-revenue', [...companyIds].sort().join(','), sparklineWeeks],
     queryFn: async () => {
-      // Fetch dimensions to build address ID remap (secondary → primary).
+      // Fetch dimensions to build ID remaps (secondary → primary).
       // This ensures sparkline keys match grouped hierarchy row IDs.
       const dimensions = await fetchAllDimensions(companyIds);
       const addressRemap = new Map<string, string>();
@@ -214,6 +218,14 @@ export function useWeeklyRevenue(options?: { enabled?: boolean }) {
         for (const id of addr.allIds) {
           if (id !== addr.id) {
             addressRemap.set(id, addr.id);
+          }
+        }
+      }
+      const storeRemap = new Map<string, string>();
+      for (const store of dimensions.stores) {
+        for (const id of store.allIds) {
+          if (id !== store.id) {
+            storeRemap.set(id, store.id);
           }
         }
       }
@@ -225,10 +237,10 @@ export function useWeeklyRevenue(options?: { enabled?: boolean }) {
       );
 
       // Aggregate each week's data (revenue-only for sparklines)
-      const weeklyAggs = weeklyResults.map(rows => aggregateRevenueByRowId(rows, addressRemap));
+      const weeklyAggs = weeklyResults.map(rows => aggregateRevenueByRowId(rows, addressRemap, storeRemap));
 
       // Aggregate each week's FULL metrics (for detail panel)
-      const weeklyMetricsAggs = weeklyResults.map(rows => aggregateAllMetricsByRowId(rows, addressRemap));
+      const weeklyMetricsAggs = weeklyResults.map(rows => aggregateAllMetricsByRowId(rows, addressRemap, storeRemap));
 
       // Build row-level map: rowId → [week1, ..., week8] (revenue only)
       const allRowIds = new Set<string>();
