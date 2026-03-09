@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 import { sendEmail, buildAlertEmailHtml, type AlertCompanyData } from './email.js';
 import { escapeHtml, verifyCronSecret } from './auth.js';
 
@@ -840,7 +841,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 4. Allow manual override via query param: ?type=daily|weekly|monthly
+  // 4. Job tracking — check-in
+  const runId = crypto.randomUUID();
+  const JOB_ID = 'daily-alerts';
+  try {
+    await supabase.rpc('job_checkin', { p_job_id: JOB_ID, p_run_id: runId });
+    console.log(`[alerts] Job check-in: ${JOB_ID} run=${runId}`);
+  } catch (e) {
+    // Non-blocking — alerts still run if tracking fails
+    console.warn('[alerts] Job check-in failed (non-blocking):', e);
+  }
+
+  // 5. Allow manual override via query param: ?type=daily|weekly|monthly
   const manualType = req.query?.type as string | undefined;
   const alertType: AlertType = (manualType === 'daily' || manualType === 'weekly' || manualType === 'monthly')
     ? manualType
@@ -848,18 +860,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   console.log(`[alerts] Alert type: ${alertType} (manual=${!!manualType})`);
 
-  // 5. Route to handler
+  // 6. Route to handler
   let result: { status: number; body: Record<string, unknown> };
-  switch (alertType) {
-    case 'monthly':
-      result = await handleMonthlyAlert(supabase);
-      break;
-    case 'weekly':
-      result = await handleWeeklyAlert(supabase);
-      break;
-    default:
-      result = await handleDailyAlert(supabase);
-  }
+  try {
+    switch (alertType) {
+      case 'monthly':
+        result = await handleMonthlyAlert(supabase);
+        break;
+      case 'weekly':
+        result = await handleWeeklyAlert(supabase);
+        break;
+      default:
+        result = await handleDailyAlert(supabase);
+    }
 
-  return res.status(result.status).json(result.body);
+    // 7. Job tracking — check-out success
+    try {
+      await supabase.rpc('job_checkout_success', {
+        p_run_id: runId,
+        p_metadata: result.body,
+      });
+      console.log(`[alerts] Job check-out: success`);
+    } catch (e) {
+      console.warn('[alerts] Job check-out failed (non-blocking):', e);
+    }
+
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    // 7b. Job tracking — check-out failure
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    try {
+      await supabase.rpc('job_checkout_failure', {
+        p_run_id: runId,
+        p_error: errorMessage,
+        p_metadata: {},
+      });
+      console.log(`[alerts] Job check-out: failure`);
+    } catch (e) {
+      console.warn('[alerts] Job failure check-out failed (non-blocking):', e);
+    }
+
+    console.error('[alerts] Unhandled error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
