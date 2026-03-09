@@ -28,6 +28,9 @@ export { SalesProjection } from './SalesProjection';
 export { SalesProjectionSetup } from './SalesProjectionSetup';
 export { SalesProjectionWarning } from './SalesProjectionWarning';
 
+// Gantt view
+export { GanttChart } from './gantt/GanttChart';
+
 // Page components
 export { MetricItem } from './MetricItem';
 export { HorizonSection } from './HorizonSection';

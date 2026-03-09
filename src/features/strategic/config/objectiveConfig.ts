@@ -100,6 +100,20 @@ export const CATEGORIES: CategoryConfig[] = [
 ];
 
 // ============================================
+// GANTT CHART COLORS (inline styles for bars)
+// ============================================
+
+export const CATEGORY_GANTT_COLORS: Record<ObjectiveCategory, { bg: string; accent: string }> = {
+  finanzas:    { bg: '#ecfdf5', accent: '#10b981' },
+  operaciones: { bg: '#eff6ff', accent: '#3b82f6' },
+  clientes:    { bg: '#f5f3ff', accent: '#7c3aed' },
+  marca:       { bg: '#fdf2f8', accent: '#ec4899' },
+  reputacion:  { bg: '#fffbeb', accent: '#f59e0b' },
+  proveedores: { bg: '#ecfeff', accent: '#06b6d4' },
+  menu:        { bg: '#fff7ed', accent: '#f97316' },
+};
+
+// ============================================
 // RESPONSABLES
 // ============================================
 

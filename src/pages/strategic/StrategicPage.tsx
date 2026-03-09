@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Search,
   Info,
+  LayoutGrid,
+  GanttChart as GanttChartIcon,
 } from 'lucide-react';
 import { Card, Spinner, ToastContainer } from '@/components/ui';
 import { ExportButtons } from '@/components/common';
@@ -26,6 +28,7 @@ import {
   SalesProjectionWarning,
   HorizonSection,
   StrategicEmptyState,
+  GanttChart,
 } from '@/features/strategic/components';
 import { cn } from '@/utils/cn';
 import { useStrategicPageState } from './useStrategicPageState';
@@ -304,6 +307,35 @@ export function StrategicPage() {
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-gray-900">Objetivos</h2>
                   <div className="flex items-center gap-2">
+                    {/* View toggle */}
+                    {state.hasObjectives && (
+                      <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg">
+                        <button
+                          onClick={() => state.setObjectivesView('cards')}
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md transition-all',
+                            state.objectivesView === 'cards'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-700'
+                          )}
+                        >
+                          <LayoutGrid className="w-3 h-3" />
+                          Tarjetas
+                        </button>
+                        <button
+                          onClick={() => state.setObjectivesView('gantt')}
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md transition-all',
+                            state.objectivesView === 'gantt'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500 hover:text-gray-700'
+                          )}
+                        >
+                          <GanttChartIcon className="w-3 h-3" />
+                          Gantt
+                        </button>
+                      </div>
+                    )}
                     {state.hasObjectives && (
                       <ExportButtons onExport={state.handleExportObjectives} size="sm" variant="ghost" />
                     )}
@@ -400,6 +432,14 @@ export function StrategicPage() {
                         Crear objetivo
                       </button>
                     </div>
+                  ) : state.objectivesView === 'gantt' ? (
+                    <GanttChart
+                      objectives={state.filteredObjectives}
+                      allCompanies={state.allCompanies}
+                      allBrands={state.allBrands}
+                      onObjectiveClick={state.handleEditObjective}
+                      taskCountByObjectiveId={state.taskCountByObjectiveId}
+                    />
                   ) : (
                     <div className="divide-y divide-gray-100">
                       <HorizonSection

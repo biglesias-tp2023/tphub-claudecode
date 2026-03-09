@@ -147,6 +147,9 @@ export function useStrategicPageState() {
   const isSetupOpen = setupScope !== null;
   const [isWarningOpen, setIsWarningOpen] = useState(false);
 
+  // View mode: cards vs gantt (persisted in session)
+  const [objectivesView, setObjectivesView] = useSessionState<'cards' | 'gantt'>('tphub-st-view', 'cards');
+
   // Persisted filter states
   const [selectedCategory, setSelectedCategory] = useSessionState<ObjectiveCategory | 'all'>('tphub-st-category', 'all');
   const [selectedStatus, setSelectedStatus] = useSessionState<ObjectiveStatus | 'all'>('tphub-st-status', 'all');
@@ -856,6 +859,11 @@ export function useStrategicPageState() {
     commissions,
     salesProjection,
     defaultRestaurantId,
+
+    // View mode
+    objectivesView,
+    setObjectivesView,
+    filteredObjectives,
 
     // Filter state
     selectedCategory,
