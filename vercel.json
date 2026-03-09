@@ -3,10 +3,6 @@
     {
       "path": "/api/alerts/daily",
       "schedule": "0 7 * * 1-5"
-    },
-    {
-      "path": "/api/cron/watchdog",
-      "schedule": "*/10 * * * *"
     }
   ],
   "rewrites": [
