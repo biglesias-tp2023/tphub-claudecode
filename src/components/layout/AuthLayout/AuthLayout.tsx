@@ -3,8 +3,6 @@ import { Outlet } from 'react-router-dom';
 
 /* ─── TPHub Design System Colors ─── */
 const P300 = '#6bb8e0';
-const P400 = '#3a9fd4';
-const P600 = '#095789';
 const BG = '#f3f7f9';
 
 /* ─── Aurora Waves Canvas ─── */
@@ -154,9 +152,9 @@ export function AuthLayout() {
             key={label}
             href="#"
             className="text-[11px] font-[450] transition-colors duration-150"
-            style={{ color: P400 }}
-            onMouseEnter={(e) => ((e.target as HTMLElement).style.color = P600)}
-            onMouseLeave={(e) => ((e.target as HTMLElement).style.color = P400)}
+            style={{ color: '#ffffff' }}
+            onMouseEnter={(e) => ((e.target as HTMLElement).style.color = P300)}
+            onMouseLeave={(e) => ((e.target as HTMLElement).style.color = '#ffffff')}
           >
             {label}
           </a>

@@ -13,10 +13,11 @@
  * @module services/crp-portal/rpcLimiter
  */
 
-const MAX_CONCURRENT = 2;
+const MAX_CONCURRENT = 4;
 
-/** Max companies per RPC call to avoid PostgreSQL statement timeouts */
-export const RPC_BATCH_SIZE = 10;
+/** Max companies per RPC call. With 120s statement_timeout, larger batches
+ *  are safe and drastically reduce round-trips (80 companies: 2 batches vs 16). */
+export const RPC_BATCH_SIZE = 40;
 let running = 0;
 const queue: Array<() => void> = [];
 

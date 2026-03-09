@@ -96,8 +96,9 @@ export function useHierarchyData() {
       return result;
     },
     enabled: numericCompanyIds.length > 0,
-    // Disable auto-retry: retrying expensive RPCs on timeout compounds DB load
-    retry: false,
+    // Retry once on timeout — with smaller batch sizes a single retry usually succeeds
+    retry: 1,
+    retryDelay: 2000,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
   });

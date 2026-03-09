@@ -256,37 +256,6 @@ export function useStrategicPageState() {
     };
   }, [allCompanies, effectiveCompanyIds]);
 
-  // Real revenue, promos, and ads by month for the SalesProjection grid rows and scorecards
-  const revenueParams = {
-    companyIds: effectiveCompanyIds,
-    brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
-    addressIds: expandedRestaurantIds.length > 0 ? expandedRestaurantIds : undefined,
-    monthOffsets: [-2, -1, 0, 1, 2, 3] as number[],
-  };
-  const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth(revenueParams);
-
-  // DEBUG: diagnóstico de filtrado de datos reales
-  useEffect(() => {
-    console.group('[Strategic] Diagnóstico datos reales');
-    console.log('filterBrandIds (store):', filterBrandIds);
-    console.log('filterRestaurantIds (store):', filterRestaurantIds);
-    console.log('expandedBrandIds:', expandedBrandIds);
-    console.log('expandedRestaurantIds:', expandedRestaurantIds);
-    console.log('→ RPC params:', {
-      companyIds: revenueParams.companyIds,
-      brandIds: revenueParams.brandIds ?? '(null — sin filtro marca)',
-      addressIds: revenueParams.addressIds ?? '(null — sin filtro dirección)',
-    });
-    if (Object.keys(realRevenueByMonth).length > 0) {
-      const totals: Record<string, number> = {};
-      for (const [month, entry] of Object.entries(realRevenueByMonth)) {
-        totals[month] = (entry.glovo || 0) + (entry.ubereats || 0) + (entry.justeat || 0);
-      }
-      console.log('→ Revenue por mes:', totals);
-    }
-    console.groupEnd();
-  }, [filterBrandIds, filterRestaurantIds, expandedBrandIds, expandedRestaurantIds, revenueParams.companyIds, revenueParams.brandIds, revenueParams.addressIds, realRevenueByMonth]);
-
   // ============================================
   // SALES PROJECTION (Supabase-backed)
   // ============================================
@@ -338,6 +307,30 @@ export function useStrategicPageState() {
     ? isLoadingBulk
     : (isLoadingAddressProjection || isLoadingBrandProjection || (primaryBrandId ? isLoadingCompanyProjection : false));
   void _isLoadingProjection; // reserved for future use
+
+  // Projection-scope-aware IDs for real revenue:
+  // When the active projection is at brand/address level but the dashboard store has no
+  // brand/address filter, automatically scope real data to match the projection scope.
+  const projectionScopeBrandIds = useMemo(() => {
+    if (expandedBrandIds.length > 0) return expandedBrandIds;
+    if (!salesProjection?.brandId) return [];
+    return expandBrandIds([salesProjection.brandId], allBrands);
+  }, [expandedBrandIds, salesProjection?.brandId, allBrands]);
+
+  const projectionScopeAddressIds = useMemo(() => {
+    if (expandedRestaurantIds.length > 0) return expandedRestaurantIds;
+    if (!salesProjection?.addressId) return [];
+    return expandRestaurantIds([salesProjection.addressId], allRestaurants);
+  }, [expandedRestaurantIds, salesProjection?.addressId, allRestaurants]);
+
+  // Real revenue, promos, and ads by month for the SalesProjection grid rows and scorecards
+  const revenueParams = {
+    companyIds: effectiveCompanyIds,
+    brandIds: projectionScopeBrandIds.length > 0 ? projectionScopeBrandIds : undefined,
+    addressIds: projectionScopeAddressIds.length > 0 ? projectionScopeAddressIds : undefined,
+    monthOffsets: [-2, -1, 0, 1, 2, 3] as number[],
+  };
+  const { revenueByMonth: realRevenueByMonth, promosByMonth: realPromosByMonth, adsByMonth: realAdsByMonth } = useActualRevenueByMonth(revenueParams);
 
   // Fallback info: which level is being shown vs which was requested
   const fallbackInfo = useMemo(() => {
