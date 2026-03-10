@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsUpDown } from 'lucide-react';
 import { GanttRow, LABEL_COL_WIDTH, WEEK_COL_WIDTH } from './GanttRow';
 import type { StrategicObjective, HealthStatus, Company, Brand } from '@/types';
 
@@ -129,6 +129,7 @@ export function GanttChart({
   objectives,
   allCompanies,
   onObjectiveClick,
+  taskCountByObjectiveId,
 }: GanttChartProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -244,6 +245,15 @@ export function GanttChart({
     });
   };
 
+  const toggleAllGroups = () => {
+    setCollapsedGroups(prev => {
+      // If all are collapsed, expand all; otherwise collapse all
+      const allCollapsed = groups.every(g => prev.has(g.id));
+      if (allCollapsed) return new Set();
+      return new Set(groups.map(g => g.id));
+    });
+  };
+
   if (objectives.length === 0) {
     return (
       <div className="text-center py-12 text-sm text-gray-400">
@@ -290,7 +300,7 @@ export function GanttChart({
             {monthHeaders.map((mh, i) => (
               <div
                 key={i}
-                className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-1 py-1 border-r border-gray-200 text-center truncate"
+                className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-1 py-1.5 border-r border-gray-200 text-center truncate"
                 style={{ width: mh.span * WEEK_COL_WIDTH }}
               >
                 {mh.label}
@@ -300,18 +310,25 @@ export function GanttChart({
         </div>
 
         {/* Header: Week row */}
-        <div className="flex sticky top-[25px] z-20 bg-white border-b border-gray-200">
+        <div className="flex sticky top-[29px] z-20 bg-white border-b border-gray-200">
           <div
-            className="sticky left-0 z-30 bg-white shrink-0 px-3 flex items-center text-[10px] font-medium text-gray-400 uppercase tracking-wider border-r border-gray-200"
+            className="sticky left-0 z-30 bg-white shrink-0 px-3 flex items-center justify-between text-[10px] font-medium text-gray-400 uppercase tracking-wider border-r border-gray-200"
             style={{ width: LABEL_COL_WIDTH, minWidth: LABEL_COL_WIDTH }}
           >
-            Objetivo
+            <span>Objetivo</span>
+            <button
+              onClick={toggleAllGroups}
+              className="p-0.5 rounded hover:bg-gray-100 transition-colors"
+              title="Expandir/Colapsar todo"
+            >
+              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
           </div>
           <div className="flex relative" style={{ minWidth: trackWidth }}>
             {weeks.map((w, i) => (
               <div
                 key={i}
-                className="text-[9px] text-gray-400 text-center py-1.5 border-r border-gray-100 truncate"
+                className="text-[10px] text-gray-400 text-center py-1.5 border-r border-gray-100 truncate"
                 style={{ width: WEEK_COL_WIDTH }}
               >
                 {formatWeekLabel(w)}
@@ -324,16 +341,17 @@ export function GanttChart({
         <div className="relative">
           {/* Today line */}
           <div
-            className="absolute top-0 bottom-0 w-px bg-primary-400 z-[5] pointer-events-none"
+            className="absolute top-0 bottom-0 w-0.5 bg-primary-500 z-[5] pointer-events-none"
             style={{ left: LABEL_COL_WIDTH + (todayPct / 100) * trackWidth }}
           >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-primary-500 text-white text-[8px] font-bold px-1 rounded-b">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-primary-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-b shadow-sm">
               Hoy
             </div>
           </div>
 
           {groups.map(group => {
             const isCollapsed = collapsedGroups.has(group.id);
+            let rowIndex = 0;
             return (
               <div key={group.id}>
                 {/* Group header */}
@@ -354,6 +372,7 @@ export function GanttChart({
                 {/* Rows */}
                 {!isCollapsed && group.objectives.map(obj => {
                   const dates = objectiveDates.get(obj.id)!;
+                  const currentIndex = rowIndex++;
                   return (
                     <GanttRow
                       key={obj.id}
@@ -367,6 +386,8 @@ export function GanttChart({
                       barEnd={dates.end}
                       hasFallbackEnd={dates.hasFallbackEnd}
                       onObjectiveClick={onObjectiveClick}
+                      index={currentIndex}
+                      taskCount={taskCountByObjectiveId[obj.id]}
                     />
                   );
                 })}

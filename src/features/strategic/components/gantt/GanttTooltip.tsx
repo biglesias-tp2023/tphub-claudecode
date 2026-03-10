@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { AlertCircle } from 'lucide-react';
 import { HealthBadge } from '../HealthBadge';
 import { CATEGORIES } from '../../config/objectiveConfig';
 import type { StrategicObjective, HealthStatus } from '@/types';
@@ -16,19 +17,23 @@ interface GanttTooltipProps {
   progressPct: number;
   position: { x: number; y: number };
   hasFallbackEnd: boolean;
+  taskCount?: { completed: number; total: number };
 }
 
-export function GanttTooltip({ objective, healthStatus, progressPct, position, hasFallbackEnd }: GanttTooltipProps) {
+export function GanttTooltip({ objective, healthStatus, progressPct, position, hasFallbackEnd, taskCount }: GanttTooltipProps) {
   const category = CATEGORIES.find(c => c.id === objective.category);
   const startLabel = new Date(objective.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   const endLabel = objective.evaluationDate
     ? new Date(objective.evaluationDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
 
+  // Edge clamp: tooltip is w-64 (256px), half = 128, pad to 140
+  const clampedX = Math.max(140, Math.min(position.x, window.innerWidth - 140));
+
   return createPortal(
     <div
       className="fixed z-[9999] pointer-events-none"
-      style={{ left: position.x, top: position.y }}
+      style={{ left: clampedX, top: position.y }}
     >
       <div className="bg-gray-900 text-white rounded-lg shadow-xl px-3.5 py-3 text-xs w-64 -translate-x-1/2 translate-y-2">
         {/* Title */}
@@ -48,9 +53,23 @@ export function GanttTooltip({ objective, healthStatus, progressPct, position, h
         <div className="flex items-center gap-1.5 text-gray-300 mb-1.5">
           <span>{startLabel}</span>
           <span>&rarr;</span>
-          <span>{endLabel ?? 'Sin fecha límite'}</span>
-          {hasFallbackEnd && <span className="text-gray-500">(est.)</span>}
+          {endLabel ? (
+            <span>{endLabel}</span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-amber-400">
+              <AlertCircle className="w-3 h-3" />
+              Sin fecha límite
+            </span>
+          )}
+          {hasFallbackEnd && endLabel && <span className="text-gray-500">(est.)</span>}
         </div>
+
+        {/* Tasks count */}
+        {taskCount && taskCount.total > 0 && (
+          <div className="text-gray-400 mb-1.5">
+            {taskCount.total} {taskCount.total === 1 ? 'tarea' : 'tareas'} ({taskCount.completed} {taskCount.completed === 1 ? 'completada' : 'completadas'})
+          </div>
+        )}
 
         {/* Health + progress */}
         <div className="flex items-center justify-between pt-1.5 border-t border-gray-700">
