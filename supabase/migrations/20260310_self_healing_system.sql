@@ -264,15 +264,13 @@ ON CONFLICT (id) DO NOTHING;
 -- NOTE: Requires pg_cron and pg_net extensions enabled in Supabase.
 -- If not available, the Vercel backup watchdog (/api/cron/watchdog) covers this.
 
--- Uncomment after verifying pg_cron is enabled:
--- SELECT cron.schedule('watchdog-check-jobs', '*/5 * * * *', 'SELECT watchdog_check_jobs()');
+SELECT cron.schedule('watchdog-check-jobs', '*/5 * * * *', 'SELECT watchdog_check_jobs()');
 
 -- ============================================
 -- 5. Cleanup: Delete logs older than 30 days (weekly)
 -- ============================================
 
--- Uncomment after verifying pg_cron is enabled:
--- SELECT cron.schedule('cleanup-job-logs', '0 3 * * 0', $$DELETE FROM job_execution_log WHERE started_at < now() - interval '30 days'$$);
+SELECT cron.schedule('cleanup-job-logs', '0 3 * * 0', $$DELETE FROM job_execution_log WHERE started_at < now() - interval '30 days'$$);
 
 -- ============================================
 -- 6. RLS: service_role only
