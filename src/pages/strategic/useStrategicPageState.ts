@@ -312,11 +312,18 @@ export function useStrategicPageState() {
     primaryBrandId,
   );
 
-  // Addresses belonging to the selected brand (for the wizard)
-  const brandAddresses = useMemo(() =>
-    primaryBrandId ? allRestaurants.filter(r => r.brandId === primaryBrandId) : [],
-    [primaryBrandId, allRestaurants]
-  );
+  // Addresses available for the wizard:
+  // - If a brand is selected: addresses of that brand
+  // - Otherwise: all addresses of the selected companies
+  const brandAddresses = useMemo(() => {
+    if (primaryBrandId) {
+      return allRestaurants.filter(r => r.brandId === primaryBrandId);
+    }
+    if (effectiveCompanyIds.length > 0) {
+      return allRestaurants.filter(r => effectiveCompanyIds.includes(r.companyId));
+    }
+    return [];
+  }, [primaryBrandId, effectiveCompanyIds, allRestaurants]);
 
   // Single company: resolve projection with multi-address awareness
   const singleCompanyProjection = useMemo(() => {
