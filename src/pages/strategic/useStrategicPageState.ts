@@ -22,6 +22,7 @@ import {
   useProfiles,
   useActualRevenueByMonth,
   useSalesProjection,
+  useSalesProjectionsByBrand,
   useSalesProjectionsBulk,
   useUpsertSalesProjection,
   useUpdateSalesProjectionTargets,
@@ -302,9 +303,40 @@ export function useStrategicPageState() {
   // How many selected companies have a projection (for UI feedback)
   const multiCompanyProjectionCount = isMultiCompany ? bulkProjections.length : 0;
 
-  // Single company: use fallback chain (address → brand → company)
-  // Multi company: use aggregated projection from all company-level projections
-  const singleCompanyProjection = addressProjection ?? brandProjection ?? companyProjection;
+  // ============================================
+  // MULTI-ADDRESS AGGREGATION (per brand)
+  // ============================================
+
+  const { data: brandAddressProjections = [] } = useSalesProjectionsByBrand(
+    primaryCompanyId,
+    primaryBrandId,
+  );
+
+  // Addresses belonging to the selected brand (for the wizard)
+  const brandAddresses = useMemo(() =>
+    primaryBrandId ? allRestaurants.filter(r => r.brandId === primaryBrandId) : [],
+    [primaryBrandId, allRestaurants]
+  );
+
+  // Single company: resolve projection with multi-address awareness
+  const singleCompanyProjection = useMemo(() => {
+    // Case 1: specific addresses selected + brand has per-address projections
+    if (filterRestaurantIds.length > 0 && brandAddressProjections.length > 0) {
+      const matching = brandAddressProjections.filter(p =>
+        p.addressId && filterRestaurantIds.includes(p.addressId)
+      );
+      if (matching.length > 0) return aggregateSalesProjections(matching);
+    }
+
+    // Case 2: brand selected + brand has per-address projections → aggregate all
+    if (primaryBrandId && brandAddressProjections.length > 0) {
+      return aggregateSalesProjections(brandAddressProjections);
+    }
+
+    // Case 3: fallback chain (address → brand → company)
+    return addressProjection ?? brandProjection ?? companyProjection;
+  }, [filterRestaurantIds, brandAddressProjections, primaryBrandId, addressProjection, brandProjection, companyProjection]);
+
   const salesProjection = isMultiCompany ? aggregatedProjection : singleCompanyProjection;
   const _isLoadingProjection = isMultiCompany
     ? isLoadingBulk
@@ -337,7 +369,20 @@ export function useStrategicPageState() {
 
   // Fallback info: which level is being shown vs which was requested
   const fallbackInfo = useMemo(() => {
-    if (isMultiCompany) return null; // No fallback info in multi-company mode
+    if (isMultiCompany) return null;
+    // Multi-address aggregation active — no fallback needed
+    if (brandAddressProjections.length > 0 && (primaryBrandId || filterRestaurantIds.length > 0)) {
+      // Check if showing partial (some addresses without projections)
+      if (filterRestaurantIds.length > 0) {
+        const matching = brandAddressProjections.filter(p =>
+          p.addressId && filterRestaurantIds.includes(p.addressId)
+        );
+        if (matching.length > 0 && matching.length < filterRestaurantIds.length) {
+          return { level: 'multi_address' as const, targetScope: 'address' as const, matchCount: matching.length, totalCount: filterRestaurantIds.length };
+        }
+      }
+      return null;
+    }
     if (primaryAddressId) {
       if (addressProjection) return null;
       if (brandProjection) return { level: 'brand' as const, targetScope: 'address' as const };
@@ -350,7 +395,7 @@ export function useStrategicPageState() {
       return null;
     }
     return null;
-  }, [isMultiCompany, primaryAddressId, primaryBrandId, addressProjection, brandProjection, companyProjection]);
+  }, [isMultiCompany, primaryAddressId, primaryBrandId, addressProjection, brandProjection, companyProjection, brandAddressProjections, filterRestaurantIds]);
 
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
@@ -546,6 +591,30 @@ export function useStrategicPageState() {
       error('Error al crear proyección');
     }
   }, [setupScope, primaryCompanyId, upsertProjection, success, error]);
+
+  const handleSetupCompleteBatch = useCallback(async (
+    config: SalesProjectionConfig,
+    addressData: Array<{ addressId: string; brandId: string; targetRevenue: GridChannelMonthData; baselineRevenue: ChannelMonthEntry }>,
+  ) => {
+    try {
+      await Promise.all(addressData.map(addr =>
+        upsertProjection.mutateAsync({
+          companyId: primaryCompanyId,
+          brandId: addr.brandId,
+          addressId: addr.addressId,
+          config,
+          baselineRevenue: addr.baselineRevenue,
+          targetRevenue: addr.targetRevenue,
+          targetAds: {},
+          targetPromos: {},
+        })
+      ));
+      setSetupScope(null);
+      success(`Proyección creada para ${addressData.length} establecimientos`);
+    } catch {
+      error('Error al crear proyecciones');
+    }
+  }, [primaryCompanyId, upsertProjection, success, error]);
 
   // Open setup wizard with explicit scope
   const openSetupForCompany = useCallback(() => {
@@ -858,6 +927,8 @@ export function useStrategicPageState() {
     realAdsByMonth,
     commissions,
     salesProjection,
+    brandAddresses,
+    brandAddressProjections,
     defaultRestaurantId,
 
     // View mode
@@ -910,6 +981,7 @@ export function useStrategicPageState() {
     closeSetup,
     isWarningOpen,
     handleSetupComplete,
+    handleSetupCompleteBatch,
     handleUpdateTargetRevenue,
     handleDismissWarning,
     handleCreateNewFromWarning,

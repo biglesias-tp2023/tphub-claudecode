@@ -9,21 +9,33 @@
  * @module features/strategic/components/SalesProjectionSetup
  */
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Calendar, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { X, Check, TrendingUp, Megaphone, Percent, ChevronRight, ChevronLeft, Calendar, Edit3, AlertTriangle, RefreshCw, MapPin } from 'lucide-react';
+import { useQueryClient, useQueries } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
 import { useActualRevenueByMonth } from '../hooks/useActualRevenueByMonth';
-import type { SalesChannel, SalesInvestmentMode, SalesProjectionConfig, SalesProjectionData, GridChannelMonthData, ChannelMonthEntry } from '@/types';
+import { fetchMonthlyRevenueByChannel } from '@/services/crp-portal';
+import { expandRestaurantIds } from '@/hooks/idExpansion';
+import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
+import type { SalesChannel, SalesInvestmentMode, SalesProjectionConfig, SalesProjectionData, GridChannelMonthData, ChannelMonthEntry, Restaurant } from '@/types';
 
 // ============================================
 // TYPES
 // ============================================
 
+interface AddressBatchEntry {
+  addressId: string;
+  brandId: string;
+  targetRevenue: GridChannelMonthData;
+  baselineRevenue: ChannelMonthEntry;
+}
+
 interface SalesProjectionSetupProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: (config: SalesProjectionConfig, targetRevenue: GridChannelMonthData, baselineRevenue: ChannelMonthEntry) => void;
+  /** Batch completion for multi-address mode */
+  onCompleteBatch?: (config: SalesProjectionConfig, addressData: AddressBatchEntry[]) => void;
   lastMonthRevenue?: ChannelMonthEntry;
   /** Effective company IDs for fetching CRP data (from page state) */
   companyIds?: string[];
@@ -33,11 +45,15 @@ interface SalesProjectionSetupProps {
   addressIds?: string[];
   /** Existing projection to pre-fill the wizard (edit mode) */
   existingProjection?: SalesProjectionData | null;
+  /** Addresses of the selected brand (enables multi-address mode when > 1) */
+  addresses?: Restaurant[];
+  /** Existing per-address projections for pre-fill in multi-address mode */
+  existingAddressProjections?: SalesProjectionData[];
   /** Scope label shown in the header (e.g. "Company > Brand") */
   scopeLabel?: string;
 }
 
-type Step = 'channels' | 'investment' | 'baseline' | 'targets';
+type Step = 'channels' | 'addresses' | 'investment' | 'baseline' | 'targets';
 
 // ============================================
 // CONSTANTS
@@ -124,7 +140,77 @@ function ChannelStep({ selected, onToggle }: { selected: SalesChannel[]; onToggl
   );
 }
 
-/** Step 2: Configuración de inversión */
+/** Step 2: Selección de puntos de venta */
+function AddressSelectionStep({
+  addresses,
+  selectedIds,
+  onToggle,
+  onSelectAll,
+  onDeselectAll,
+}: {
+  addresses: Restaurant[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">¿Sobre qué puntos de venta?</h3>
+        <p className="text-sm text-gray-500">Selecciona los establecimientos para los que quieres configurar objetivos</p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-500">{selectedIds.length} de {addresses.length} seleccionados</span>
+        <div className="flex gap-2">
+          <button onClick={onSelectAll} className="text-xs text-primary-600 hover:text-primary-800 font-medium">Seleccionar todos</button>
+          <button onClick={onDeselectAll} className="text-xs text-gray-500 hover:text-gray-700 font-medium">Ninguno</button>
+        </div>
+      </div>
+
+      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        {addresses.map((addr) => {
+          const isSelected = selectedIds.includes(addr.id);
+          return (
+            <button
+              key={addr.id}
+              onClick={() => onToggle(addr.id)}
+              className={cn(
+                'w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left',
+                isSelected
+                  ? 'border-primary-400 bg-primary-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              )}
+            >
+              <div className={cn(
+                'w-5 h-5 rounded-full flex items-center justify-center shrink-0',
+                isSelected ? 'bg-primary-600' : 'bg-gray-100'
+              )}>
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <MapPin className={cn('w-4 h-4 shrink-0', isSelected ? 'text-primary-600' : 'text-gray-400')} />
+              <div className="min-w-0">
+                <span className={cn('text-sm font-medium block truncate', isSelected ? 'text-gray-900' : 'text-gray-600')}>
+                  {addr.name}
+                </span>
+                {addr.address && (
+                  <span className="text-xs text-gray-400 block truncate">{addr.address}</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedIds.length === 0 && (
+        <p className="text-center text-xs text-amber-600 bg-amber-50 rounded-lg py-2">Selecciona al menos un punto de venta</p>
+      )}
+    </div>
+  );
+}
+
+/** Step 3: Configuración de inversión */
 function InvestmentStep({
   channels, mode, onModeChange, ads, promos, onAdsChange, onPromosChange,
 }: {
@@ -505,10 +591,228 @@ function TargetsStep({
 }
 
 // ============================================
+// MULTI-ADDRESS STEP COMPONENTS
+// ============================================
+
+/** Multi-address baseline: table with one row per address */
+function MultiAddressBaselineStep({
+  channels,
+  addresses,
+  addressBaselines,
+  onChangeAddress,
+  isEditing,
+  onToggleEdit,
+  monthLabel,
+}: {
+  channels: SalesChannel[];
+  addresses: Restaurant[];
+  addressBaselines: Record<string, ChannelMonthEntry>;
+  onChangeAddress: (addressId: string, ch: SalesChannel, v: number) => void;
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  monthLabel: string;
+}) {
+  const totals: ChannelMonthEntry = { glovo: 0, ubereats: 0, justeat: 0 };
+  for (const addr of addresses) {
+    const b = addressBaselines[addr.id] || { glovo: 0, ubereats: 0, justeat: 0 };
+    for (const ch of channels) totals[ch] += b[ch] || 0;
+  }
+  const grandTotal = channels.reduce((s, ch) => s + totals[ch], 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Punto de partida por dirección</h3>
+        <p className="text-sm text-gray-500">{monthLabel} — {addresses.length} direcciones</p>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={onToggleEdit}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+            isEditing ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-500 hover:text-gray-700 border border-gray-200'
+          )}
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+          {isEditing ? 'Editando' : 'Editar'}
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="text-left text-xs text-gray-400 font-medium py-2">Dirección</th>
+              {channels.map((ch) => {
+                const channel = CHANNELS.find(c => c.id === ch);
+                return <th key={ch} className="text-center text-xs text-gray-400 font-medium py-2 min-w-[80px]">{channel?.name}</th>;
+              })}
+              <th className="text-right text-xs text-gray-400 font-medium py-2 w-20">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {addresses.map((addr) => {
+              const b = addressBaselines[addr.id] || { glovo: 0, ubereats: 0, justeat: 0 };
+              const rowTotal = channels.reduce((s, ch) => s + (b[ch] || 0), 0);
+              return (
+                <tr key={addr.id} className="border-t border-gray-50">
+                  <td className="py-1.5 pr-2">
+                    <span className="text-sm text-gray-700 truncate block max-w-[180px]" title={addr.name}>
+                      {addr.name}
+                    </span>
+                  </td>
+                  {channels.map((ch) => (
+                    <td key={ch} className="py-1 px-1">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={b[ch] || ''}
+                          onChange={(e) => onChangeAddress(addr.id, ch, parseFloat(e.target.value) || 0)}
+                          className="w-full text-center text-sm py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-300 bg-white"
+                        />
+                      ) : (
+                        <div className="text-center text-sm font-medium text-gray-700 tabular-nums py-1.5">{fmt(b[ch] || 0)}€</div>
+                      )}
+                    </td>
+                  ))}
+                  <td className="py-1.5 text-right">
+                    <span className="text-sm font-semibold text-gray-700 tabular-nums">{fmt(rowTotal)}€</span>
+                  </td>
+                </tr>
+              );
+            })}
+            <tr className="border-t-2 border-gray-200">
+              <td className="py-2 text-sm font-semibold text-gray-900">Total</td>
+              {channels.map((ch) => (
+                <td key={ch} className="py-2 text-center">
+                  <span className="text-sm font-semibold text-primary-600 tabular-nums">{fmt(totals[ch])}€</span>
+                </td>
+              ))}
+              <td className="py-2 text-right">
+                <span className="text-base font-bold text-primary-700 tabular-nums">{fmt(grandTotal)}€</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Multi-address targets: tabs per address + summary tab */
+function MultiAddressTargetsStep({
+  channels,
+  addresses,
+  addressTargets,
+  addressBaselines,
+  onChangeAddress,
+  activeTab,
+  onTabChange,
+  actualRevenue,
+}: {
+  channels: SalesChannel[];
+  addresses: Restaurant[];
+  addressTargets: Record<string, GridChannelMonthData>;
+  addressBaselines: Record<string, ChannelMonthEntry>;
+  onChangeAddress: (addressId: string, month: string, ch: SalesChannel, v: number) => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  actualRevenue?: GridChannelMonthData;
+}) {
+  const months = getMonths(6);
+
+  // Compute summary: sum of all address targets
+  const summaryTargets = useMemo(() => {
+    const result: GridChannelMonthData = {};
+    for (const addr of addresses) {
+      const t = addressTargets[addr.id] || {};
+      for (const m of months) {
+        if (!result[m.key]) result[m.key] = { glovo: 0, ubereats: 0, justeat: 0 };
+        result[m.key].glovo += t[m.key]?.glovo || 0;
+        result[m.key].ubereats += t[m.key]?.ubereats || 0;
+        result[m.key].justeat += t[m.key]?.justeat || 0;
+      }
+    }
+    return result;
+  }, [addressTargets, addresses, months]);
+
+  const summaryBaseline = useMemo(() => {
+    const result: ChannelMonthEntry = { glovo: 0, ubereats: 0, justeat: 0 };
+    for (const addr of addresses) {
+      const b = addressBaselines[addr.id] || { glovo: 0, ubereats: 0, justeat: 0 };
+      result.glovo += b.glovo;
+      result.ubereats += b.ubereats;
+      result.justeat += b.justeat;
+    }
+    return result;
+  }, [addressBaselines, addresses]);
+
+  // For single address, force the tab to that address (no summary)
+  const effectiveTab = addresses.length === 1 ? addresses[0].id : activeTab;
+  const isSummary = effectiveTab === '__summary__' && addresses.length > 1;
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Objetivos de venta</h3>
+        <p className="text-sm text-gray-500">{addresses.length} {addresses.length === 1 ? 'punto de venta' : 'puntos de venta'} · 6 meses</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 overflow-x-auto pb-1 border-b border-gray-100">
+        {addresses.length > 1 && (
+          <button
+            onClick={() => onTabChange('__summary__')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded-t-lg whitespace-nowrap transition-colors',
+              isSummary ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-500' : 'text-gray-500 hover:text-gray-700'
+            )}
+          >
+            Agrupado
+          </button>
+        )}
+        {addresses.map((addr, i) => (
+          <button
+            key={addr.id}
+            onClick={() => onTabChange(addr.id)}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded-t-lg whitespace-nowrap transition-colors max-w-[160px] truncate',
+              activeTab === addr.id ? 'bg-primary-50 text-primary-700 border-b-2 border-primary-500' : 'text-gray-500 hover:text-gray-700'
+            )}
+            title={addr.name}
+          >
+            Local {i + 1}: {addr.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {isSummary ? (
+        <TargetsStep
+          channels={channels}
+          targets={summaryTargets}
+          onChange={() => {}} // read-only
+          baseline={summaryBaseline}
+          actualRevenue={actualRevenue}
+        />
+      ) : (
+        <TargetsStep
+          channels={channels}
+          targets={addressTargets[effectiveTab] || {}}
+          onChange={(month, ch, v) => onChangeAddress(effectiveTab, month, ch, v)}
+          baseline={addressBaselines[effectiveTab] || { glovo: 0, ubereats: 0, justeat: 0 }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
-export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds, existingProjection, scopeLabel }: SalesProjectionSetupProps) {
+export function SalesProjectionSetup({ isOpen, onClose, onComplete, onCompleteBatch, lastMonthRevenue, companyIds: propCompanyIds, brandIds: propBrandIds, addressIds: propAddressIds, existingProjection, addresses, existingAddressProjections, scopeLabel }: SalesProjectionSetupProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('channels');
   const [channels, setChannels] = useState<SalesChannel[]>(['glovo', 'ubereats', 'justeat']);
@@ -520,13 +824,62 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   const [editingBaseline, setEditingBaseline] = useState(false);
   const [targets, setTargets] = useState<GridChannelMonthData>({});
 
+  // Multi-address state
+  const hasAddresses = (addresses?.length ?? 0) > 0;
+  const [selectedAddressIds, setSelectedAddressIds] = useState<string[]>([]);
+  const selectedAddresses = useMemo(() =>
+    addresses?.filter(a => selectedAddressIds.includes(a.id)) ?? [],
+    [addresses, selectedAddressIds]
+  );
+  const [addressBaselines, setAddressBaselines] = useState<Record<string, ChannelMonthEntry>>({});
+  const [addressTargets, setAddressTargets] = useState<Record<string, GridChannelMonthData>>({});
+  const [activeAddressTab, setActiveAddressTab] = useState<string>('__summary__');
+
   // Pre-fill wizard from existing projection when opening in edit mode
   useEffect(() => {
     if (!isOpen) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStep('channels');
     setEditingBaseline(false);
-    if (existingProjection) {
+    setActiveAddressTab('__summary__');
+
+    // Initialize selected addresses: all by default, or from existing projections
+    if (hasAddresses && addresses) {
+      if (existingAddressProjections && existingAddressProjections.length > 0) {
+        // Pre-select addresses that have existing projections
+        const existingIds = existingAddressProjections
+          .map(p => p.addressId)
+          .filter((id): id is string => !!id);
+        setSelectedAddressIds(existingIds.length > 0 ? existingIds : addresses.map(a => a.id));
+      } else {
+        setSelectedAddressIds(addresses.map(a => a.id));
+      }
+    } else {
+      setSelectedAddressIds([]);
+    }
+
+    // Multi-address: pre-fill from existing address projections
+    if (hasAddresses && existingAddressProjections && existingAddressProjections.length > 0) {
+      const first = existingAddressProjections[0];
+      setChannels(first.config.activeChannels);
+      setMode(first.config.investmentMode);
+      setAds(first.config.maxAdsPercent);
+      setPromos(first.config.maxPromosPercent);
+
+      const baselines: Record<string, ChannelMonthEntry> = {};
+      const targets: Record<string, GridChannelMonthData> = {};
+      for (const p of existingAddressProjections) {
+        if (p.addressId) {
+          baselines[p.addressId] = p.baselineRevenue;
+          targets[p.addressId] = p.targetRevenue;
+        }
+      }
+      setAddressBaselines(baselines);
+      setAddressTargets(targets);
+      setBaselineLoaded(true);
+      setBaseline(lastMonthRevenue || { glovo: 0, ubereats: 0, justeat: 0 });
+      setTargets({});
+    } else if (existingProjection) {
       setChannels(existingProjection.config.activeChannels);
       setMode(existingProjection.config.investmentMode);
       setAds(existingProjection.config.maxAdsPercent);
@@ -534,6 +887,8 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       setBaseline(existingProjection.baselineRevenue);
       setBaselineLoaded(true);
       setTargets(existingProjection.targetRevenue);
+      setAddressBaselines({});
+      setAddressTargets({});
     } else {
       setChannels(['glovo', 'ubereats', 'justeat']);
       setMode('global');
@@ -542,6 +897,8 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       setBaseline(lastMonthRevenue || { glovo: 0, ubereats: 0, justeat: 0 });
       setBaselineLoaded(false);
       setTargets({});
+      setAddressBaselines({});
+      setAddressTargets({});
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -569,6 +926,76 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       }
     }
   }, [isLoadingRevenue, isRevenueError, revenueError, autoLastMonthRevenue, latestMonthWithData, effectiveCompanyIds, isOpen]);
+
+  // Multi-address: per-address revenue for baseline auto-population
+  const addressRevenueQueries = useQueries({
+    queries: (selectedAddresses.length > 0 && isOpen ? selectedAddresses : []).map((addr) => {
+      const addrAllIds = expandRestaurantIds([addr.id], addresses || []);
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      const startDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      const endDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      return {
+        queryKey: ['address-revenue', addr.id, startDate, endDate],
+        queryFn: () => fetchMonthlyRevenueByChannel({
+          companyIds: effectiveCompanyIds,
+          addressIds: addrAllIds.length > 0 ? addrAllIds : [addr.id],
+          startDate,
+          endDate,
+        }),
+        enabled: effectiveCompanyIds.length > 0,
+        staleTime: QUERY_STALE_MEDIUM,
+        gcTime: QUERY_GC_MEDIUM,
+      };
+    }),
+  });
+
+  // Auto-populate addressBaselines from per-address revenue queries
+  const [addressBaselineLoaded, setAddressBaselineLoaded] = useState(false);
+  useEffect(() => {
+    if (selectedAddresses.length === 0 || addressBaselineLoaded || !isOpen) return;
+    // Wait for all queries to settle
+    const allDone = addressRevenueQueries.every(q => !q.isLoading);
+    if (!allDone) return;
+
+    const newBaselines: Record<string, ChannelMonthEntry> = {};
+    let hasAnyData = false;
+    selectedAddresses.forEach((addr, i) => {
+      const result = addressRevenueQueries[i]?.data;
+      const entry: ChannelMonthEntry = { glovo: 0, ubereats: 0, justeat: 0 };
+      if (result) {
+        for (const row of result) {
+          const ch = row.channel as SalesChannel;
+          if (ch === 'glovo' || ch === 'ubereats' || ch === 'justeat') {
+            entry[ch] = Math.round(Number(row.total_revenue) || 0);
+            if (entry[ch] > 0) hasAnyData = true;
+          }
+        }
+      }
+      newBaselines[addr.id] = entry;
+    });
+
+    if (hasAnyData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAddressBaselines(prev => {
+        // Only auto-fill addresses that have no existing data
+        const merged = { ...prev };
+        for (const [addrId, entry] of Object.entries(newBaselines)) {
+          if (!merged[addrId] || (merged[addrId].glovo === 0 && merged[addrId].ubereats === 0 && merged[addrId].justeat === 0)) {
+            merged[addrId] = entry;
+          }
+        }
+        return merged;
+      });
+      setAddressBaselineLoaded(true);
+    }
+  }, [addressRevenueQueries, selectedAddresses, addressBaselineLoaded, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset addressBaselineLoaded when wizard closes
+  useEffect(() => {
+    if (!isOpen) setAddressBaselineLoaded(false);
+  }, [isOpen]);
 
   const handleRetryRevenue = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['actual-revenue-by-month'] });
@@ -639,15 +1066,49 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
   }, [autoLastMonthRevenue, latestMonthWithData]);
 
   const months = useMemo(() => getMonths(6), []);
-  const steps: Step[] = ['channels', 'investment', 'baseline', 'targets'];
+  const steps: Step[] = useMemo(() =>
+    hasAddresses
+      ? ['channels', 'addresses', 'investment', 'baseline', 'targets']
+      : ['channels', 'investment', 'baseline', 'targets'],
+    [hasAddresses]
+  );
   const idx = steps.indexOf(step);
 
   const toggleChannel = (ch: SalesChannel) => setChannels((prev) => prev.includes(ch) ? prev.filter((c) => c !== ch) : [...prev, ch]);
+
+  const toggleAddress = (id: string) => setSelectedAddressIds((prev) =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  );
 
   const handleTargetChange = (month: string, ch: SalesChannel, value: number) => {
     setTargets((prev) => ({
       ...prev,
       [month]: { ...prev[month], glovo: prev[month]?.glovo || 0, ubereats: prev[month]?.ubereats || 0, justeat: prev[month]?.justeat || 0, [ch]: value },
+    }));
+  };
+
+  const handleAddressTargetChange = (addressId: string, month: string, ch: SalesChannel, value: number) => {
+    setAddressTargets((prev) => ({
+      ...prev,
+      [addressId]: {
+        ...prev[addressId],
+        [month]: {
+          glovo: prev[addressId]?.[month]?.glovo || 0,
+          ubereats: prev[addressId]?.[month]?.ubereats || 0,
+          justeat: prev[addressId]?.[month]?.justeat || 0,
+          [ch]: value,
+        },
+      },
+    }));
+  };
+
+  const handleAddressBaselineChange = (addressId: string, ch: SalesChannel, value: number) => {
+    setAddressBaselines((prev) => ({
+      ...prev,
+      [addressId]: {
+        ...prev[addressId] || { glovo: 0, ubereats: 0, justeat: 0 },
+        [ch]: value,
+      },
     }));
   };
 
@@ -660,12 +1121,31 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
       startDate: new Date().toISOString().split('T')[0],
       endDate: getEndDate(6),
     };
-    onComplete(config, targets, baseline);
+
+    if (selectedAddresses.length > 0 && onCompleteBatch) {
+      const batchData: AddressBatchEntry[] = selectedAddresses.map((addr) => ({
+        addressId: addr.id,
+        brandId: addr.brandId,
+        targetRevenue: addressTargets[addr.id] || {},
+        baselineRevenue: addressBaselines[addr.id] || { glovo: 0, ubereats: 0, justeat: 0 },
+      }));
+      onCompleteBatch(config, batchData);
+    } else {
+      onComplete(config, targets, baseline);
+    }
   };
 
   const canProceed = () => {
     if (step === 'channels') return channels.length > 0;
+    if (step === 'addresses') return selectedAddressIds.length > 0;
     if (step === 'targets') {
+      if (selectedAddresses.length > 0) {
+        return selectedAddresses.some((addr) => {
+          const t = addressTargets[addr.id];
+          if (!t) return false;
+          return months.some((m) => channels.some((ch) => (t[m.key]?.[ch] || 0) > 0));
+        });
+      }
       const total = months.reduce((sum, m) => sum + channels.reduce((chSum, ch) => chSum + (targets[m.key]?.[ch] || 0), 0), 0);
       return total > 0;
     }
@@ -676,7 +1156,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className={cn('relative w-full mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden', selectedAddresses.length > 1 ? 'max-w-3xl' : 'max-w-2xl')}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -707,13 +1187,49 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
         {/* Content */}
         <div className="px-6 py-6 min-h-[400px]">
           {step === 'channels' && <ChannelStep selected={channels} onToggle={toggleChannel} />}
+          {step === 'addresses' && addresses && (
+            <AddressSelectionStep
+              addresses={addresses}
+              selectedIds={selectedAddressIds}
+              onToggle={toggleAddress}
+              onSelectAll={() => setSelectedAddressIds(addresses.map(a => a.id))}
+              onDeselectAll={() => setSelectedAddressIds([])}
+            />
+          )}
           {step === 'investment' && (
             <InvestmentStep channels={channels} mode={mode} onModeChange={setMode} ads={ads} promos={promos} onAdsChange={setAds} onPromosChange={setPromos} />
           )}
           {step === 'baseline' && (
-            <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} isError={isRevenueError} onRetry={handleRetryRevenue} monthLabel={baselineMonthInfo.label} isPartialMonth={baselineMonthInfo.isPartial} />
+            selectedAddresses.length > 0 ? (
+              <MultiAddressBaselineStep
+                channels={channels}
+                addresses={selectedAddresses}
+                addressBaselines={addressBaselines}
+                onChangeAddress={handleAddressBaselineChange}
+                isEditing={editingBaseline}
+                onToggleEdit={() => setEditingBaseline(!editingBaseline)}
+                monthLabel={baselineMonthInfo.label}
+              />
+            ) : (
+              <BaselineStep channels={channels} baseline={baseline} onChange={(ch, v) => setBaseline((p) => ({ ...p, [ch]: v }))} isEditing={editingBaseline} onToggleEdit={() => setEditingBaseline(!editingBaseline)} isLoadingRevenue={isLoadingRevenue} isError={isRevenueError} onRetry={handleRetryRevenue} monthLabel={baselineMonthInfo.label} isPartialMonth={baselineMonthInfo.isPartial} />
+            )
           )}
-          {step === 'targets' && <TargetsStep channels={channels} targets={targets} onChange={handleTargetChange} baseline={baseline} actualRevenue={autoRevenue} />}
+          {step === 'targets' && (
+            selectedAddresses.length > 0 ? (
+              <MultiAddressTargetsStep
+                channels={channels}
+                addresses={selectedAddresses}
+                addressTargets={addressTargets}
+                addressBaselines={addressBaselines}
+                onChangeAddress={handleAddressTargetChange}
+                activeTab={activeAddressTab}
+                onTabChange={setActiveAddressTab}
+                actualRevenue={autoRevenue}
+              />
+            ) : (
+              <TargetsStep channels={channels} targets={targets} onChange={handleTargetChange} baseline={baseline} actualRevenue={autoRevenue} />
+            )
+          )}
         </div>
 
         {/* Footer */}
@@ -743,7 +1259,7 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, lastMonthRev
               className={cn('flex items-center gap-1.5 px-5 py-2 text-sm font-medium rounded-lg transition-colors', canProceed() ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed')}
             >
               <TrendingUp className="w-4 h-4" />
-              Crear proyección
+              {selectedAddresses.length > 1 ? `Crear ${selectedAddresses.length} proyecciones` : 'Crear proyección'}
             </button>
           )}
         </div>

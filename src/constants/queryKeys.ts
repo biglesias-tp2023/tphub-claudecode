@@ -231,6 +231,8 @@ export const queryKeys = {
   salesProjections: {
     byScope: (companyId: string, brandId?: string | null, addressId?: string | null) =>
       ['sales-projections', companyId, brandId ?? '__NULL__', addressId ?? '__NULL__'] as const,
+    byBrand: (companyId: string, brandId: string | null) =>
+      ['sales-projections', 'brand', companyId, brandId ?? '__NULL__'] as const,
     bulk: (companyIds: string[]) =>
       ['sales-projections', 'bulk', companyIds] as const,
   },

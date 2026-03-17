@@ -155,7 +155,19 @@ export function StrategicPage() {
           {state.hasSalesProjection && state.salesProjection ? (
             <>
               {state.fallbackInfo && (() => {
-                const { level, targetScope } = state.fallbackInfo;
+                const info = state.fallbackInfo;
+                if ('matchCount' in info) {
+                  // Multi-address partial match
+                  return (
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-primary-50 border border-primary-200 rounded-xl">
+                      <Info className="w-3.5 h-3.5 text-primary-600 shrink-0" />
+                      <p className="text-xs text-primary-800">
+                        Mostrando agregación de {info.matchCount} de {info.totalCount} direcciones seleccionadas
+                      </p>
+                    </div>
+                  );
+                }
+                const { level, targetScope } = info;
                 const targetName = targetScope === 'address' ? addressName : brandName;
                 const sourceLabel = level === 'company' ? 'proyección general' : `proyección de ${brandName}`;
                 if (!targetName) return null;
@@ -484,10 +496,13 @@ export function StrategicPage() {
         isOpen={state.isSetupOpen}
         onClose={state.closeSetup}
         onComplete={state.handleSetupComplete}
+        onCompleteBatch={state.handleSetupCompleteBatch}
         companyIds={state.effectiveCompanyIds}
         brandIds={state.wizardBrandIds}
         addressIds={state.wizardAddressIds}
         existingProjection={state.salesProjection}
+        addresses={state.brandAddresses}
+        existingAddressProjections={state.brandAddressProjections}
         scopeLabel={[companyLabel, brandName, addressName].filter(Boolean).join(' > ')}
       />
 

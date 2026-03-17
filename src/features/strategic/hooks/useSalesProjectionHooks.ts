@@ -7,6 +7,7 @@ import { QUERY_STALE_MEDIUM, QUERY_GC_MEDIUM } from '@/constants/queryConfig';
 import { queryKeys } from '@/constants/queryKeys';
 import {
   fetchSalesProjection,
+  fetchSalesProjectionsByBrand,
   fetchSalesProjectionsByCompanyIds,
   upsertSalesProjection,
   updateSalesProjectionTargets,
@@ -33,6 +34,20 @@ export function useSalesProjection({ companyId, brandId, addressId }: UseSalesPr
     queryKey: queryKeys.salesProjections.byScope(companyId, brandId, addressId),
     queryFn: () => fetchSalesProjection({ companyId, brandId, addressId }),
     enabled: !!companyId,
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
+  });
+}
+
+/**
+ * Fetch all address-level projections for a given brand.
+ * Used for multi-address aggregation in the wizard and dashboard.
+ */
+export function useSalesProjectionsByBrand(companyId: string, brandId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.salesProjections.byBrand(companyId, brandId),
+    queryFn: () => fetchSalesProjectionsByBrand(companyId, brandId!),
+    enabled: !!companyId && !!brandId,
     staleTime: QUERY_STALE_MEDIUM,
     gcTime: QUERY_GC_MEDIUM,
   });
@@ -73,6 +88,12 @@ export function useUpsertSalesProjection() {
           variables.addressId,
         ),
       });
+      // Also invalidate byBrand cache when the projection has a brand
+      if (variables.brandId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.salesProjections.byBrand(variables.companyId, variables.brandId),
+        });
+      }
     },
   });
 }
@@ -125,6 +146,11 @@ export function useDeleteSalesProjection() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.salesProjections.byScope(vars.companyId, vars.brandId, vars.addressId),
       });
+      if (vars.brandId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.salesProjections.byBrand(vars.companyId, vars.brandId),
+        });
+      }
     },
   });
 }

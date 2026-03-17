@@ -83,6 +83,7 @@ export {
 export {
   mapDbSalesProjection,
   fetchSalesProjection,
+  fetchSalesProjectionsByBrand,
   fetchSalesProjectionsByCompanyIds,
   upsertSalesProjection,
   updateSalesProjectionTargets,

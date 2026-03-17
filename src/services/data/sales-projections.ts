@@ -122,6 +122,27 @@ export async function fetchSalesProjectionsByCompanyIds(
   return data.map((row) => mapDbSalesProjection(row as DbSalesProjection));
 }
 
+/**
+ * Fetch all address-level projections for a given brand.
+ * Used for multi-address aggregation in the wizard and dashboard.
+ */
+export async function fetchSalesProjectionsByBrand(
+  companyId: string,
+  brandId: string
+): Promise<SalesProjectionData[]> {
+  const { data, error } = await supabase
+    .from('sales_projections')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('brand_id', brandId)
+    .not('address_id', 'is', null);
+
+  if (error) handleQueryError(error, 'No se pudieron cargar las proyecciones por marca');
+  if (!data) return [];
+
+  return data.map((row) => mapDbSalesProjection(row as DbSalesProjection));
+}
+
 // ============================================
 // UPSERT
 // ============================================
