@@ -22,6 +22,7 @@ export interface SalesProjectionProps {
   actualPromos?: GridChannelMonthData;
   onTargetChange?: (data: GridChannelMonthData) => void;
   onEditConfig?: () => void;
+  onDelete?: () => void;
   restaurantName?: string;
   /** Real revenue by month×channel from CRP Portal for grid rows */
   realRevenueByMonth?: GridChannelMonthData;

@@ -191,8 +191,11 @@ export interface PostPromoHealth {
 }
 
 // ============================================
-// HELPERS
+// CONSTANTS & HELPERS
 // ============================================
+
+/** Number of days to look back for customer history */
+const LOOKBACK_DAYS = 183;
 
 /**
  * Maps a portal ID to a channel ID.
@@ -245,6 +248,74 @@ function getCohortId(date: Date, granularity: 'week' | 'month'): string {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   return `${year}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+/**
+ * Compute the lookback start date: startDate minus LOOKBACK_DAYS.
+ */
+function computeLookbackStart(startDate: string): string {
+  const d = new Date(startDate);
+  d.setDate(d.getDate() - LOOKBACK_DAYS);
+  return d.toISOString().split('T')[0];
+}
+
+/** Context returned by fetchOrdersWithContext */
+interface OrdersContext {
+  /** All orders in lookback + analysis range */
+  allOrders: CustomerOrder[];
+  /** Set of customer IDs who ordered within [analysisStart, analysisEnd] */
+  activeCustomerIds: Set<string>;
+  /** Original analysis start date as Date */
+  analysisStart: Date;
+  /** Original analysis end date as Date */
+  analysisEnd: Date;
+}
+
+/**
+ * Fetches orders with 183-day lookback and identifies active customers.
+ *
+ * - Queries from (startDate - 183d) to endDate
+ * - Active customers = those with at least 1 order in [startDate, endDate]
+ * - All orders (including lookback) are used to classify customers
+ */
+async function fetchOrdersWithContext(params: FetchCustomerDataParams): Promise<OrdersContext> {
+  const lookbackStart = computeLookbackStart(params.startDate);
+  const extendedParams: FetchCustomerDataParams = {
+    ...params,
+    startDate: lookbackStart,
+  };
+
+  const allOrders = await fetchCustomerOrders(extendedParams);
+  const analysisStart = new Date(`${params.startDate}T00:00:00`);
+  const analysisEnd = new Date(`${params.endDate}T23:59:59`);
+
+  // Active = ordered in the selected range
+  const activeCustomerIds = new Set<string>();
+  for (const order of allOrders) {
+    if (order.orderDate >= analysisStart && order.orderDate <= analysisEnd) {
+      activeCustomerIds.add(order.customerId);
+    }
+  }
+
+  return { allOrders, activeCustomerIds, analysisStart, analysisEnd };
+}
+
+/**
+ * Group orders by customer ID, optionally filtered to specific customer IDs.
+ */
+function groupByCustomer(
+  orders: CustomerOrder[],
+  filterCustomerIds?: Set<string>
+): Map<string, CustomerOrder[]> {
+  const map = new Map<string, CustomerOrder[]>();
+  for (const order of orders) {
+    if (filterCustomerIds && !filterCustomerIds.has(order.customerId)) continue;
+    if (!map.has(order.customerId)) {
+      map.set(order.customerId, []);
+    }
+    map.get(order.customerId)!.push(order);
+  }
+  return map;
 }
 
 // ============================================
@@ -331,68 +402,72 @@ async function fetchCustomerOrders(params: FetchCustomerDataParams): Promise<Cus
 // ============================================
 
 /**
- * Calculate customer metrics from order data.
+ * Calculate customer metrics with lookback context.
+ *
+ * - Active customers = those who ordered in [analysisStart, analysisEnd]
+ * - New = active customer with NO orders before analysisStart in the lookback
+ * - Returning = active customer WITH orders before analysisStart
+ * - Retention rate = active customers with >1 order total (lookback+range) / active customers
+ * - Revenue/orders/ticket = computed from orders IN THE ANALYSIS RANGE only
  */
-function calculateMetrics(orders: CustomerOrder[]): CustomerMetrics {
-  if (orders.length === 0) {
+function calculateMetricsWithContext(ctx: OrdersContext): CustomerMetrics {
+  const { allOrders, activeCustomerIds, analysisStart, analysisEnd } = ctx;
+
+  if (activeCustomerIds.size === 0) {
     return {
-      totalCustomers: 0,
-      newCustomers: 0,
-      returningCustomers: 0,
-      retentionRate: 0,
-      avgFrequencyDays: 0,
-      avgSpendPerCustomer: 0,
-      avgTicket: 0,
-      totalOrders: 0,
-      totalRevenue: 0,
-      avgOrdersPerCustomer: 0,
+      totalCustomers: 0, newCustomers: 0, returningCustomers: 0,
+      retentionRate: 0, avgFrequencyDays: 0, avgSpendPerCustomer: 0,
+      avgTicket: 0, totalOrders: 0, totalRevenue: 0, avgOrdersPerCustomer: 0,
     };
   }
 
-  // Group orders by customer
-  const customerOrders = new Map<string, CustomerOrder[]>();
-  for (const order of orders) {
-    if (!customerOrders.has(order.customerId)) {
-      customerOrders.set(order.customerId, []);
-    }
-    customerOrders.get(order.customerId)!.push(order);
-  }
+  // Group ALL orders by active customer
+  const customerAllOrders = groupByCustomer(allOrders, activeCustomerIds);
 
-  const totalCustomers = customerOrders.size;
+  const totalCustomers = activeCustomerIds.size;
   let newCustomers = 0;
   let returningCustomers = 0;
   let totalFrequencyDays = 0;
   let customersWithMultipleOrders = 0;
 
-  for (const [, custOrders] of customerOrders) {
-    // Check if any order is marked as new customer
-    const hasNewCustomerFlag = custOrders.some((o) => o.isNewCustomer);
-    if (hasNewCustomerFlag) {
-      newCustomers++;
-    } else {
+  // Orders within the analysis range (for revenue/ticket calculations)
+  let rangeOrders = 0;
+  let rangeRevenue = 0;
+
+  for (const [, custOrders] of customerAllOrders) {
+    const sorted = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
+
+    // New = no orders before analysisStart
+    const hasOrderBeforeRange = sorted.some((o) => o.orderDate < analysisStart);
+    if (hasOrderBeforeRange) {
       returningCustomers++;
+    } else {
+      newCustomers++;
     }
 
-    // Calculate frequency for customers with multiple orders
-    if (custOrders.length > 1) {
-      const sortedOrders = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
-      const firstOrder = sortedOrders[0].orderDate;
-      const lastOrder = sortedOrders[sortedOrders.length - 1].orderDate;
+    // Count total orders for retention/frequency (full history)
+    if (sorted.length > 1) {
+      const firstOrder = sorted[0].orderDate;
+      const lastOrder = sorted[sorted.length - 1].orderDate;
       const daysBetween = (lastOrder.getTime() - firstOrder.getTime()) / (1000 * 60 * 60 * 24);
-      const avgDays = daysBetween / (sortedOrders.length - 1);
+      const avgDays = daysBetween / (sorted.length - 1);
       totalFrequencyDays += avgDays;
       customersWithMultipleOrders++;
     }
+
+    // Accumulate range-only metrics
+    for (const order of sorted) {
+      if (order.orderDate >= analysisStart && order.orderDate <= analysisEnd) {
+        rangeOrders++;
+        rangeRevenue += order.totalPrice;
+      }
+    }
   }
 
-  const totalOrders = orders.length;
-  const totalRevenue = orders.reduce((sum, o) => sum + o.totalPrice, 0);
-  const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const avgOrdersPerCustomer = totalCustomers > 0 ? totalOrders / totalCustomers : 0;
+  const avgTicket = rangeOrders > 0 ? rangeRevenue / rangeOrders : 0;
+  const avgOrdersPerCustomer = totalCustomers > 0 ? rangeOrders / totalCustomers : 0;
   const avgFrequencyDays = customersWithMultipleOrders > 0 ? totalFrequencyDays / customersWithMultipleOrders : 0;
-  const avgSpendPerCustomer = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
-
-  // Retention rate: customers who made more than 1 order / total customers
+  const avgSpendPerCustomer = totalCustomers > 0 ? rangeRevenue / totalCustomers : 0;
   const retentionRate = totalCustomers > 0 ? (customersWithMultipleOrders / totalCustomers) * 100 : 0;
 
   return {
@@ -403,8 +478,8 @@ function calculateMetrics(orders: CustomerOrder[]): CustomerMetrics {
     avgFrequencyDays,
     avgSpendPerCustomer,
     avgTicket,
-    totalOrders,
-    totalRevenue,
+    totalOrders: rangeOrders,
+    totalRevenue: rangeRevenue,
     avgOrdersPerCustomer,
   };
 }
@@ -415,18 +490,19 @@ function calculateMetrics(orders: CustomerOrder[]): CustomerMetrics {
 
 /**
  * Fetches customer metrics with period comparison.
+ * Both periods use 183-day lookback for classification.
  */
 export async function fetchCustomerMetrics(
   currentParams: FetchCustomerDataParams,
   previousParams: FetchCustomerDataParams
 ): Promise<CustomerMetricsWithChanges> {
-  const [currentOrders, previousOrders] = await Promise.all([
-    fetchCustomerOrders(currentParams),
-    fetchCustomerOrders(previousParams),
+  const [currentCtx, previousCtx] = await Promise.all([
+    fetchOrdersWithContext(currentParams),
+    fetchOrdersWithContext(previousParams),
   ]);
 
-  const current = calculateMetrics(currentOrders);
-  const previous = calculateMetrics(previousOrders);
+  const current = calculateMetricsWithContext(currentCtx);
+  const previous = calculateMetricsWithContext(previousCtx);
 
   return {
     ...current,
@@ -440,24 +516,15 @@ export async function fetchCustomerMetrics(
 }
 
 /**
- * Fetches customer metrics by channel.
+ * Fetches customer metrics by channel with lookback context.
+ *
+ * Active in channel X = ordered in channel X during [startDate, endDate].
+ * History in channel X = all orders in that channel during lookback+range.
  */
 export async function fetchCustomerMetricsByChannel(
   params: FetchCustomerDataParams
 ): Promise<ChannelCustomerMetrics[]> {
-  const orders = await fetchCustomerOrders(params);
-
-  // Group by channel
-  const channelOrders = new Map<ChannelId, CustomerOrder[]>();
-  for (const order of orders) {
-    const channelId = portalIdToChannelId(order.portalId);
-    if (channelId) {
-      if (!channelOrders.has(channelId)) {
-        channelOrders.set(channelId, []);
-      }
-      channelOrders.get(channelId)!.push(order);
-    }
-  }
+  const { allOrders, analysisStart, analysisEnd } = await fetchOrdersWithContext(params);
 
   const channelNames: Record<ChannelId, string> = {
     glovo: 'Glovo',
@@ -468,41 +535,70 @@ export async function fetchCustomerMetricsByChannel(
   const results: ChannelCustomerMetrics[] = [];
 
   for (const channelId of ['glovo', 'ubereats', 'justeat'] as ChannelId[]) {
-    const chOrders = channelOrders.get(channelId) || [];
-    const metrics = calculateMetrics(chOrders);
+    // Filter all orders for this channel
+    const chAllOrders = allOrders.filter((o) => portalIdToChannelId(o.portalId) === channelId);
 
-    // Calculate returning customers (customers with >1 order in this channel)
-    const customerOrderCounts = new Map<string, number>();
-    for (const order of chOrders) {
-      customerOrderCounts.set(order.customerId, (customerOrderCounts.get(order.customerId) || 0) + 1);
+    // Active in this channel = ordered in range in this channel
+    const chActiveIds = new Set<string>();
+    for (const order of chAllOrders) {
+      if (order.orderDate >= analysisStart && order.orderDate <= analysisEnd) {
+        chActiveIds.add(order.customerId);
+      }
     }
+
+    if (chActiveIds.size === 0) continue;
+
+    // Group all channel orders by active customer
+    const customerAllOrders = groupByCustomer(chAllOrders, chActiveIds);
+
+    const totalCustomers = chActiveIds.size;
+    let newCustomers = 0;
     let returningCustomers = 0;
-    for (const count of customerOrderCounts.values()) {
-      if (count > 1) returningCustomers++;
+    let rangeOrders = 0;
+    let rangeRevenue = 0;
+    let rangeRefunds = 0;
+    let rangePromoOrders = 0;
+
+    for (const [, custOrders] of customerAllOrders) {
+      const sorted = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
+
+      // New in this channel = no orders before analysisStart in this channel
+      const hasOrderBefore = sorted.some((o) => o.orderDate < analysisStart);
+      if (hasOrderBefore) returningCustomers++;
+      else newCustomers++;
+
+      // Range-only metrics
+      for (const order of sorted) {
+        if (order.orderDate >= analysisStart && order.orderDate <= analysisEnd) {
+          rangeOrders++;
+          rangeRevenue += order.totalPrice;
+          rangeRefunds += order.refunds;
+          if (order.promotions > 0) rangePromoOrders++;
+        }
+      }
     }
-    const repetitionRate = metrics.totalCustomers > 0 ? (returningCustomers / metrics.totalCustomers) * 100 : 0;
 
-    // Net revenue per customer
-    const totalRefunds = chOrders.reduce((sum, o) => sum + o.refunds, 0);
-    const netRevenuePerCustomer = metrics.totalCustomers > 0
-      ? (metrics.totalRevenue - totalRefunds) / metrics.totalCustomers
-      : 0;
+    // Returning = customers with >1 order total in this channel (lookback+range)
+    let customersWithMultipleOrders = 0;
+    for (const [, custOrders] of customerAllOrders) {
+      if (custOrders.length > 1) customersWithMultipleOrders++;
+    }
 
-    // Promo orders percentage
-    const ordersWithPromo = chOrders.filter((o) => o.promotions > 0).length;
-    const promoOrdersPercentage = chOrders.length > 0
-      ? (ordersWithPromo / chOrders.length) * 100
-      : 0;
+    const avgTicket = rangeOrders > 0 ? rangeRevenue / rangeOrders : 0;
+    const avgOrdersPerCustomer = totalCustomers > 0 ? rangeOrders / totalCustomers : 0;
+    const repetitionRate = totalCustomers > 0 ? (customersWithMultipleOrders / totalCustomers) * 100 : 0;
+    const netRevenuePerCustomer = totalCustomers > 0 ? (rangeRevenue - rangeRefunds) / totalCustomers : 0;
+    const promoOrdersPercentage = rangeOrders > 0 ? (rangePromoOrders / rangeOrders) * 100 : 0;
 
     results.push({
       channelId,
       channelName: channelNames[channelId],
-      totalCustomers: metrics.totalCustomers,
-      newCustomers: metrics.newCustomers,
-      newCustomersPercentage: metrics.totalCustomers > 0 ? (metrics.newCustomers / metrics.totalCustomers) * 100 : 0,
-      avgTicket: metrics.avgTicket,
-      avgOrdersPerCustomer: metrics.avgOrdersPerCustomer,
-      returningCustomers,
+      totalCustomers,
+      newCustomers,
+      newCustomersPercentage: totalCustomers > 0 ? (newCustomers / totalCustomers) * 100 : 0,
+      avgTicket,
+      avgOrdersPerCustomer,
+      returningCustomers: customersWithMultipleOrders,
       repetitionRate,
       netRevenuePerCustomer,
       promoOrdersPercentage,
@@ -513,31 +609,33 @@ export async function fetchCustomerMetricsByChannel(
 }
 
 /**
- * Fetches cohort retention data.
+ * Fetches cohort retention data with lookback.
+ *
+ * Unlike other functions, cohorts include ALL customers in the lookback+range window,
+ * not just active ones. This avoids survivorship bias: a cohort from Oct 2025 should
+ * show all customers who first purchased in Oct, including those who never returned.
+ * Otherwise retention for old cohorts would be artificially inflated.
+ *
+ * - Cohort = month/week of REAL first order in the full window
+ * - Purchase periods tracked across the full lookback+range window
  */
 export async function fetchCustomerCohorts(
   params: FetchCustomerDataParams,
   granularity: 'week' | 'month' = 'month'
 ): Promise<CohortData[]> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
+  if (allOrders.length === 0) {
     return [];
   }
 
-  // Group orders by customer
-  const customerOrders = new Map<string, CustomerOrder[]>();
-  for (const order of orders) {
-    if (!customerOrders.has(order.customerId)) {
-      customerOrders.set(order.customerId, []);
-    }
-    customerOrders.get(order.customerId)!.push(order);
-  }
+  // Group ALL orders by ALL customers (no active filter — avoids survivorship bias)
+  const customerAllOrders = groupByCustomer(allOrders);
 
-  // Determine first purchase cohort for each customer
+  // Determine first purchase cohort for each customer (real first order in lookback+range)
   const customerCohorts = new Map<string, { cohortId: string; purchasePeriods: Set<string> }>();
 
-  for (const [customerId, custOrders] of customerOrders) {
+  for (const [customerId, custOrders] of customerAllOrders) {
     const sortedOrders = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
     const firstOrder = sortedOrders[0];
     const cohortId = getCohortId(firstOrder.orderDate, granularity);
@@ -582,7 +680,6 @@ export async function fetchCustomerCohorts(
 
   // Convert to CohortData array
   const cohorts: CohortData[] = [];
-  // Use 8 periods for weekly granularity, 6 for monthly
   const maxPeriods = granularity === 'week' ? 8 : 6;
 
   for (const [cohortId, data] of cohortDataMap) {
@@ -594,16 +691,14 @@ export async function fetchCustomerCohorts(
       retention.push(data.size > 0 ? (count / data.size) * 100 : 0);
     }
 
-    // Calculate cumulative retention: % of customers who have returned at least once up to this period
+    // Calculate cumulative retention
     const cumulativeRetention: number[] = [];
     const returnedCustomers = new Set<string>();
 
     for (let i = 0; i <= maxPeriods; i++) {
       if (i === 0) {
-        // Period 0 is always 100% (first purchase)
         cumulativeRetention.push(100);
       } else {
-        // Count unique customers who have purchased in any period from 1 to i
         for (const [customerId, { cohortId: cId, purchasePeriods }] of customerCohorts) {
           if (cId !== cohortId) continue;
           const cohortPeriodIndex = sortedPeriods.indexOf(cohortId);
@@ -629,65 +724,41 @@ export async function fetchCustomerCohorts(
     });
   }
 
-  // Sort by cohort ID
   cohorts.sort((a, b) => a.cohortId.localeCompare(b.cohortId));
-
-  // Limit to last 8 cohorts
   return cohorts.slice(-8);
 }
 
 /**
- * Fetches customers at risk of churning.
+ * Fetches customers at risk of churning (uses lookback for full history).
  */
 export async function fetchChurnRiskCustomers(
   params: FetchCustomerDataParams,
   limit = 20
 ): Promise<CustomerChurnRisk[]> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders, activeCustomerIds } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
-    return [];
-  }
+  if (activeCustomerIds.size === 0) return [];
 
-  // Group by customer
-  const customerOrders = new Map<string, CustomerOrder[]>();
-  for (const order of orders) {
-    if (!customerOrders.has(order.customerId)) {
-      customerOrders.set(order.customerId, []);
-    }
-    customerOrders.get(order.customerId)!.push(order);
-  }
-
+  const customerAllOrders = groupByCustomer(allOrders, activeCustomerIds);
   const today = new Date();
   const risks: CustomerChurnRisk[] = [];
 
-  for (const [customerId, custOrders] of customerOrders) {
-    // Only consider customers with at least 2 orders for churn analysis
+  for (const [customerId, custOrders] of customerAllOrders) {
     if (custOrders.length < 2) continue;
 
     const sortedOrders = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
     const lastOrder = sortedOrders[sortedOrders.length - 1];
     const totalSpend = custOrders.reduce((sum, o) => sum + o.totalPrice, 0);
-
-    // Calculate average days between orders
     const firstOrder = sortedOrders[0];
     const daysBetweenAll = (lastOrder.orderDate.getTime() - firstOrder.orderDate.getTime()) / (1000 * 60 * 60 * 24);
     const avgFrequencyDays = daysBetweenAll / (sortedOrders.length - 1);
-
-    // Calculate days since last order
     const daysSinceLastOrder = (today.getTime() - lastOrder.orderDate.getTime()) / (1000 * 60 * 60 * 24);
-
-    // Risk score: ratio of days since last order to average frequency
     const riskScore = avgFrequencyDays > 0 ? daysSinceLastOrder / avgFrequencyDays : 0;
 
     let riskLevel: 'high' | 'medium' | 'low';
-    if (riskScore > 2) {
-      riskLevel = 'high';
-    } else if (riskScore > 1.5) {
-      riskLevel = 'medium';
-    } else {
-      riskLevel = 'low';
-    }
+    if (riskScore > 2) riskLevel = 'high';
+    else if (riskScore > 1.5) riskLevel = 'medium';
+    else riskLevel = 'low';
 
     risks.push({
       customerId,
@@ -701,39 +772,30 @@ export async function fetchChurnRiskCustomers(
     });
   }
 
-  // Sort by risk score (highest first) and limit
   return risks
-    .filter((r) => r.riskLevel !== 'low') // Only show medium and high risk
+    .filter((r) => r.riskLevel !== 'low')
     .sort((a, b) => b.riskScore - a.riskScore)
     .slice(0, limit);
 }
 
 /**
- * Fetches multi-platform customer analysis with overlap breakdown.
+ * Fetches multi-platform customer analysis (uses lookback for full history).
  */
 export async function fetchMultiPlatformAnalysis(
   params: FetchCustomerDataParams
 ): Promise<MultiPlatformAnalysis> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders, activeCustomerIds } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
-    return {
-      glovoOnly: 0,
-      ubereatsOnly: 0,
-      justeatOnly: 0,
-      multiPlatform: 0,
-      multiPlatformPercentage: 0,
-      overlapBreakdown: [],
-    };
+  if (activeCustomerIds.size === 0) {
+    return { glovoOnly: 0, ubereatsOnly: 0, justeatOnly: 0, multiPlatform: 0, multiPlatformPercentage: 0, overlapBreakdown: [] };
   }
 
-  // Track platforms per customer
+  // Track platforms per active customer using full history
   const customerPlatforms = new Map<string, Set<ChannelId>>();
-
-  for (const order of orders) {
+  for (const order of allOrders) {
+    if (!activeCustomerIds.has(order.customerId)) continue;
     const channelId = portalIdToChannelId(order.portalId);
     if (!channelId) continue;
-
     if (!customerPlatforms.has(order.customerId)) {
       customerPlatforms.set(order.customerId, new Set());
     }
@@ -744,20 +806,14 @@ export async function fetchMultiPlatformAnalysis(
   let ubereatsOnly = 0;
   let justeatOnly = 0;
   let multiPlatform = 0;
-
-  // Track overlap combinations
   const overlapCounts = new Map<string, { channels: ChannelId[]; count: number }>();
 
   for (const platforms of customerPlatforms.values()) {
     if (platforms.size > 1) {
       multiPlatform++;
-
-      // Track the specific combination
       const sorted = Array.from(platforms).sort() as ChannelId[];
       const key = sorted.join('+');
-      if (!overlapCounts.has(key)) {
-        overlapCounts.set(key, { channels: sorted, count: 0 });
-      }
+      if (!overlapCounts.has(key)) overlapCounts.set(key, { channels: sorted, count: 0 });
       overlapCounts.get(key)!.count++;
     } else {
       const platform = Array.from(platforms)[0];
@@ -768,41 +824,41 @@ export async function fetchMultiPlatformAnalysis(
   }
 
   const totalCustomers = customerPlatforms.size;
-  const multiPlatformPercentage = totalCustomers > 0 ? (multiPlatform / totalCustomers) * 100 : 0;
-
-  // Convert overlap map to sorted array
-  const overlapBreakdown = Array.from(overlapCounts.values()).sort((a, b) => b.count - a.count);
-
   return {
     glovoOnly,
     ubereatsOnly,
     justeatOnly,
     multiPlatform,
-    multiPlatformPercentage,
-    overlapBreakdown,
+    multiPlatformPercentage: totalCustomers > 0 ? (multiPlatform / totalCustomers) * 100 : 0,
+    overlapBreakdown: Array.from(overlapCounts.values()).sort((a, b) => b.count - a.count),
   };
 }
 
 /**
  * Fetches revenue concentration (Pareto) analysis.
+ *
+ * - Active customers = ordered in range
+ * - Spend = revenue IN THE RANGE only (concentration of current activity)
+ * - Gini uses optimized O(n log n) formula instead of O(n²)
  */
 export async function fetchRevenueConcentration(
   params: FetchCustomerDataParams
 ): Promise<RevenueConcentration> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders, activeCustomerIds, analysisStart, analysisEnd } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
+  if (activeCustomerIds.size === 0) {
     return { top10Pct: 0, top20Pct: 0, top50Pct: 0, giniCoefficient: 0 };
   }
 
-  // Calculate total spend per customer
+  // Calculate spend per active customer IN THE RANGE only
   const customerSpend = new Map<string, number>();
-  for (const order of orders) {
+  for (const order of allOrders) {
+    if (!activeCustomerIds.has(order.customerId)) continue;
+    if (order.orderDate < analysisStart || order.orderDate > analysisEnd) continue;
     const current = customerSpend.get(order.customerId) || 0;
     customerSpend.set(order.customerId, current + order.totalPrice);
   }
 
-  // Sort descending by spend
   const spends = Array.from(customerSpend.values()).sort((a, b) => b - a);
   const totalRevenue = spends.reduce((sum, s) => sum + s, 0);
   const n = spends.length;
@@ -811,75 +867,66 @@ export async function fetchRevenueConcentration(
     return { top10Pct: 0, top20Pct: 0, top50Pct: 0, giniCoefficient: 0 };
   }
 
-  // Calculate revenue from top X%
   const revenueFromTopN = (pct: number): number => {
     const count = Math.max(1, Math.ceil(n * pct));
     const topSum = spends.slice(0, count).reduce((sum, s) => sum + s, 0);
     return (topSum / totalRevenue) * 100;
   };
 
-  // Gini coefficient calculation
+  // Gini coefficient — O(n log n) formula: G = (2 * Σ(i * y_i)) / (n * Σy_i) - (n + 1) / n
   const sortedAsc = [...spends].sort((a, b) => a - b);
-  const mean = totalRevenue / n;
-  let sumAbsDiff = 0;
+  let weightedSum = 0;
   for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      sumAbsDiff += Math.abs(sortedAsc[i] - sortedAsc[j]);
-    }
+    weightedSum += (i + 1) * sortedAsc[i];
   }
-  const giniCoefficient = n > 1 ? sumAbsDiff / (2 * n * n * mean) : 0;
+  const giniCoefficient = n > 1
+    ? (2 * weightedSum) / (n * totalRevenue) - (n + 1) / n
+    : 0;
 
   return {
     top10Pct: revenueFromTopN(0.1),
     top20Pct: revenueFromTopN(0.2),
     top50Pct: revenueFromTopN(0.5),
-    giniCoefficient: Math.min(giniCoefficient, 1),
+    giniCoefficient: Math.min(Math.max(giniCoefficient, 0), 1),
   };
 }
 
 /**
- * Fetches post-promo health segments.
+ * Fetches post-promo health segments with lookback.
  *
- * Classification logic:
- * 1. Dormidos: Had 45+ day gap between orders AND returning order had promo
- * 2. Sticky: First order had promo AND at least one later order without promo
- * 3. Promocioneros: First order had promo AND no later order without promo
- * 4. Organico: First order had no promo (all remaining)
+ * - Active customers = ordered in [startDate, endDate]
+ * - Classification uses FULL history (lookback+range):
+ *   1. Dormidos: Gap ≥183d between consecutive orders AND reactivation order had promo
+ *   2. Sticky: Real first order had promo AND at least one later order without promo
+ *   3. Promocioneros: Real first order had promo AND all later orders with promo
+ *   4. Orgánico: Real first order had no promo
  */
 export async function fetchPostPromoHealth(
   params: FetchCustomerDataParams
 ): Promise<PostPromoHealth> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders, activeCustomerIds } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
+  if (activeCustomerIds.size === 0) {
     return { sticky: 0, promocioneros: 0, organico: 0, dormidos: 0, total: 0 };
   }
 
-  // Group orders by customer
-  const customerOrders = new Map<string, CustomerOrder[]>();
-  for (const order of orders) {
-    if (!customerOrders.has(order.customerId)) {
-      customerOrders.set(order.customerId, []);
-    }
-    customerOrders.get(order.customerId)!.push(order);
-  }
+  // Group ALL orders by active customer
+  const customerAllOrders = groupByCustomer(allOrders, activeCustomerIds);
 
   let sticky = 0;
   let promocioneros = 0;
   let organico = 0;
   let dormidos = 0;
 
-  const DORMANT_THRESHOLD_DAYS = 183;
-
-  for (const [, custOrders] of customerOrders) {
+  for (const [, custOrders] of customerAllOrders) {
     const sorted = custOrders.sort((a, b) => a.orderDate.getTime() - b.orderDate.getTime());
 
-    // Check for dormidos first: 45+ day gap with promo reactivation
+    // Check for dormidos first: 183+ day gap with promo reactivation
     let isDormido = false;
     if (sorted.length >= 2) {
       for (let i = 1; i < sorted.length; i++) {
         const gapDays = (sorted[i].orderDate.getTime() - sorted[i - 1].orderDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (gapDays >= DORMANT_THRESHOLD_DAYS && sorted[i].promotions > 0) {
+        if (gapDays >= LOOKBACK_DAYS && sorted[i].promotions > 0) {
           isDormido = true;
           break;
         }
@@ -891,10 +938,10 @@ export async function fetchPostPromoHealth(
       continue;
     }
 
+    // Real first order (earliest in lookback+range)
     const firstOrderHadPromo = sorted[0].promotions > 0;
 
     if (firstOrderHadPromo) {
-      // Check if any subsequent order was without promo
       const hasOrganicReturn = sorted.length > 1 && sorted.slice(1).some((o) => o.promotions === 0);
       if (hasOrganicReturn) {
         sticky++;
@@ -911,7 +958,7 @@ export async function fetchPostPromoHealth(
     promocioneros,
     organico,
     dormidos,
-    total: customerOrders.size,
+    total: activeCustomerIds.size,
   };
 }
 
@@ -965,34 +1012,31 @@ function rfmToSegment(r: number, f: number, m: number): RFMSegment {
 }
 
 /**
- * Fetches RFM (Recency, Frequency, Monetary) segmentation analysis.
+ * Fetches RFM (Recency, Frequency, Monetary) segmentation analysis with lookback.
+ *
+ * - Active customers = ordered in [startDate, endDate]
+ * - R = days since last order (across full lookback+range) to endDate
+ * - F = total orders in lookback+range
+ * - M = total spend in lookback+range
  */
 export async function fetchRFMAnalysis(params: FetchCustomerDataParams): Promise<RFMAnalysis> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders, activeCustomerIds, analysisEnd } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
+  if (activeCustomerIds.size === 0) {
     return { segments: [], totalCustomers: 0, totalRevenue: 0 };
   }
 
-  const endDate = new Date(params.endDate);
-
-  // Group by customer
-  const customerMap = new Map<string, { orders: CustomerOrder[] }>();
-  for (const order of orders) {
-    if (!customerMap.has(order.customerId)) {
-      customerMap.set(order.customerId, { orders: [] });
-    }
-    customerMap.get(order.customerId)!.orders.push(order);
-  }
+  // Group ALL orders by active customer
+  const customerAllOrders = groupByCustomer(allOrders, activeCustomerIds);
 
   const customerIds: string[] = [];
   const recencies: number[] = [];
   const frequencies: number[] = [];
   const monetaries: number[] = [];
 
-  for (const [customerId, data] of customerMap) {
-    const sorted = data.orders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
-    const recencyDays = Math.floor((endDate.getTime() - sorted[0].orderDate.getTime()) / (1000 * 60 * 60 * 24));
+  for (const [customerId, custOrders] of customerAllOrders) {
+    const sorted = custOrders.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+    const recencyDays = Math.floor((analysisEnd.getTime() - sorted[0].orderDate.getTime()) / (1000 * 60 * 60 * 24));
     const frequency = sorted.length;
     const monetary = sorted.reduce((sum, o) => sum + o.totalPrice, 0);
 
@@ -1002,13 +1046,11 @@ export async function fetchRFMAnalysis(params: FetchCustomerDataParams): Promise
     monetaries.push(monetary);
   }
 
-  // Recency is inverted: lower days = higher score, so we invert before assigning quintiles
   const invertedRecencies = recencies.map((r) => -r);
   const rScores = assignQuintiles(invertedRecencies);
   const fScores = assignQuintiles(frequencies);
   const mScores = assignQuintiles(monetaries);
 
-  // Aggregate by segment
   const segmentAgg = new Map<RFMSegment, { count: number; revenue: number; totalOrders: number }>();
   let totalRevenue = 0;
 
@@ -1061,49 +1103,63 @@ export interface RepeatRateData {
 }
 
 /**
- * Fetches repeat rate at 30/60/90 day windows.
+ * Fetches repeat rate at 30/60/90 day windows with lookback.
  *
- * For each window N: count customers whose first order was >= N days before endDate,
- * then check how many have a subsequent order.
+ * For each active customer (ordered in the selected range):
+ *   - Find their LAST order within the analysis range
+ *   - Look back N days from that last order
+ *   - If they have any PRIOR order in that window → they are a repeater
+ *
+ * Tasa 30d = "of everyone who bought this period, how many had also bought in the prior 30 days?"
+ * Tasa 90d will always be ≥ Tasa 60d ≥ Tasa 30d (wider window catches more)
  */
 export async function fetchRepeatRate(params: FetchCustomerDataParams): Promise<RepeatRateData> {
-  const orders = await fetchCustomerOrders(params);
+  const { allOrders, activeCustomerIds, analysisStart, analysisEnd } = await fetchOrdersWithContext(params);
 
-  if (orders.length === 0) {
+  if (activeCustomerIds.size === 0) {
     return { rate30d: 0, rate60d: 0, rate90d: 0, total30d: 0, repeat30d: 0, total60d: 0, repeat60d: 0, total90d: 0, repeat90d: 0 };
   }
 
-  const endDate = new Date(params.endDate);
+  // For each active customer: find their last order in the range + all prior orders
+  const customerData = new Map<string, { lastInRange: Date; priorDates: Date[] }>();
 
-  // Group by customer with sorted orders
-  const customerOrders = new Map<string, Date[]>();
-  for (const order of orders) {
-    if (!customerOrders.has(order.customerId)) {
-      customerOrders.set(order.customerId, []);
+  // First pass: find last order in range per customer
+  for (const order of allOrders) {
+    if (!activeCustomerIds.has(order.customerId)) continue;
+    if (order.orderDate >= analysisStart && order.orderDate <= analysisEnd) {
+      const existing = customerData.get(order.customerId);
+      if (!existing || order.orderDate > existing.lastInRange) {
+        if (!existing) {
+          customerData.set(order.customerId, { lastInRange: order.orderDate, priorDates: [] });
+        } else {
+          existing.lastInRange = order.orderDate;
+        }
+      }
     }
-    customerOrders.get(order.customerId)!.push(order.orderDate);
   }
 
-  // Sort each customer's orders
-  for (const dates of customerOrders.values()) {
-    dates.sort((a, b) => a.getTime() - b.getTime());
+  // Second pass: collect all orders BEFORE lastInRange for each customer
+  for (const order of allOrders) {
+    const data = customerData.get(order.customerId);
+    if (!data) continue;
+    if (order.orderDate < data.lastInRange) {
+      data.priorDates.push(order.orderDate);
+    }
   }
+
+  const total = customerData.size;
 
   function calcWindow(windowDays: number): { total: number; repeat: number; rate: number } {
-    const cutoff = new Date(endDate);
-    cutoff.setDate(cutoff.getDate() - windowDays);
-
-    let total = 0;
     let repeat = 0;
 
-    for (const dates of customerOrders.values()) {
-      // First order must be at or before the cutoff
-      if (dates[0] <= cutoff) {
-        total++;
-        // Check if they have any order after their first one
-        if (dates.length > 1) {
-          repeat++;
-        }
+    for (const { lastInRange, priorDates } of customerData.values()) {
+      const windowStart = new Date(lastInRange);
+      windowStart.setDate(windowStart.getDate() - windowDays);
+
+      // Has any prior order within N days before their last order in range?
+      const hasRecentPrior = priorDates.some((d) => d >= windowStart);
+      if (hasRecentPrior) {
+        repeat++;
       }
     }
 

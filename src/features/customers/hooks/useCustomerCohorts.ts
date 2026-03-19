@@ -6,10 +6,13 @@
  * @module features/customers/hooks/useCustomerCohorts
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCustomerCohorts } from '@/services/crp-portal';
 import type { CohortData } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useBrands } from '@/hooks/useBrands';
+import { expandBrandIds } from '@/hooks/idExpansion';
 import { formatDate, parseNumericIds } from '@/utils/dateUtils';
 
 export interface UseCustomerCohortsParams {
@@ -28,9 +31,14 @@ export function useCustomerCohorts(
   const { granularity = 'month' } = params;
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange, datePreset, brandIds, channelIds } = useDashboardFiltersStore();
+  const { data: brands } = useBrands();
 
   const numericCompanyIds = parseNumericIds(companyIds);
-  const numericBrandIds = parseNumericIds(brandIds);
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brands || []),
+    [brandIds, brands]
+  );
+  const numericBrandIds = parseNumericIds(expandedBrandIds);
 
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);

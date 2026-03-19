@@ -25,3 +25,20 @@ export interface Product {
   isActive: boolean;
   channelIds: ChannelIds;
 }
+
+// ============================================
+// PRODUCT SALES ANALYSIS
+// ============================================
+
+export interface ProductSalesRow {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  totalQuantity: number;
+  totalRevenue: number;
+}
+
+export interface ProductAnalysisRow extends ProductSalesRow {
+  quantityPercent: number;
+  revenuePercent: number;
+}

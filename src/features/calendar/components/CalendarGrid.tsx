@@ -1,6 +1,18 @@
-import { useMemo } from 'react';
-import { CalendarDay } from './CalendarDay';
+/**
+ * Calendar Grid (Month View)
+ *
+ * Google Calendar-style month view with campaign bars spanning columns,
+ * daily revenue indicators, objectives bars, and drag-to-create support.
+ */
+
+import { useMemo, useState, useCallback, useRef } from 'react';
+import { MonthWeekRow } from './MonthWeekRow';
+import { QuickCreatePopover } from './QuickCreatePopover';
+import { CampaignPopover } from './CampaignPopover';
+import { getMonthGridDates, splitIntoWeeks, WEEKDAY_NAMES } from '../utils/dateHelpers';
 import type { PromotionalCampaign, CalendarEvent, WeatherForecast } from '@/types';
+import type { DailyChannelRevenue } from '@/services/crp-portal/dailyRevenue';
+import type { CalendarObjectiveItem } from '../hooks/useCalendarObjectives';
 
 interface CalendarGridProps {
   year: number;
@@ -8,27 +20,15 @@ interface CalendarGridProps {
   campaigns: PromotionalCampaign[];
   events: CalendarEvent[];
   weatherForecasts?: WeatherForecast[];
-  onCampaignClick?: (campaign: PromotionalCampaign) => void;
+  revenueByDate?: Map<string, DailyChannelRevenue>;
+  objectives?: CalendarObjectiveItem[];
   onDayClick?: (date: Date, campaigns: PromotionalCampaign[], events: CalendarEvent[]) => void;
-}
-
-const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-interface CalendarDayData {
-  date: Date;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  campaigns: PromotionalCampaign[];
-  events: CalendarEvent[];
-  weather?: WeatherForecast;
-}
-
-// Helper to format date as YYYY-MM-DD using local timezone
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  onEditCampaign?: (campaign: PromotionalCampaign) => void;
+  onDeleteCampaign?: (campaign: PromotionalCampaign) => void;
+  onDuplicateCampaign?: (campaign: PromotionalCampaign) => void;
+  onCreateCampaignWithDates?: (startDate: string, endDate: string) => void;
+  isClientMode?: boolean;
+  restaurantId?: string;
 }
 
 export function CalendarGrid({
@@ -37,76 +37,60 @@ export function CalendarGrid({
   campaigns,
   events,
   weatherForecasts = [],
-  onCampaignClick,
+  revenueByDate = new Map(),
+  objectives = [],
   onDayClick,
+  onEditCampaign,
+  onDeleteCampaign,
+  onDuplicateCampaign,
+  onCreateCampaignWithDates,
+  isClientMode = false,
+  restaurantId,
 }: CalendarGridProps) {
-  // Create today's date at midnight in local timezone
-  const today = useMemo(() => {
+  // Drag state
+  const [dragStartDate, setDragStartDate] = useState<string | null>(null);
+  const [dragEndDate, setDragEndDate] = useState<string | null>(null);
+
+  // Quick create popover state
+  const [quickCreate, setQuickCreate] = useState<{
+    startDate: string;
+    endDate: string;
+    anchor: { x: number; y: number };
+  } | null>(null);
+
+  // Campaign popover state
+  const [selectedCampaign, setSelectedCampaign] = useState<PromotionalCampaign | null>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
+
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const todayStr = useMemo(() => {
     const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return now;
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }, []);
-  const todayStr = formatLocalDate(today);
 
-  // Pre-calculate the date strings for all 42 grid cells
-  const gridDateStrings = useMemo(() => {
-    const dateStrings: string[] = [];
+  // Generate grid dates and split into weeks
+  const gridDates = useMemo(() => getMonthGridDates(year, month), [year, month]);
+  const weeks = useMemo(() => splitIntoWeeks(gridDates), [gridDates]);
 
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
-
-    let dayOfWeek = firstDay.getDay();
-    dayOfWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-    // Previous month dates
-    const prevMonthLastDay = new Date(year, month - 1, 0);
-    for (let i = dayOfWeek - 1; i >= 0; i--) {
-      const date = new Date(year, month - 2, prevMonthLastDay.getDate() - i);
-      dateStrings.push(formatLocalDate(date));
-    }
-
-    // Current month dates
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      dateStrings.push(formatLocalDate(new Date(year, month - 1, day)));
-    }
-
-    // Next month dates
-    const remainingDays = 42 - dateStrings.length;
-    for (let day = 1; day <= remainingDays; day++) {
-      dateStrings.push(formatLocalDate(new Date(year, month, day)));
-    }
-
-    return dateStrings;
-  }, [year, month]);
-
-  // Pre-calculate Map<dateStr, PromotionalCampaign[]> for all grid dates
-  const campaignsByDate = useMemo(() => {
-    const map = new Map<string, PromotionalCampaign[]>();
-    for (const dateStr of gridDateStrings) {
-      const matching = campaigns.filter(
-        c => c.startDate <= dateStr && c.endDate >= dateStr
-      );
-      map.set(dateStr, matching);
-    }
-    return map;
-  }, [campaigns, gridDateStrings]);
-
-  // Pre-calculate Map<dateStr, CalendarEvent[]> for all grid dates
+  // Pre-compute event and weather maps
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const dateStr of gridDateStrings) {
+    for (const dateStr of gridDates) {
       const matching = events.filter(event => {
         if (event.endDate) {
           return event.eventDate <= dateStr && event.endDate >= dateStr;
         }
         return event.eventDate === dateStr;
       });
-      map.set(dateStr, matching);
+      if (matching.length > 0) map.set(dateStr, matching);
     }
     return map;
-  }, [events, gridDateStrings]);
+  }, [events, gridDates]);
 
-  // Pre-calculate Map<dateStr, WeatherForecast> for quick lookup
   const weatherByDate = useMemo(() => {
     const map = new Map<string, WeatherForecast>();
     for (const w of weatherForecasts) {
@@ -115,99 +99,147 @@ export function CalendarGrid({
     return map;
   }, [weatherForecasts]);
 
-  const calendarDays = useMemo(() => {
-    const days: CalendarDayData[] = [];
+  // Drag-to-create handlers
+  const handleDayMouseDown = useCallback((dateStr: string, e: React.MouseEvent) => {
+    if (isClientMode) return;
+    e.preventDefault();
+    setDragStartDate(dateStr);
+    setDragEndDate(dateStr);
+    setQuickCreate(null);
+    setSelectedCampaign(null);
+  }, [isClientMode]);
 
-    // First day of the month
-    const firstDay = new Date(year, month - 1, 1);
-    // Last day of the month
-    const lastDay = new Date(year, month, 0);
-
-    // Start from Monday (adjust for Spanish calendar where week starts on Monday)
-    let dayOfWeek = firstDay.getDay();
-    dayOfWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert Sunday=0 to Monday=0
-
-    // Add days from previous month
-    const prevMonthLastDay = new Date(year, month - 1, 0);
-    for (let i = dayOfWeek - 1; i >= 0; i--) {
-      const date = new Date(year, month - 2, prevMonthLastDay.getDate() - i);
-      const dateStr = formatLocalDate(date);
-
-      days.push({
-        date,
-        isCurrentMonth: false,
-        isToday: dateStr === todayStr,
-        campaigns: campaignsByDate.get(dateStr) ?? [],
-        events: eventsByDate.get(dateStr) ?? [],
-        weather: weatherByDate.get(dateStr),
-      });
+  const handleDayMouseEnter = useCallback((dateStr: string) => {
+    if (dragStartDate !== null) {
+      setDragEndDate(dateStr);
     }
+  }, [dragStartDate]);
 
-    // Add days of current month
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      const date = new Date(year, month - 1, day);
-      const dateStr = formatLocalDate(date);
+  const handleMouseUp = useCallback(() => {
+    if (dragStartDate !== null && dragEndDate !== null && !isClientMode) {
+      const start = dragStartDate < dragEndDate ? dragStartDate : dragEndDate;
+      const end = dragStartDate > dragEndDate ? dragStartDate : dragEndDate;
 
-      days.push({
-        date,
-        isCurrentMonth: true,
-        isToday: dateStr === todayStr,
-        campaigns: campaignsByDate.get(dateStr) ?? [],
-        events: eventsByDate.get(dateStr) ?? [],
-        weather: weatherByDate.get(dateStr),
-      });
+      if (start !== end) {
+        // Multi-day drag: show quick create popover
+        const gridEl = gridRef.current;
+        if (gridEl) {
+          const rect = gridEl.getBoundingClientRect();
+          setQuickCreate({
+            startDate: start,
+            endDate: end,
+            anchor: {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 3,
+            },
+          });
+        }
+      }
     }
+    setDragStartDate(null);
+    setDragEndDate(null);
+  }, [dragStartDate, dragEndDate, isClientMode]);
 
-    // Add days from next month to complete the grid (6 weeks)
-    const remainingDays = 42 - days.length; // 6 weeks * 7 days
-    for (let day = 1; day <= remainingDays; day++) {
-      const date = new Date(year, month, day);
-      const dateStr = formatLocalDate(date);
+  // Day click handler
+  const handleDayClick = useCallback((dateStr: string) => {
+    if (dragStartDate !== null) return; // Don't trigger click during drag
+    const date = new Date(dateStr + 'T00:00:00');
+    const dayCampaigns = campaigns.filter(c => c.startDate <= dateStr && c.endDate >= dateStr);
+    const dayEvents = eventsByDate.get(dateStr) ?? [];
+    onDayClick?.(date, dayCampaigns, dayEvents);
+  }, [dragStartDate, campaigns, eventsByDate, onDayClick]);
 
-      days.push({
-        date,
-        isCurrentMonth: false,
-        isToday: dateStr === todayStr,
-        campaigns: campaignsByDate.get(dateStr) ?? [],
-        events: eventsByDate.get(dateStr) ?? [],
-        weather: weatherByDate.get(dateStr),
-      });
-    }
+  // Campaign click handler
+  const handleCampaignClick = useCallback((campaign: PromotionalCampaign, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setSelectedCampaign(campaign);
+    setPopoverAnchor({
+      x: rect.left + rect.width / 2,
+      y: rect.bottom + 8,
+    });
+  }, []);
 
-    return days;
-  }, [year, month, campaignsByDate, eventsByDate, weatherByDate, todayStr]);
+  const handleClosePopover = useCallback(() => {
+    setSelectedCampaign(null);
+    setPopoverAnchor(null);
+  }, []);
+
+  const handleCloseQuickCreate = useCallback(() => {
+    setQuickCreate(null);
+  }, []);
+
+  const handleMoreOptions = useCallback((startDate: string, endDate: string) => {
+    onCreateCampaignWithDates?.(startDate, endDate);
+  }, [onCreateCampaignWithDates]);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-full flex flex-col">
+    <div
+      ref={gridRef}
+      className="bg-white rounded-lg border border-gray-200 overflow-hidden h-full flex flex-col select-none"
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-        {WEEKDAYS.map(day => (
+        {WEEKDAY_NAMES.map(day => (
           <div
             key={day}
-            className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+            className="px-2 py-1.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
           >
             {day}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 flex-1">
-        {calendarDays.map((dayData) => (
-          <CalendarDay
-            key={formatLocalDate(dayData.date)}
-            date={dayData.date}
-            isCurrentMonth={dayData.isCurrentMonth}
-            isToday={dayData.isToday}
-            campaigns={dayData.campaigns}
-            events={dayData.events}
-            weather={dayData.weather}
-            onCampaignClick={onCampaignClick}
-            onDayClick={onDayClick}
+      {/* Week rows */}
+      <div className="flex-1">
+        {weeks.map((weekDates) => (
+          <MonthWeekRow
+            key={weekDates[0]}
+            weekDates={weekDates}
+            year={year}
+            month={month}
+            campaigns={campaigns}
+            eventsByDate={eventsByDate}
+            weatherByDate={weatherByDate}
+            revenueByDate={revenueByDate}
+            objectives={objectives}
+            todayStr={todayStr}
+            dragStartDate={dragStartDate}
+            dragEndDate={dragEndDate}
+            onDayMouseDown={handleDayMouseDown}
+            onDayMouseEnter={handleDayMouseEnter}
+            onDayClick={handleDayClick}
+            onCampaignClick={handleCampaignClick}
+            isClientMode={isClientMode}
           />
         ))}
       </div>
+
+      {/* Campaign popover */}
+      {selectedCampaign && popoverAnchor && (
+        <CampaignPopover
+          campaign={selectedCampaign}
+          anchor={popoverAnchor}
+          onClose={handleClosePopover}
+          onEdit={isClientMode ? undefined : onEditCampaign}
+          onDelete={isClientMode ? undefined : onDeleteCampaign}
+          onDuplicate={isClientMode ? undefined : onDuplicateCampaign}
+          isClientMode={isClientMode}
+        />
+      )}
+
+      {/* Quick create popover */}
+      {quickCreate && !isClientMode && (
+        <QuickCreatePopover
+          startDate={quickCreate.startDate}
+          endDate={quickCreate.endDate}
+          anchor={quickCreate.anchor}
+          onClose={handleCloseQuickCreate}
+          onMoreOptions={handleMoreOptions}
+          restaurantId={restaurantId}
+        />
+      )}
     </div>
   );
 }
-

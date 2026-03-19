@@ -92,6 +92,7 @@ export interface RawReview {
   delivery_time_minutes: number | null;
   amt_refunds: number | null;
   amt_total_price: number | null;
+  amt_promotions: number | null;
 }
 
 export interface ReviewsChanges {

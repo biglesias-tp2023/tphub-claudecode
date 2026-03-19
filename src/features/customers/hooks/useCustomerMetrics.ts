@@ -6,10 +6,13 @@
  * @module features/customers/hooks/useCustomerMetrics
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCustomerMetrics, fetchCustomerMetricsByChannel } from '@/services/crp-portal';
 import type { CustomerMetricsWithChanges, ChannelCustomerMetrics } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useBrands } from '@/hooks/useBrands';
+import { expandBrandIds } from '@/hooks/idExpansion';
 import { formatDate, parseNumericIds, getPreviousPeriodRange } from '@/utils/dateUtils';
 
 export interface UseCustomerMetricsResult {
@@ -21,9 +24,14 @@ export interface UseCustomerMetricsResult {
 export function useCustomerMetrics(): UseCustomerMetricsResult {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange, datePreset, brandIds, channelIds } = useDashboardFiltersStore();
+  const { data: brands } = useBrands();
 
   const numericCompanyIds = parseNumericIds(companyIds);
-  const numericBrandIds = parseNumericIds(brandIds);
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brands || []),
+    [brandIds, brands]
+  );
+  const numericBrandIds = parseNumericIds(expandedBrandIds);
 
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);
@@ -80,9 +88,14 @@ export interface UseChannelMetricsResult {
 export function useChannelCustomerMetrics(): UseChannelMetricsResult {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange, datePreset, brandIds } = useDashboardFiltersStore();
+  const { data: brands } = useBrands();
 
   const numericCompanyIds = parseNumericIds(companyIds);
-  const numericBrandIds = parseNumericIds(brandIds);
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brands || []),
+    [brandIds, brands]
+  );
+  const numericBrandIds = parseNumericIds(expandedBrandIds);
 
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);

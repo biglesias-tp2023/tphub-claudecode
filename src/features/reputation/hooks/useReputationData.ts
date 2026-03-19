@@ -61,6 +61,7 @@ export interface RatingDistributionItem {
 export interface Review {
   id: string;
   orderId: string;
+  companyId: string;
   channel: ChannelId;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
@@ -70,6 +71,7 @@ export interface Review {
   deliveryTime?: number | null; // minutes
   refundAmount?: number | null; // EUR from ft_order_head.amt_refunds
   orderAmount?: number | null; // EUR from ft_order_head.amt_total_price
+  promotionAmount?: number | null; // EUR from ft_order_head.amt_promotions
 }
 
 export interface ReputationData {
@@ -259,12 +261,14 @@ export function useReputationData() {
       const ts = new Date(raw.ts_creation_time);
       const refundAmount = raw.amt_refunds != null && Number(raw.amt_refunds) > 0 ? Number(raw.amt_refunds) : null;
       const orderAmount = raw.amt_total_price != null && Number(raw.amt_total_price) > 0 ? Number(raw.amt_total_price) : null;
+      const promotionAmount = raw.amt_promotions != null && Number(raw.amt_promotions) > 0 ? Number(raw.amt_promotions) : null;
       const deliveryTime = raw.delivery_time_minutes != null ? Number(raw.delivery_time_minutes) : null;
       const tags = tagMap?.get(raw.pk_id_review) ?? null;
       const comment = raw.txt_comment && raw.txt_comment.trim() !== '' ? raw.txt_comment.trim() : null;
       return {
         id: raw.pk_id_review,
         orderId: raw.fk_id_order,
+        companyId: raw.pfk_id_company,
         channel,
         date: ts.toISOString().slice(0, 10),
         time: ts.toTimeString().slice(0, 5),
@@ -272,6 +276,7 @@ export function useReputationData() {
         comment,
         refundAmount,
         orderAmount,
+        promotionAmount,
         deliveryTime,
         tags,
       };

@@ -2,22 +2,8 @@
  * Calendar Page
  *
  * Main page for managing promotional campaigns across delivery platforms.
- * Displays a monthly calendar view with campaigns, events, and weather data.
- *
- * ## Features
- *
- * - Monthly calendar grid with campaigns displayed as colored bars
- * - Weather forecast integration (requires restaurant with coordinates)
- * - Calendar events (holidays, sports, commercial events)
- * - Campaign creation wizard (5 steps)
- * - Sidebar with mini calendar and filters
- *
- * ## Data Flow
- *
- * 1. Restaurants loaded from CRP Portal based on global filters
- * 2. First restaurant with coordinates used for weather
- * 3. Campaigns fetched for selected restaurants + month
- * 4. Events fetched from Supabase (calendar_events table)
+ * Displays monthly/weekly/agenda calendar views with campaigns, events,
+ * weather data, daily revenue, and strategic objectives.
  *
  * @module pages/calendar/CalendarPage
  */
@@ -27,7 +13,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Calendar, CloudOff } from 'lucide-react';
 import { Card, ToastContainer } from '@/components/ui';
 import { DashboardFilters } from '@/features/dashboard';
-import { useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
 import { useRestaurants } from '@/features/dashboard/hooks';
 import { useToast } from '@/hooks/useToast';
 import {
@@ -41,6 +27,8 @@ import {
   useCreateCampaign,
   useDeleteCampaign,
   useUpdateCampaign,
+  useCalendarDailyRevenue,
+  useCalendarObjectives,
 } from '@/features/calendar';
 import type { PromotionalCampaignInput, PromotionalCampaign, CampaignPlatform, EventCategory, CalendarEvent } from '@/types';
 
@@ -52,18 +40,14 @@ const CAMPAIGN_EDITOR_STORAGE_KEY = 'tphub_campaign_editor_state';
 // ============================================
 
 interface CalendarState {
-  // Editor modal
   isEditorOpen: boolean;
   selectedDate: string | undefined;
   editingCampaign: PromotionalCampaign | null;
-  // Detail modal
   detailModalDate: Date | null;
   detailModalCampaigns: PromotionalCampaign[];
   detailModalEvents: CalendarEvent[];
-  // Calendar navigation
   currentMonth: { year: number; month: number };
   sidebarDate: Date;
-  // Filters
   selectedPlatforms: CampaignPlatform[];
   selectedStatuses: string[];
   selectedEventCategories: EventCategory[];
@@ -93,28 +77,20 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
   switch (action.type) {
     case 'OPEN_EDITOR':
       return { ...state, isEditorOpen: true, selectedDate: action.date, editingCampaign: null };
-
     case 'CLOSE_EDITOR':
       return { ...state, isEditorOpen: false, selectedDate: undefined, editingCampaign: null };
-
     case 'EDITOR_SAVED':
       return { ...state, isEditorOpen: false, selectedDate: undefined, editingCampaign: null };
-
     case 'EDIT_CAMPAIGN':
       return { ...state, isEditorOpen: true, editingCampaign: action.campaign, selectedDate: action.campaign.startDate };
-
     case 'DUPLICATE_CAMPAIGN':
       return { ...state, isEditorOpen: true, editingCampaign: null, selectedDate: action.startDate };
-
     case 'OPEN_DETAIL':
       return { ...state, detailModalDate: action.date, detailModalCampaigns: action.campaigns, detailModalEvents: action.events };
-
     case 'CLOSE_DETAIL':
       return { ...state, detailModalDate: null, detailModalCampaigns: [], detailModalEvents: [] };
-
     case 'REMOVE_CAMPAIGN_FROM_DETAIL':
       return { ...state, detailModalCampaigns: state.detailModalCampaigns.filter(c => c.id !== action.campaignId) };
-
     case 'ADD_CAMPAIGN_FROM_DETAIL':
       return {
         ...state,
@@ -122,7 +98,6 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
         detailModalDate: null, detailModalCampaigns: [], detailModalEvents: [],
         isEditorOpen: true, editingCampaign: null,
       };
-
     case 'EDIT_FROM_DETAIL':
       return {
         ...state,
@@ -131,25 +106,18 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
         detailModalDate: null, detailModalCampaigns: [], detailModalEvents: [],
         isEditorOpen: true,
       };
-
     case 'SET_MONTH':
       return { ...state, currentMonth: { year: action.year, month: action.month }, sidebarDate: new Date(action.year, action.month - 1, 1) };
-
     case 'SET_SIDEBAR_DATE':
       return { ...state, sidebarDate: action.date, currentMonth: { year: action.date.getFullYear(), month: action.date.getMonth() + 1 } };
-
     case 'SET_PLATFORMS':
       return { ...state, selectedPlatforms: action.platforms };
-
     case 'SET_STATUSES':
       return { ...state, selectedStatuses: action.statuses };
-
     case 'SET_EVENT_CATEGORIES':
       return { ...state, selectedEventCategories: action.categories };
-
     case 'SET_REGION':
       return { ...state, selectedRegion: action.region };
-
     case 'SYNC_FROM_URL': {
       const next = { ...state };
       if (action.month) next.currentMonth = action.month;
@@ -159,7 +127,6 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
       if (action.region) next.selectedRegion = action.region;
       return next;
     }
-
     default:
       return state;
   }
@@ -184,7 +151,6 @@ function createInitialState(): CalendarState {
     // Ignore errors
   }
 
-  // Restore persisted filters from sessionStorage
   let currentMonth = { year: now.getFullYear(), month: now.getMonth() + 1 };
   let selectedPlatforms: CampaignPlatform[] = [];
   let selectedStatuses: string[] = [];
@@ -228,6 +194,7 @@ function createInitialState(): CalendarState {
 export function CalendarPage() {
   const [searchParams] = useSearchParams();
   const { restaurantIds } = useDashboardFiltersStore();
+  const { companyIds } = useGlobalFiltersStore();
   const { toasts, closeToast, success } = useToast();
 
   const [state, dispatch] = useReducer(calendarReducer, null, createInitialState);
@@ -298,10 +265,9 @@ export function CalendarPage() {
     }
   }, [searchParams]);
 
-  // Get restaurants based on filters (uses store internally)
+  // Get restaurants based on filters
   const { data: restaurants = [] } = useRestaurants();
 
-  // Get the first selected restaurant or first in list
   const selectedRestaurant = restaurantIds.length > 0
     ? restaurants.find(r => restaurantIds.includes(r.id))
     : restaurants[0];
@@ -313,21 +279,35 @@ export function CalendarPage() {
     state.currentMonth.month
   );
 
-  // Fetch calendar events (passing region for localized events)
+  // Fetch calendar events
   const { data: calendarEvents = [] } = useCalendarEventsByMonth(
     state.currentMonth.year,
     state.currentMonth.month,
     state.selectedRegion.startsWith('ES-') ? 'ES' : state.selectedRegion
   );
 
-  // Fetch weather for selected restaurant (includes historical data for the month)
+  // Fetch weather
   const { data: weatherForecasts = [] } = useWeatherByMonth(
     selectedRestaurant,
     state.currentMonth.year,
     state.currentMonth.month
   );
 
-  // Check if weather data is available (requires restaurant with coordinates)
+  // Fetch daily revenue
+  const { data: revenueByDate } = useCalendarDailyRevenue({
+    companyIds,
+    year: state.currentMonth.year,
+    month: state.currentMonth.month,
+  });
+
+  // Fetch calendar objectives
+  const { items: objectiveItems } = useCalendarObjectives({
+    companyIds,
+    year: state.currentMonth.year,
+    month: state.currentMonth.month,
+  });
+
+  // Weather availability check
   const hasRestaurantWithCoordinates = selectedRestaurant &&
     selectedRestaurant.latitude != null &&
     selectedRestaurant.longitude != null;
@@ -338,25 +318,19 @@ export function CalendarPage() {
   const deleteCampaign = useDeleteCampaign();
   const updateCampaign = useUpdateCampaign();
 
-  // Filter campaigns based on sidebar filters
+  // Filter campaigns
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter(campaign => {
-      if (state.selectedPlatforms.length > 0 && !state.selectedPlatforms.includes(campaign.platform)) {
-        return false;
-      }
-      if (state.selectedStatuses.length > 0 && !state.selectedStatuses.includes(campaign.status)) {
-        return false;
-      }
+      if (state.selectedPlatforms.length > 0 && !state.selectedPlatforms.includes(campaign.platform)) return false;
+      if (state.selectedStatuses.length > 0 && !state.selectedStatuses.includes(campaign.status)) return false;
       return true;
     });
   }, [campaigns, state.selectedPlatforms, state.selectedStatuses]);
 
-  // Filter events based on category and region
+  // Filter events
   const filteredEvents = useMemo(() => {
     return calendarEvents.filter(event => {
-      if (state.selectedEventCategories.length > 0 && !state.selectedEventCategories.includes(event.category)) {
-        return false;
-      }
+      if (state.selectedEventCategories.length > 0 && !state.selectedEventCategories.includes(event.category)) return false;
       if (state.selectedRegion.startsWith('ES-')) {
         const isNational = !event.regionCode || event.regionCode === null;
         const isMatchingRegion = event.regionCode === state.selectedRegion;
@@ -365,6 +339,9 @@ export function CalendarPage() {
       return !event.regionCode || event.regionCode === null;
     });
   }, [calendarEvents, state.selectedEventCategories, state.selectedRegion]);
+
+  // Stable revenue map reference
+  const stableRevenueByDate = useMemo(() => revenueByDate ?? new Map(), [revenueByDate]);
 
   const handleNewCampaign = useCallback(() => {
     dispatch({ type: 'OPEN_EDITOR' });
@@ -394,10 +371,7 @@ export function CalendarPage() {
   const handleSaveCampaign = useCallback(async (input: PromotionalCampaignInput) => {
     try {
       if (state.editingCampaign) {
-        await updateCampaign.mutateAsync({
-          id: state.editingCampaign.id,
-          updates: input,
-        });
+        await updateCampaign.mutateAsync({ id: state.editingCampaign.id, updates: input });
         success('¡Campaña actualizada con éxito!');
       } else {
         await createCampaign.mutateAsync(input);
@@ -446,8 +420,8 @@ export function CalendarPage() {
     dispatch({ type: 'DUPLICATE_CAMPAIGN', startDate: campaign.startDate });
   }, []);
 
-  const handleCreateCampaignWithDates = useCallback((startDate: string, _endDate: string) => {
-    void _endDate;
+  const handleCreateCampaignWithDates = useCallback((startDate: string, endDate: string) => {
+    void endDate;
     dispatch({ type: 'OPEN_EDITOR', date: startDate });
   }, []);
 
@@ -490,7 +464,7 @@ export function CalendarPage() {
       {/* Main content with sidebar */}
       <Card className="flex-1 overflow-hidden">
         <div className="flex h-full">
-          {/* Sidebar - hide create button in client mode */}
+          {/* Sidebar */}
           {!isClientMode && (
             <CalendarSidebar
               selectedDate={state.sidebarDate}
@@ -510,13 +484,10 @@ export function CalendarPage() {
 
           {/* Calendar area */}
           <div className="flex-1 p-6 overflow-hidden flex flex-col">
-            {/* Weather unavailable message */}
             {showWeatherUnavailableMessage && (
               <div className="mb-3 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
                 <CloudOff className="w-4 h-4" />
-                <span>
-                  Selecciona un establecimiento con coordenadas para ver el clima
-                </span>
+                <span>Selecciona un establecimiento con coordenadas para ver el clima</span>
               </div>
             )}
 
@@ -524,6 +495,8 @@ export function CalendarPage() {
               campaigns={filteredCampaigns}
               events={filteredEvents}
               weatherForecasts={weatherForecasts}
+              revenueByDate={stableRevenueByDate}
+              objectives={objectiveItems}
               isLoading={campaignsLoading}
               onNewCampaign={handleNewCampaign}
               onCampaignClick={handleCampaignClick}
@@ -534,6 +507,7 @@ export function CalendarPage() {
               onDuplicateCampaign={handleDuplicateCampaign}
               onCreateCampaignWithDates={handleCreateCampaignWithDates}
               isClientMode={isClientMode}
+              restaurantId={selectedRestaurant?.id}
               shareFilters={{
                 restaurantIds,
                 platformFilters: state.selectedPlatforms,

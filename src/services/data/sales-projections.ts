@@ -143,6 +143,26 @@ export async function fetchSalesProjectionsByBrand(
   return data.map((row) => mapDbSalesProjection(row as DbSalesProjection));
 }
 
+/**
+ * Fetch ALL non-company-level projections for a company.
+ * Used for bottom-up aggregation: when viewing at company level,
+ * aggregate all brand/address projections underneath.
+ */
+export async function fetchAllChildProjections(
+  companyId: string
+): Promise<SalesProjectionData[]> {
+  const { data, error } = await supabase
+    .from('sales_projections')
+    .select('*')
+    .eq('company_id', companyId)
+    .not('brand_id', 'is', null);
+
+  if (error) handleQueryError(error, 'No se pudieron cargar las proyecciones hijas');
+  if (!data) return [];
+
+  return data.map((row) => mapDbSalesProjection(row as DbSalesProjection));
+}
+
 // ============================================
 // UPSERT
 // ============================================

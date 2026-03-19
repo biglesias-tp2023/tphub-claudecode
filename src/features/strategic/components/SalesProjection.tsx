@@ -11,7 +11,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   TrendingUp, Eye, EyeOff, Megaphone, Percent,
-  Calendar, Edit3, ChevronDown, Settings2,
+  Calendar, Edit3, ChevronDown, Settings2, Trash2,
 } from 'lucide-react';
 import { AreaChart } from '@/components/charts/rosen/AreaChart';
 import type { AreaSeriesConfig, ReferenceLineConfig } from '@/components/charts/rosen/types';
@@ -41,7 +41,7 @@ import { SalesTableRow } from './SalesTableRow';
 
 export function SalesProjection({
   config, targetRevenue, actualRevenue = {}, actualAds = {}, actualPromos = {},
-  onTargetChange: _onTargetChange, onEditConfig,
+  onTargetChange: _onTargetChange, onEditConfig, onDelete,
   restaurantName = 'Restaurante',
   realRevenueByMonth,
   realPromosByMonth,
@@ -51,6 +51,7 @@ export function SalesProjection({
   const [showActual, setShowActual] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
   const [showTable, setShowTable] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const months = useMemo(() => getFixedMonthWindow(), []);
   const { activeChannels } = config;
@@ -294,6 +295,11 @@ export function SalesProjection({
               <Edit3 className="w-4 h-4" />
             </button>
           )}
+          {onDelete && (
+            <button onClick={() => setConfirmDelete(true)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -367,6 +373,29 @@ export function SalesProjection({
           <div className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-dashed border-indigo-400 rounded" /><span className="text-gray-500">Fecha actual</span></div>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="px-5 py-3 bg-red-50 border-b border-red-100 flex items-center justify-between">
+          <p className="text-sm text-red-800">
+            ¿Eliminar esta proyección? Esta acción no se puede deshacer.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => { setConfirmDelete(false); onDelete?.(); }}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Collapsible Table */}
       <div className="border-t border-gray-100">

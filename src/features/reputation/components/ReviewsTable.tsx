@@ -219,6 +219,7 @@ export const ReviewsTable = memo(function ReviewsTable({ data, totalInPeriod, cl
             <tr className="bg-gray-50/50 border-b border-gray-100">
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">App</th>
               <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">AOV</th>
+              <th className="text-right text-sm font-medium text-gray-600 px-4 py-3">Descuento</th>
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Fecha</th>
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Hora</th>
               <th className="text-left text-sm font-medium text-gray-600 px-4 py-3">Rating</th>
@@ -258,6 +259,15 @@ export const ReviewsTable = memo(function ReviewsTable({ data, totalInPeriod, cl
                       </span>
                     ) : (
                       <span className="italic text-gray-300">&mdash;</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums whitespace-nowrap">
+                    {review.promotionAmount != null && review.promotionAmount > 0 ? (
+                      <span className="text-purple-600 font-medium">
+                        -{review.promotionAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;&euro;
+                      </span>
+                    ) : (
+                      <span className="italic text-gray-300">0,00&nbsp;&euro;</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">

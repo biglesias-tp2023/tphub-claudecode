@@ -887,8 +887,15 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, onCompleteBa
       setBaseline(existingProjection.baselineRevenue);
       setBaselineLoaded(true);
       setTargets(existingProjection.targetRevenue);
-      setAddressBaselines({});
-      setAddressTargets({});
+      // If the existing projection is address-scoped, pre-fill that address's targets
+      if (existingProjection.addressId && hasAddresses) {
+        setAddressBaselines({ [existingProjection.addressId]: existingProjection.baselineRevenue });
+        setAddressTargets({ [existingProjection.addressId]: existingProjection.targetRevenue });
+        setSelectedAddressIds([existingProjection.addressId]);
+      } else {
+        setAddressBaselines({});
+        setAddressTargets({});
+      }
     } else {
       setChannels(['glovo', 'ubereats', 'justeat']);
       setMode('global');
@@ -1259,7 +1266,11 @@ export function SalesProjectionSetup({ isOpen, onClose, onComplete, onCompleteBa
               className={cn('flex items-center gap-1.5 px-5 py-2 text-sm font-medium rounded-lg transition-colors', canProceed() ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed')}
             >
               <TrendingUp className="w-4 h-4" />
-              {selectedAddresses.length > 1 ? `Crear ${selectedAddresses.length} proyecciones` : 'Crear proyección'}
+              {(() => {
+                const isEdit = !!(existingProjection || (existingAddressProjections && existingAddressProjections.length > 0));
+                const verb = isEdit ? 'Actualizar' : 'Crear';
+                return selectedAddresses.length > 1 ? `${verb} ${selectedAddresses.length} proyecciones` : `${verb} proyección`;
+              })()}
             </button>
           )}
         </div>

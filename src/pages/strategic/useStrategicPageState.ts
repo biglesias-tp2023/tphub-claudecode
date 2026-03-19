@@ -22,10 +22,11 @@ import {
   useProfiles,
   useActualRevenueByMonth,
   useSalesProjection,
-  useSalesProjectionsByBrand,
   useSalesProjectionsBulk,
   useUpsertSalesProjection,
   useUpdateSalesProjectionTargets,
+  useDeleteSalesProjection,
+  useAllChildProjections,
 } from '@/features/strategic/hooks';
 import { upsertSalesProjection as upsertSalesProjectionService } from '@/services/supabase-data';
 import {
@@ -304,13 +305,56 @@ export function useStrategicPageState() {
   const multiCompanyProjectionCount = isMultiCompany ? bulkProjections.length : 0;
 
   // ============================================
+  // BOTTOM-UP AGGREGATION (all children of a company)
+  // ============================================
+
+  // Always fetch all child projections (brand + address level) for the company.
+  // Used at every resolution level: company, brand, and address.
+  const { data: allChildProjections = [] } = useAllChildProjections(
+    primaryCompanyId,
+    !isMultiCompany,
+  );
+
+  // Deduplicate for company-level view: for each brand, prefer address-level over brand-level
+  const deduplicatedChildProjections = useMemo(() => {
+    if (allChildProjections.length === 0) return [];
+
+    // Group by brand
+    const byBrand = new Map<string, SalesProjectionData[]>();
+    for (const p of allChildProjections) {
+      if (!p.brandId) continue;
+      const list = byBrand.get(p.brandId) || [];
+      list.push(p);
+      byBrand.set(p.brandId, list);
+    }
+
+    // For each brand: use address-level if any exist, otherwise use brand-level
+    const result: SalesProjectionData[] = [];
+    for (const [, projections] of byBrand) {
+      const addressLevel = projections.filter(p => p.addressId);
+      if (addressLevel.length > 0) {
+        result.push(...addressLevel);
+      } else {
+        result.push(...projections);
+      }
+    }
+    return result;
+  }, [allChildProjections]);
+
+  // ============================================
   // MULTI-ADDRESS AGGREGATION (per brand)
   // ============================================
 
-  const { data: brandAddressProjections = [] } = useSalesProjectionsByBrand(
-    primaryCompanyId,
-    primaryBrandId,
-  );
+  // Brand's children from the already-fetched allChildProjections (no extra query needed)
+  const brandAddressProjections = useMemo(() => {
+    if (allChildProjections.length === 0) return [];
+    // If a brand is selected, filter to that brand's children
+    if (primaryBrandId) {
+      return allChildProjections.filter(p => p.brandId === primaryBrandId);
+    }
+    // No brand filter: return all deduplicated child projections (for wizard pre-fill)
+    return deduplicatedChildProjections;
+  }, [primaryBrandId, allChildProjections, deduplicatedChildProjections]);
 
   // Addresses available for the wizard:
   // - If a brand is selected: addresses of that brand
@@ -325,24 +369,43 @@ export function useStrategicPageState() {
     return [];
   }, [primaryBrandId, effectiveCompanyIds, allRestaurants]);
 
-  // Single company: resolve projection with multi-address awareness
+  // ============================================
+  // PROJECTION RESOLUTION (bottom-up)
+  // ============================================
+
   const singleCompanyProjection = useMemo(() => {
-    // Case 1: specific addresses selected + brand has per-address projections
-    if (filterRestaurantIds.length > 0 && brandAddressProjections.length > 0) {
-      const matching = brandAddressProjections.filter(p =>
+    // === ADDRESS LEVEL: specific addresses selected ===
+    if (filterRestaurantIds.length > 0) {
+      // Match address-level projections
+      const matching = allChildProjections.filter(p =>
         p.addressId && filterRestaurantIds.includes(p.addressId)
       );
       if (matching.length > 0) return aggregateSalesProjections(matching);
+      // Fallback: exact address projection, then brand, then company
+      return addressProjection ?? brandProjection ?? companyProjection ?? null;
     }
 
-    // Case 2: brand selected + brand has per-address projections → aggregate all
-    if (primaryBrandId && brandAddressProjections.length > 0) {
-      return aggregateSalesProjections(brandAddressProjections);
+    // === BRAND LEVEL: brand selected, no address filter ===
+    if (primaryBrandId) {
+      // Aggregate all projections under this brand (brand-level + address-level)
+      const brandChildren = allChildProjections.filter(p => p.brandId === primaryBrandId);
+      if (brandChildren.length > 0) {
+        // Deduplicate: prefer address-level over brand-level within this brand
+        const addressLevel = brandChildren.filter(p => p.addressId);
+        const toAggregate = addressLevel.length > 0 ? addressLevel : brandChildren;
+        return aggregateSalesProjections(toAggregate);
+      }
+      // Fallback: brand-level projection, then company
+      return brandProjection ?? companyProjection ?? null;
     }
 
-    // Case 3: fallback chain (address → brand → company)
-    return addressProjection ?? brandProjection ?? companyProjection;
-  }, [filterRestaurantIds, brandAddressProjections, primaryBrandId, addressProjection, brandProjection, companyProjection]);
+    // === COMPANY LEVEL: no brand/address filter ===
+    // Prefer bottom-up aggregation of children over company-level projection
+    if (deduplicatedChildProjections.length > 0) {
+      return aggregateSalesProjections(deduplicatedChildProjections);
+    }
+    return companyProjection ?? null;
+  }, [filterRestaurantIds, allChildProjections, primaryBrandId, deduplicatedChildProjections, addressProjection, brandProjection, companyProjection]);
 
   const salesProjection = isMultiCompany ? aggregatedProjection : singleCompanyProjection;
   const _isLoadingProjection = isMultiCompany
@@ -406,6 +469,7 @@ export function useStrategicPageState() {
 
   const upsertProjection = useUpsertSalesProjection();
   const updateProjectionTargets = useUpdateSalesProjectionTargets();
+  const deleteProjectionMutation = useDeleteSalesProjection();
 
   // One-time migration: localStorage → Supabase (both legacy keys)
   const migrationDone = useRef(false);
@@ -589,15 +653,16 @@ export function useStrategicPageState() {
         config,
         baselineRevenue,
         targetRevenue,
-        targetAds: {},
-        targetPromos: {},
+        // Preserve existing investment targets when editing
+        targetAds: salesProjection?.targetAds ?? {},
+        targetPromos: salesProjection?.targetPromos ?? {},
       });
       setSetupScope(null);
-      success('Proyección de ventas creada');
+      success('Proyección de ventas guardada');
     } catch {
-      error('Error al crear proyección');
+      error('Error al guardar proyección');
     }
-  }, [setupScope, primaryCompanyId, upsertProjection, success, error]);
+  }, [setupScope, primaryCompanyId, upsertProjection, salesProjection, success, error]);
 
   const handleSetupCompleteBatch = useCallback(async (
     config: SalesProjectionConfig,
@@ -668,6 +733,21 @@ export function useStrategicPageState() {
       addressId: salesProjection?.addressId ?? null,
     });
   }, [salesProjection]);
+
+  const handleDeleteProjection = useCallback(async () => {
+    if (!salesProjection || salesProjection.id === '__aggregated__') return;
+    try {
+      await deleteProjectionMutation.mutateAsync({
+        id: salesProjection.id,
+        companyId: salesProjection.companyId,
+        brandId: salesProjection.brandId,
+        addressId: salesProjection.addressId,
+      });
+      success('Proyección eliminada');
+    } catch {
+      error('Error al eliminar proyección');
+    }
+  }, [salesProjection, deleteProjectionMutation, success, error]);
 
   // ============================================
   // HANDLERS - Objectives
@@ -990,6 +1070,7 @@ export function useStrategicPageState() {
     handleSetupComplete,
     handleSetupCompleteBatch,
     handleUpdateTargetRevenue,
+    handleDeleteProjection,
     handleDismissWarning,
     handleCreateNewFromWarning,
 

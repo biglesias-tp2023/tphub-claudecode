@@ -1,15 +1,27 @@
+/**
+ * Calendar View
+ *
+ * Main calendar orchestration component.
+ * Supports month, week, and agenda views with navigation controls.
+ */
+
 import { useState, useCallback, useMemo } from 'react';
 import { Eye } from 'lucide-react';
 import { CalendarHeader, type CalendarViewType } from './CalendarHeader';
 import { CalendarGrid } from './CalendarGrid';
 import { CalendarWeek } from './CalendarWeek';
+import { CalendarAgenda } from './CalendarAgenda';
 import { ShareCalendarModal } from './ShareCalendarModal';
 import type { PromotionalCampaign, CalendarEvent, WeatherForecast, CampaignPlatform, EventCategory } from '@/types';
+import type { DailyChannelRevenue } from '@/services/crp-portal/dailyRevenue';
+import type { CalendarObjectiveItem } from '../hooks/useCalendarObjectives';
 
 interface CalendarViewProps {
   campaigns: PromotionalCampaign[];
   events: CalendarEvent[];
   weatherForecasts?: WeatherForecast[];
+  revenueByDate?: Map<string, DailyChannelRevenue>;
+  objectives?: CalendarObjectiveItem[];
   isLoading?: boolean;
   onNewCampaign: () => void;
   onCampaignClick: (campaign: PromotionalCampaign) => void;
@@ -20,7 +32,7 @@ interface CalendarViewProps {
   onDuplicateCampaign?: (campaign: PromotionalCampaign) => void;
   onCreateCampaignWithDates?: (startDate: string, endDate: string) => void;
   isClientMode?: boolean;
-  // Filter state for sharing
+  restaurantId?: string;
   shareFilters?: {
     brandIds?: string[];
     restaurantIds?: string[];
@@ -35,6 +47,8 @@ export function CalendarView({
   campaigns,
   events,
   weatherForecasts = [],
+  revenueByDate,
+  objectives,
   isLoading,
   onCampaignClick,
   onDayClick,
@@ -44,6 +58,7 @@ export function CalendarView({
   onDuplicateCampaign,
   onCreateCampaignWithDates,
   isClientMode = false,
+  restaurantId,
   shareFilters = {},
 }: CalendarViewProps) {
   const today = new Date();
@@ -64,19 +79,7 @@ export function CalendarView({
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handlePrevPeriod = useCallback(() => {
-    if (currentView === 'day') {
-      const prevDay = new Date(year, month - 1, day - 1);
-      setYear(prevDay.getFullYear());
-      setMonth(prevDay.getMonth() + 1);
-      setDay(prevDay.getDate());
-      onMonthChange?.(prevDay.getFullYear(), prevDay.getMonth() + 1);
-    } else if (currentView === '4days') {
-      const prevDate = new Date(year, month - 1, day - 4);
-      setYear(prevDate.getFullYear());
-      setMonth(prevDate.getMonth() + 1);
-      setDay(prevDate.getDate());
-      onMonthChange?.(prevDate.getFullYear(), prevDate.getMonth() + 1);
-    } else if (currentView === 'week') {
+    if (currentView === 'week') {
       const prevWeek = new Date(year, month - 1, day - 7);
       setYear(prevWeek.getFullYear());
       setMonth(prevWeek.getMonth() + 1);
@@ -97,19 +100,7 @@ export function CalendarView({
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleNextPeriod = useCallback(() => {
-    if (currentView === 'day') {
-      const nextDay = new Date(year, month - 1, day + 1);
-      setYear(nextDay.getFullYear());
-      setMonth(nextDay.getMonth() + 1);
-      setDay(nextDay.getDate());
-      onMonthChange?.(nextDay.getFullYear(), nextDay.getMonth() + 1);
-    } else if (currentView === '4days') {
-      const nextDate = new Date(year, month - 1, day + 4);
-      setYear(nextDate.getFullYear());
-      setMonth(nextDate.getMonth() + 1);
-      setDay(nextDate.getDate());
-      onMonthChange?.(nextDate.getFullYear(), nextDate.getMonth() + 1);
-    } else if (currentView === 'week') {
+    if (currentView === 'week') {
       const nextWeek = new Date(year, month - 1, day + 7);
       setYear(nextWeek.getFullYear());
       setMonth(nextWeek.getMonth() + 1);
@@ -171,16 +162,23 @@ export function CalendarView({
           </div>
         )}
 
-        {/* Currently showing month view - other views can be added later */}
-        {(currentView === 'month' || currentView === 'agenda') && (
+        {/* Month view */}
+        {currentView === 'month' && (
           <CalendarGrid
             year={year}
             month={month}
             campaigns={campaigns}
             events={events}
             weatherForecasts={weatherForecasts}
-            onCampaignClick={onCampaignClick}
+            revenueByDate={revenueByDate}
+            objectives={objectives}
             onDayClick={onDayClick}
+            onEditCampaign={onEditCampaign}
+            onDeleteCampaign={onDeleteCampaign}
+            onDuplicateCampaign={onDuplicateCampaign}
+            onCreateCampaignWithDates={onCreateCampaignWithDates}
+            isClientMode={isClientMode}
+            restaurantId={restaurantId}
           />
         )}
 
@@ -193,6 +191,8 @@ export function CalendarView({
             campaigns={campaigns}
             events={events}
             weatherForecasts={weatherForecasts}
+            revenueByDate={revenueByDate}
+            objectives={objectives}
             onCampaignClick={onCampaignClick}
             onDayClick={onDayClick}
             onEditCampaign={onEditCampaign}
@@ -203,11 +203,16 @@ export function CalendarView({
           />
         )}
 
-        {/* Placeholder for other views */}
-        {(currentView === 'day' || currentView === '4days') && (
-          <div className="flex items-center justify-center h-64 text-gray-500">
-            Vista {currentView === 'day' ? 'de día' : 'de 4 días'} próximamente
-          </div>
+        {/* Agenda view */}
+        {currentView === 'agenda' && (
+          <CalendarAgenda
+            year={year}
+            month={month}
+            campaigns={campaigns}
+            events={events}
+            revenueByDate={revenueByDate}
+            onCampaignClick={onCampaignClick}
+          />
         )}
       </div>
 

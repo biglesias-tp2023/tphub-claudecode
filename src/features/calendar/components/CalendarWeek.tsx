@@ -1,16 +1,26 @@
 /**
  * Calendar Week View
  *
- * Displays a 7-day horizontal view similar to Google Calendar's week view,
- * optimized for marketing campaigns with multi-day spanning blocks.
+ * 7-day horizontal view with:
+ * - Day header with day name, number, and weather
+ * - All-day section: multi-day campaigns, objectives, holidays
+ * - Hourly grid (09:00-23:00): campaigns with start time positioned vertically
+ * - Current time indicator (red line)
+ * - Daily revenue per channel
+ * - Drag-to-create
  */
 
 import { useMemo, useCallback, useState, useRef } from 'react';
 import { Flag, Trophy, ShoppingBag, type LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { PLATFORMS, getCampaignTypeConfig } from '../config/platforms';
+import { computeCampaignLayout } from '../utils/campaignLayout';
+import { formatLocalDate, getMondayOfWeek } from '../utils/dateHelpers';
+import { DailyRevenueIndicator } from './DailyRevenueIndicator';
 import { CampaignPopover } from './CampaignPopover';
 import type { PromotionalCampaign, CalendarEvent, WeatherForecast, EventCategory } from '@/types';
+import type { DailyChannelRevenue } from '@/services/crp-portal/dailyRevenue';
+import type { CalendarObjectiveItem } from '../hooks/useCalendarObjectives';
 
 // ============================================
 // TYPES
@@ -23,6 +33,8 @@ interface CalendarWeekProps {
   campaigns: PromotionalCampaign[];
   events: CalendarEvent[];
   weatherForecasts?: WeatherForecast[];
+  revenueByDate?: Map<string, DailyChannelRevenue>;
+  objectives?: CalendarObjectiveItem[];
   onCampaignClick?: (campaign: PromotionalCampaign) => void;
   onDayClick?: (date: Date, campaigns: PromotionalCampaign[], events: CalendarEvent[]) => void;
   onEditCampaign?: (campaign: PromotionalCampaign) => void;
@@ -42,18 +54,14 @@ interface WeekDay {
   events: CalendarEvent[];
 }
 
-interface CampaignLayoutRow {
-  campaign: PromotionalCampaign;
-  startCol: number; // 0-6 (Monday-Sunday)
-  endCol: number;   // 0-6 (Monday-Sunday)
-  row: number;      // Row index for stacking
-}
-
 // ============================================
 // CONSTANTS
 // ============================================
 
 const WEEKDAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const START_HOUR = 9;
+const END_HOUR = 23;
+const HOUR_HEIGHT = 48; // px per hour
 
 const EVENT_CATEGORY_CONFIG: Record<EventCategory, { icon: LucideIcon; color: string; bgColor: string }> = {
   holiday: { icon: Flag, color: 'text-red-600', bgColor: 'bg-red-100' },
@@ -66,20 +74,6 @@ const EVENT_CATEGORY_CONFIG: Record<EventCategory, { icon: LucideIcon; color: st
 // HELPERS
 // ============================================
 
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getMondayOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff));
-}
-
 function getEventsForDate(events: CalendarEvent[], dateStr: string): CalendarEvent[] {
   return events.filter(event => {
     if (event.endDate) {
@@ -87,88 +81,6 @@ function getEventsForDate(events: CalendarEvent[], dateStr: string): CalendarEve
     }
     return event.eventDate === dateStr;
   });
-}
-
-function getCampaignsForWeek(
-  campaigns: PromotionalCampaign[],
-  weekStart: string,
-  weekEnd: string
-): PromotionalCampaign[] {
-  return campaigns.filter(campaign => {
-    return campaign.startDate <= weekEnd && campaign.endDate >= weekStart;
-  });
-}
-
-/**
- * Compute layout rows for campaigns to handle overlapping
- * Uses a greedy algorithm to assign rows without collisions
- */
-function computeCampaignLayout(
-  campaigns: PromotionalCampaign[],
-  weekDays: WeekDay[]
-): CampaignLayoutRow[] {
-  const weekStart = weekDays[0].dateStr;
-  const weekEnd = weekDays[6].dateStr;
-
-  // Map date string to column index
-  const dateToCol = new Map<string, number>();
-  weekDays.forEach((day, i) => dateToCol.set(day.dateStr, i));
-
-  // Sort campaigns by start date, then by duration (longer first)
-  const sortedCampaigns = [...campaigns].sort((a, b) => {
-    if (a.startDate !== b.startDate) {
-      return a.startDate.localeCompare(b.startDate);
-    }
-    // Longer campaigns first for better stacking
-    const durationA = (new Date(a.endDate).getTime() - new Date(a.startDate).getTime());
-    const durationB = (new Date(b.endDate).getTime() - new Date(b.startDate).getTime());
-    return durationB - durationA;
-  });
-
-  const layout: CampaignLayoutRow[] = [];
-  const rowOccupancy: boolean[][] = []; // rowOccupancy[row][col] = true if occupied
-
-  for (const campaign of sortedCampaigns) {
-    // Calculate start and end columns (clamped to week boundaries)
-    const startCol = Math.max(0, dateToCol.get(campaign.startDate) ?? (campaign.startDate < weekStart ? 0 : 7));
-    const endCol = Math.min(6, dateToCol.get(campaign.endDate) ?? (campaign.endDate > weekEnd ? 6 : -1));
-
-    if (startCol > 6 || endCol < 0 || startCol > endCol) continue;
-
-    // Find the first available row
-    let assignedRow = 0;
-    while (true) {
-      if (!rowOccupancy[assignedRow]) {
-        rowOccupancy[assignedRow] = new Array(7).fill(false);
-      }
-
-      let canFit = true;
-      for (let col = startCol; col <= endCol; col++) {
-        if (rowOccupancy[assignedRow][col]) {
-          canFit = false;
-          break;
-        }
-      }
-
-      if (canFit) {
-        // Mark columns as occupied
-        for (let col = startCol; col <= endCol; col++) {
-          rowOccupancy[assignedRow][col] = true;
-        }
-        break;
-      }
-      assignedRow++;
-    }
-
-    layout.push({
-      campaign,
-      startCol,
-      endCol,
-      row: assignedRow,
-    });
-  }
-
-  return layout;
 }
 
 // ============================================
@@ -181,8 +93,9 @@ export function CalendarWeek({
   day,
   campaigns,
   events,
-  // weatherForecasts prop available for future use
   weatherForecasts: _weatherForecasts = [],
+  revenueByDate = new Map(),
+  objectives = [],
   onDayClick,
   onEditCampaign,
   onDeleteCampaign,
@@ -190,7 +103,6 @@ export function CalendarWeek({
   onCreateCampaign,
   isClientMode = false,
 }: CalendarWeekProps) {
-  // Weather forecasts available for future use
   void _weatherForecasts;
   const [selectedCampaign, setSelectedCampaign] = useState<PromotionalCampaign | null>(null);
   const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -225,35 +137,56 @@ export function CalendarWeek({
     return days;
   }, [year, month, day, events]);
 
+  const weekDateStrings = useMemo(() => weekDays.map(d => d.dateStr), [weekDays]);
+
+  // Get campaigns for this week
   const weekStart = weekDays[0].dateStr;
   const weekEnd = weekDays[6].dateStr;
 
-  // Get campaigns for this week
   const weekCampaigns = useMemo(
-    () => getCampaignsForWeek(campaigns, weekStart, weekEnd),
+    () => campaigns.filter(c => c.startDate <= weekEnd && c.endDate >= weekStart),
     [campaigns, weekStart, weekEnd]
   );
 
-  // Compute campaign layout (row assignments for stacking)
-  const campaignLayout = useMemo(
-    () => computeCampaignLayout(weekCampaigns, weekDays),
-    [weekCampaigns, weekDays]
+  // Split into all-day and timed campaigns
+  const allDayCampaigns = useMemo(
+    () => weekCampaigns.filter(c => !c.config.startTime),
+    [weekCampaigns]
   );
 
-  const maxRows = useMemo(
-    () => Math.max(1, ...campaignLayout.map(l => l.row + 1)),
-    [campaignLayout]
+  const timedCampaigns = useMemo(
+    () => weekCampaigns.filter(c => c.config.startTime),
+    [weekCampaigns]
   );
 
-  // Handle campaign block click
+  // All-day campaign layout
+  const allDayLayout = useMemo(
+    () => computeCampaignLayout(allDayCampaigns, weekDateStrings),
+    [allDayCampaigns, weekDateStrings]
+  );
+
+  const allDayMaxRows = useMemo(
+    () => Math.max(1, ...allDayLayout.map(l => l.row + 1)),
+    [allDayLayout]
+  );
+
+  // Objectives are available via props for future hourly grid rendering
+  void objectives;
+
+  // Current time position
+  const currentTimePosition = useMemo(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    if (currentHour < START_HOUR || currentHour >= END_HOUR) return null;
+    return ((currentHour - START_HOUR) + currentMinute / 60) * HOUR_HEIGHT;
+  }, []);
+
   const handleCampaignClick = useCallback((campaign: PromotionalCampaign, event: React.MouseEvent) => {
     event.stopPropagation();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     setSelectedCampaign(campaign);
-    setPopoverAnchor({
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 8,
-    });
+    setPopoverAnchor({ x: rect.left + rect.width / 2, y: rect.bottom + 8 });
   }, []);
 
   const handleClosePopover = useCallback(() => {
@@ -261,7 +194,6 @@ export function CalendarWeek({
     setPopoverAnchor(null);
   }, []);
 
-  // Handle day click
   const handleDayClick = useCallback((dayIndex: number) => {
     if (isClientMode) return;
     const dayData = weekDays[dayIndex];
@@ -271,7 +203,6 @@ export function CalendarWeek({
     onDayClick?.(dayData.date, dayCampaigns, dayData.events);
   }, [weekDays, weekCampaigns, onDayClick, isClientMode]);
 
-  // Handle drag selection for date range
   const handleMouseDown = useCallback((dayIndex: number, e: React.MouseEvent) => {
     if (isClientMode) return;
     e.preventDefault();
@@ -297,202 +228,219 @@ export function CalendarWeek({
     setDragEnd(null);
   }, [dragStart, dragEnd, weekDays, onCreateCampaign, isClientMode]);
 
-  // Calculate progress for active campaigns
-  const getProgress = useCallback((campaign: PromotionalCampaign): number => {
-    if (campaign.status !== 'active') return 0;
-    const today = new Date();
-    const start = new Date(campaign.startDate);
-    const end = new Date(campaign.endDate);
-    end.setHours(23, 59, 59, 999);
-
-    if (today < start) return 0;
-    if (today > end) return 100;
-
-    const total = end.getTime() - start.getTime();
-    const elapsed = today.getTime() - start.getTime();
-    return Math.min(100, Math.max(0, (elapsed / total) * 100));
-  }, []);
-
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-full flex flex-col">
       {/* Week header with days */}
-      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-        {weekDays.map((day) => (
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
+        <div /> {/* Time gutter spacer */}
+        {weekDays.map((dayData) => (
           <div
-            key={day.dateStr}
+            key={dayData.dateStr}
             className={cn(
-              'px-2 py-3 text-center border-l first:border-l-0 border-gray-200',
-              day.isToday && 'bg-primary-50'
+              'px-2 py-2 text-center border-l border-gray-200',
+              dayData.isToday && 'bg-primary-50'
             )}
           >
-            <div className="text-xs font-medium text-gray-500 uppercase">
-              {day.dayName}
+            <div className="text-xs font-medium text-gray-500 uppercase">{dayData.dayName}</div>
+            <div className={cn(
+              'mt-0.5 w-8 h-8 mx-auto flex items-center justify-center rounded-full text-lg font-semibold',
+              dayData.isToday ? 'bg-primary-600 text-white' : dayData.isPast ? 'text-gray-400' : 'text-gray-900'
+            )}>
+              {dayData.dayNumber}
             </div>
-            <div
-              className={cn(
-                'mt-1 text-lg font-semibold',
-                day.isToday
-                  ? 'text-primary-600'
-                  : day.isPast
-                  ? 'text-gray-400'
-                  : 'text-gray-900'
-              )}
-            >
-              {day.dayNumber}
-            </div>
+            {/* Revenue */}
+            {revenueByDate.has(dayData.dateStr) && (
+              <div className="mt-1 flex justify-center">
+                <DailyRevenueIndicator
+                  revenue={revenueByDate.get(dayData.dateStr)!}
+                  isPast={dayData.isPast}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Events lane (context events) */}
-      <div className="grid grid-cols-7 border-b border-gray-100 min-h-[32px]">
-        {weekDays.map((day) => (
-          <div
-            key={`events-${day.dateStr}`}
-            className={cn(
-              'px-1 py-1 border-l first:border-l-0 border-gray-100 overflow-hidden',
-              day.isToday && 'bg-primary-50/30'
-            )}
-          >
-            <div className="flex flex-wrap gap-0.5">
-              {day.events.slice(0, 2).map((event) => {
+      {/* All-day section (expandable) */}
+      <div className="border-b border-gray-200">
+        <div className="grid grid-cols-[60px_repeat(7,1fr)]">
+          <div className="px-1 py-1 text-[10px] text-gray-400 text-right">todo el día</div>
+          <div className="col-span-7 relative" style={{ minHeight: `${allDayMaxRows * 24 + 8}px` }}>
+            <div className="absolute inset-0 grid grid-cols-7">
+              {weekDays.map((dayData) => (
+                <div key={`allday-bg-${dayData.dateStr}`} className={cn(
+                  'border-l border-gray-100',
+                  dayData.isToday && 'bg-primary-50/20'
+                )} />
+              ))}
+            </div>
+
+            {/* All-day campaigns */}
+            {allDayLayout.map((item) => {
+              const { campaign, startCol, endCol, row } = item;
+              const platform = PLATFORMS[campaign.platform];
+              const typeConfig = getCampaignTypeConfig(campaign.platform, campaign.campaignType);
+              const displayText = campaign.name || typeConfig?.label || campaign.campaignType;
+              const isPast = campaign.endDate < formatLocalDate(new Date());
+              const isStartInWeek = campaign.startDate >= weekStart;
+              const isEndInWeek = campaign.endDate <= weekEnd;
+
+              return (
+                <button
+                  key={campaign.id}
+                  className={cn(
+                    'absolute h-[20px] z-10 text-left text-[11px] font-medium truncate',
+                    'flex items-center gap-1 px-1.5 rounded-sm',
+                    !isStartInWeek && 'rounded-l-none',
+                    !isEndInWeek && 'rounded-r-none',
+                    isPast && 'opacity-50',
+                  )}
+                  style={{
+                    left: `calc(${(startCol / 7) * 100}% + 2px)`,
+                    width: `calc(${((endCol - startCol + 1) / 7) * 100}% - 4px)`,
+                    top: `${row * 24 + 4}px`,
+                    backgroundColor: isPast ? '#e5e7eb' : platform.color + '25',
+                    borderLeft: isStartInWeek ? `3px solid ${isPast ? '#9ca3af' : platform.color}` : undefined,
+                  }}
+                  onClick={(e) => handleCampaignClick(campaign, e)}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: isPast ? '#9ca3af' : platform.color }} />
+                  <span className="truncate">{displayText}</span>
+                </button>
+              );
+            })}
+
+            {/* Events in all-day */}
+            {weekDays.map((dayData, i) => (
+              dayData.events.slice(0, 2).map(event => {
                 const config = EVENT_CATEGORY_CONFIG[event.category];
                 const Icon = config.icon;
                 return (
                   <div
                     key={event.id}
                     className={cn(
-                      'flex items-center gap-1 px-1.5 py-0.5 rounded text-xs truncate',
+                      'absolute flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] truncate',
                       config.bgColor, config.color
                     )}
+                    style={{
+                      left: `calc(${(i / 7) * 100}% + 2px)`,
+                      width: `calc(${(1 / 7) * 100}% - 4px)`,
+                      bottom: '2px',
+                    }}
                     title={event.name}
                   >
                     <Icon className="w-3 h-3 shrink-0" />
                     <span className="truncate">{event.name}</span>
                   </div>
                 );
-              })}
-              {day.events.length > 2 && (
-                <span className="text-xs text-gray-500 px-1">+{day.events.length - 2}</span>
-              )}
-            </div>
+              })
+            ))}
           </div>
-        ))}
+        </div>
       </div>
 
-      {/* Campaign lanes */}
+      {/* Hourly grid */}
       <div
         ref={gridRef}
-        className="flex-1 relative overflow-y-auto"
+        className="flex-1 overflow-y-auto relative"
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* Day columns background + click targets */}
-        <div className="absolute inset-0 grid grid-cols-7">
-          {weekDays.map((day, i) => {
+        <div className="grid grid-cols-[60px_repeat(7,1fr)] relative" style={{ height: `${(END_HOUR - START_HOUR) * HOUR_HEIGHT}px` }}>
+          {/* Time labels */}
+          <div className="relative">
+            {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
+              <div
+                key={i}
+                className="absolute w-full text-right pr-2 text-xs text-gray-400"
+                style={{ top: `${i * HOUR_HEIGHT - 6}px` }}
+              >
+                {String(START_HOUR + i).padStart(2, '0')}:00
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {weekDays.map((dayData, i) => {
             const isInDragRange = dragStart !== null && dragEnd !== null &&
               i >= Math.min(dragStart, dragEnd) && i <= Math.max(dragStart, dragEnd);
 
             return (
               <div
-                key={`col-${day.dateStr}`}
+                key={`col-${dayData.dateStr}`}
                 className={cn(
-                  'border-l first:border-l-0 border-gray-100 transition-colors cursor-pointer',
-                  day.isToday && 'bg-primary-50/20',
-                  day.isPast && !day.isToday && 'bg-gray-50/50',
+                  'relative border-l border-gray-100',
+                  dayData.isToday && 'bg-primary-50/10',
+                  dayData.isPast && !dayData.isToday && 'bg-gray-50/30',
                   isInDragRange && 'bg-primary-100/50',
-                  !isClientMode && 'hover:bg-gray-50'
+                  !isClientMode && 'cursor-pointer hover:bg-gray-50/50'
                 )}
                 onClick={() => handleDayClick(i)}
                 onMouseDown={(e) => handleMouseDown(i, e)}
                 onMouseEnter={() => handleMouseEnter(i)}
-              />
-            );
-          })}
-        </div>
-
-        {/* Campaign blocks */}
-        <div
-          className="relative"
-          style={{ minHeight: `${Math.max(200, maxRows * 44 + 16)}px` }}
-        >
-          {campaignLayout.map((layoutItem) => {
-            const { campaign, startCol, endCol, row } = layoutItem;
-            const platform = PLATFORMS[campaign.platform];
-            const typeConfig = getCampaignTypeConfig(campaign.platform, campaign.campaignType);
-            const displayText = campaign.name || typeConfig?.label || campaign.campaignType;
-
-            const isPast = campaign.endDate < formatLocalDate(new Date());
-            const isActive = campaign.status === 'active' && !isPast;
-            const isCancelled = campaign.status === 'cancelled';
-            const progress = getProgress(campaign);
-
-            // Calculate position (percentage-based for responsiveness)
-            const left = `${(startCol / 7) * 100}%`;
-            const width = `${((endCol - startCol + 1) / 7) * 100}%`;
-            const top = `${row * 44 + 8}px`;
-
-            // Is this the start or end of the campaign within the week?
-            const isStartInWeek = campaign.startDate >= weekStart;
-            const isEndInWeek = campaign.endDate <= weekEnd;
-
-            return (
-              <div
-                key={campaign.id}
-                className={cn(
-                  'absolute h-9 px-1',
-                )}
-                style={{ left, width, top }}
               >
-                <button
-                  onClick={(e) => handleCampaignClick(campaign, e)}
-                  className={cn(
-                    'w-full h-full rounded-md text-left text-xs font-medium truncate transition-all relative overflow-hidden',
-                    'flex items-center gap-1.5 px-2',
-                    // Shape based on position
-                    !isStartInWeek && 'rounded-l-none',
-                    !isEndInWeek && 'rounded-r-none',
-                    // Status styling
-                    isPast && 'opacity-60',
-                    isCancelled && 'opacity-50 line-through',
-                    isActive && 'ring-2 ring-offset-1',
-                  )}
-                  style={{
-                    backgroundColor: isPast || isCancelled ? '#e5e7eb' : platform.color + '20',
-                    borderLeft: `3px solid ${isPast || isCancelled ? '#9ca3af' : platform.color}`,
-                    color: isPast || isCancelled ? '#6b7280' : undefined,
-                  }}
-                >
-                  {/* Progress overlay for active campaigns */}
-                  {isActive && progress > 0 && (
-                    <div
-                      className="absolute inset-y-0 left-0 bg-black/10 pointer-events-none"
-                      style={{ width: `${progress}%` }}
-                    />
-                  )}
-
-                  {/* Platform indicator */}
-                  <span
-                    className={cn(
-                      'w-2 h-2 rounded-full shrink-0',
-                      isPast || isCancelled ? 'bg-gray-400' : ''
-                    )}
-                    style={{
-                      backgroundColor: isPast || isCancelled ? undefined : platform.color,
-                    }}
+                {/* Hour lines */}
+                {Array.from({ length: END_HOUR - START_HOUR }, (_, h) => (
+                  <div
+                    key={h}
+                    className="absolute w-full border-t border-gray-100"
+                    style={{ top: `${h * HOUR_HEIGHT}px` }}
                   />
+                ))}
 
-                  {/* Campaign name */}
-                  <span className="truncate relative z-10">{displayText}</span>
+                {/* Timed campaigns */}
+                {timedCampaigns
+                  .filter(c => c.startDate <= dayData.dateStr && c.endDate >= dayData.dateStr)
+                  .map(campaign => {
+                    const platform = PLATFORMS[campaign.platform];
+                    const typeConfig = getCampaignTypeConfig(campaign.platform, campaign.campaignType);
+                    const displayText = campaign.name || typeConfig?.label || campaign.campaignType;
 
-                  {/* Status badge for active */}
-                  {isActive && (
-                    <span className="ml-auto shrink-0 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  )}
-                </button>
+                    // Parse start time
+                    const [hours, minutes] = (campaign.config.startTime || '12:00').split(':').map(Number);
+                    const duration = campaign.config.duration || 60;
+                    const topOffset = ((hours - START_HOUR) + (minutes || 0) / 60) * HOUR_HEIGHT;
+                    const height = (duration / 60) * HOUR_HEIGHT;
+
+                    if (topOffset < 0 || topOffset >= (END_HOUR - START_HOUR) * HOUR_HEIGHT) return null;
+
+                    return (
+                      <button
+                        key={campaign.id}
+                        className={cn(
+                          'absolute left-1 right-1 z-10 rounded-md text-left text-[11px] font-medium',
+                          'px-2 py-1 overflow-hidden truncate transition-all',
+                        )}
+                        style={{
+                          top: `${topOffset}px`,
+                          height: `${Math.max(height, 24)}px`,
+                          backgroundColor: platform.color + '30',
+                          borderLeft: `3px solid ${platform.color}`,
+                        }}
+                        onClick={(e) => handleCampaignClick(campaign, e)}
+                      >
+                        <span className="truncate">{displayText}</span>
+                        <div className="text-[9px] opacity-70">{campaign.config.startTime}</div>
+                      </button>
+                    );
+                  })}
               </div>
             );
           })}
+
+          {/* Current time indicator */}
+          {currentTimePosition !== null && (
+            <div
+              className="absolute left-[60px] right-0 z-20 pointer-events-none"
+              style={{ top: `${currentTimePosition}px` }}
+            >
+              <div className="flex items-center">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1.5" />
+                <div className="flex-1 h-px bg-red-500" />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Empty state */}

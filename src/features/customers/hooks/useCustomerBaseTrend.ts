@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCustomerBaseTrend } from '@/services/crp-portal';
 import type { CustomerBaseTrendWeek } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useBrands } from '@/hooks/useBrands';
+import { expandBrandIds } from '@/hooks/idExpansion';
 import { formatDate, parseNumericIds, getLastNWeeks } from '@/utils/dateUtils';
 
 export interface UseCustomerBaseTrendResult {
@@ -14,9 +16,14 @@ export interface UseCustomerBaseTrendResult {
 export function useCustomerBaseTrend(): UseCustomerBaseTrendResult {
   const { companyIds } = useGlobalFiltersStore();
   const { datePreset, brandIds, channelIds } = useDashboardFiltersStore();
+  const { data: brands } = useBrands();
 
   const numericCompanyIds = parseNumericIds(companyIds);
-  const numericBrandIds = parseNumericIds(brandIds);
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brands || []),
+    [brandIds, brands]
+  );
+  const numericBrandIds = parseNumericIds(expandedBrandIds);
 
   const weeks = useMemo(() => {
     const raw = getLastNWeeks(8);

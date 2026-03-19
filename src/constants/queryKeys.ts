@@ -132,6 +132,7 @@ export const queryKeys = {
     all: (brandIds: string[]) => ['products', brandIds] as const,
     list: (brandIds: string[], filters?: ProductFilters) => ['products', 'list', brandIds, filters] as const,
     detail: (productId: string) => ['products', 'detail', productId] as const,
+    sales: (filters: AnalyticsFilters) => ['products', 'sales', filters] as const,
   },
 
   /** Report queries */
@@ -139,6 +140,8 @@ export const queryKeys = {
     all: (companyIds: string[]) => ['reports', companyIds] as const,
     scheduled: (companyIds: string[]) => ['reports', 'scheduled', companyIds] as const,
     history: (companyIds: string[]) => ['reports', 'history', companyIds] as const,
+    weekly: (companyId: string, weekStart: string) => ['reports', 'weekly', companyId, weekStart] as const,
+    monthly: (companyId: string, monthKey: string) => ['reports', 'monthly', companyId, monthKey] as const,
   },
 
   /** Objectives queries */
@@ -235,5 +238,20 @@ export const queryKeys = {
       ['sales-projections', 'brand', companyId, brandId ?? '__NULL__'] as const,
     bulk: (companyIds: string[]) =>
       ['sales-projections', 'bulk', companyIds] as const,
+    allChildren: (companyId: string) =>
+      ['sales-projections', 'children', companyId] as const,
+  },
+  /** Calendar Daily Revenue */
+  calendarDailyRevenue: (companyIds: string[], year: number, month: number) =>
+    ['calendar-daily-revenue', companyIds, year, month] as const,
+
+  /** Calendar Objectives */
+  calendarObjectives: (companyIds: string[], year: number, month: number) =>
+    ['calendar-objectives', companyIds, year, month] as const,
+
+  /** Calendar Share Links */
+  calendarShareLinks: {
+    all: ['calendar-share-links'] as const,
+    byToken: (token: string) => ['calendar-share-links', 'token', token] as const,
   },
 } as const;

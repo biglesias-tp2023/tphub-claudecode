@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   PieChart,
   Truck,
@@ -8,12 +8,14 @@ import {
   Target,
   Calendar,
   ClipboardCheck,
+  FileBarChart,
   Calculator,
   Crosshair,
   Grid3X3,
   Map,
   Megaphone,
   Wallet,
+  Package,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -41,6 +43,7 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
+  collapsible?: boolean;
 }
 
 const navSections: NavSection[] = [
@@ -53,6 +56,7 @@ const navSections: NavSection[] = [
       { label: 'Publicidad', icon: Megaphone, to: ROUTES.MARKETING, tag: { text: 'New!', color: 'green' } },
       { label: 'Finanzas', icon: Wallet, to: ROUTES.FINANCE, tag: { text: 'New!', color: 'green' } },
       { label: 'Clientes', icon: UsersRound, to: ROUTES.CUSTOMERS, tag: { text: 'New!', color: 'green' } },
+      { label: 'Productos', icon: Package, to: ROUTES.PRODUCTS, tag: { text: 'New!', color: 'green' } },
       { label: 'Compset', icon: Crosshair, to: ROUTES.COMPSET, tag: { text: 'Beta', color: 'orange' } },
       { label: 'Operaciones', icon: Truck, to: ROUTES.OPERATIONS, tag: { text: 'Soon!', color: 'gray' } },
       { label: 'Mapas', icon: Map, to: ROUTES.MAPS, tag: { text: 'Soon!', color: 'gray' } },
@@ -60,9 +64,11 @@ const navSections: NavSection[] = [
   },
   {
     label: 'Herramientas',
+    collapsible: true,
     items: [
       { label: 'Auditorías', icon: ClipboardCheck, to: ROUTES.AUDITS },
       { label: 'Objetivos', icon: Target, to: ROUTES.STRATEGIC, tag: { text: 'New!', color: 'green' } },
+      { label: 'Reportes', icon: FileBarChart, to: ROUTES.REPORTS, tag: { text: 'New!', color: 'green' } },
       { label: 'Calculadora', icon: Calculator, to: ROUTES.CALCULATOR, tag: { text: 'New!', color: 'green' } },
       { label: 'Calendario', icon: Calendar, to: ROUTES.CALENDAR, tag: { text: 'Beta', color: 'orange' } },
     ],
@@ -79,6 +85,13 @@ export function Sidebar() {
   const [isToggleHovered, setIsToggleHovered] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const location = useLocation();
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    // Auto-expand if current route is within a collapsible section
+    const toolRoutes = navSections.find(s => s.collapsible && s.label === 'Herramientas')?.items.map(i => i.to) ?? [];
+    const isOnTool = toolRoutes.some(r => location.pathname.startsWith(r));
+    return { Herramientas: !isOnTool };
+  });
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user menu on click outside
@@ -213,11 +226,22 @@ export function Sidebar() {
 
               {/* Section header (only when expanded) */}
               {!isSidebarCollapsed && (
-                <div className="px-6 pb-1.5 pt-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  {section.label}
-                </div>
+                section.collapsible ? (
+                  <button
+                    onClick={() => setCollapsedSections(prev => ({ ...prev, [section.label]: !prev[section.label] }))}
+                    className="w-full flex items-center justify-between px-6 pb-1.5 pt-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+                  >
+                    <span>{section.label}</span>
+                    <ChevronDown className={cn('w-3 h-3 transition-transform', !collapsedSections[section.label] && 'rotate-180')} />
+                  </button>
+                ) : (
+                  <div className="px-6 pb-1.5 pt-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    {section.label}
+                  </div>
+                )
               )}
 
+              {(!section.collapsible || !collapsedSections[section.label] || isSidebarCollapsed) && (
               <ul className="space-y-1 px-3">
                 {section.items.map((item) => (
                   <li key={item.to}>
@@ -258,6 +282,7 @@ export function Sidebar() {
                   </li>
                 ))}
               </ul>
+              )}
             </div>
           ))}
         </nav>

@@ -31,12 +31,17 @@ const AuditDetailPage = lazyWithRetry(() => import('@/pages/audits').then(m => (
 const MarketingPage = lazyWithRetry(() => import('@/pages/marketing').then(m => ({ default: m.MarketingPage })));
 // Finance: P&L dashboard
 const FinancePage = lazyWithRetry(() => import('@/pages/finance').then(m => ({ default: m.FinancePage })));
+// Products: product sales analysis
+const ProductsPage = lazyWithRetry(() => import('@/pages/products').then(m => ({ default: m.ProductsPage })));
+// Reports: weekly report generator
+const WeeklyReportPage = lazyWithRetry(() => import('@/pages/reports').then(m => ({ default: m.WeeklyReportPage })));
 // Alerts: alert configuration and company preferences
 const AlertsPage = lazyWithRetry(() => import('@/pages/alerts').then(m => ({ default: m.AlertsPage })));
 // Admin: user management (admin-only)
 const AdminPage = lazyWithRetry(() => import('@/pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 // Public shared pages
 const SharedObjectivePage = lazyWithRetry(() => import('@/pages/shared/SharedObjectivePage').then(m => ({ default: m.SharedObjectivePage })));
+const SharedCalendarPage = lazyWithRetry(() => import('@/pages/shared/SharedCalendarPage').then(m => ({ default: m.SharedCalendarPage })));
 
 // Loading spinner for lazy-loaded pages
 // eslint-disable-next-line react-refresh/only-export-components
@@ -147,8 +152,11 @@ export const router = createBrowserRouter([
       { path: 'marketing', element: <LazyPage><MarketingPage /></LazyPage> },
       { path: 'finance', element: <LazyPage><FinancePage /></LazyPage> },
       { path: 'maps', element: <LazyPage><MapsPage /></LazyPage> },
+      { path: 'products', element: <LazyPage><ProductsPage /></LazyPage> },
       { path: 'admin', element: <LazyPage><AdminPage /></LazyPage> },
       { path: 'admin/users', element: <LazyPage><AdminPage /></LazyPage> },
+      // Reports: weekly report generator
+      { path: 'reports', element: <LazyPage><WeeklyReportPage /></LazyPage> },
       // Alerts: configuration + company preferences
       { path: 'alerts', element: <LazyPage><AlertsPage /></LazyPage> },
     ],
@@ -173,6 +181,21 @@ export const router = createBrowserRouter([
         }
       >
         <SharedObjectivePage />
+      </Suspense>
+    ),
+  },
+  // Shared calendar (public, no auth)
+  {
+    path: '/shared/calendar/:token',
+    element: (
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }
+      >
+        <SharedCalendarPage />
       </Suspense>
     ),
   },

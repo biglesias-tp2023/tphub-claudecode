@@ -193,6 +193,7 @@ export function StrategicPage() {
                 targetRevenue={state.salesProjection.targetRevenue}
                 onTargetChange={state.isMultiCompany ? undefined : state.handleUpdateTargetRevenue}
                 onEditConfig={state.isMultiCompany ? undefined : state.openSetupForExisting}
+                onDelete={state.isMultiCompany ? undefined : state.handleDeleteProjection}
                 realRevenueByMonth={state.realRevenueByMonth}
                 realPromosByMonth={state.realPromosByMonth}
                 realAdsByMonth={state.realAdsByMonth}

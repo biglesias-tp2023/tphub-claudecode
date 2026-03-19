@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRevenueConcentration } from '@/services/crp-portal';
 import type { RevenueConcentration } from '@/services/crp-portal';
 import { useGlobalFiltersStore, useDashboardFiltersStore } from '@/stores/filtersStore';
+import { useBrands } from '@/hooks/useBrands';
+import { expandBrandIds } from '@/hooks/idExpansion';
 import { formatDate, parseNumericIds } from '@/utils/dateUtils';
 
 export interface UseRevenueConcentrationResult {
@@ -13,9 +16,14 @@ export interface UseRevenueConcentrationResult {
 export function useRevenueConcentration(): UseRevenueConcentrationResult {
   const { companyIds } = useGlobalFiltersStore();
   const { dateRange, datePreset, brandIds, channelIds } = useDashboardFiltersStore();
+  const { data: brands } = useBrands();
 
   const numericCompanyIds = parseNumericIds(companyIds);
-  const numericBrandIds = parseNumericIds(brandIds);
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brands || []),
+    [brandIds, brands]
+  );
+  const numericBrandIds = parseNumericIds(expandedBrandIds);
 
   const startDate = formatDate(dateRange.start);
   const endDate = formatDate(dateRange.end);

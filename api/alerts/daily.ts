@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { sendEmail, buildAlertEmailHtml, type AlertCompanyData } from './email.js';
 import { escapeHtml, verifyCronSecret } from './auth.js';
+import { aggregateWeeklyReport, type MetricRow, type DimensionMaps } from '../reports/weeklyAggregation.js';
+import { buildWeeklyReportHtml } from '../reports/weeklyEmail.js';
 
 // ============================================
 // Types
@@ -500,30 +502,254 @@ function detectAlertType(): AlertType {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
+/** Format date as 'YYYY-MM-DD HH:MM:SS' for RPC timestamp params */
+function toTimestamp(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} 00:00:00`;
+}
+
+/** Format date as 'D mon' for week label, e.g. "10-16 mar" */
+function toWeekLabel(mon: Date, sun: Date): string {
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const monDay = mon.getDate();
+  const sunDay = sun.getDate();
+  const monMonth = months[mon.getMonth()];
+  const sunMonth = months[sun.getMonth()];
+  if (monMonth === sunMonth) {
+    return `${monDay}-${sunDay} ${monMonth}`;
+  }
+  return `${monDay} ${monMonth} - ${sunDay} ${sunMonth}`;
+}
+
+/** Valid company statuses (same as frontend VALID_COMPANY_STATUSES) */
+const VALID_COMPANY_STATUSES = ['Onboarding', 'Cliente Activo', 'Stand By', 'PiP'];
+
 async function handleWeeklyAlert(
   supabase: SupabaseAny,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   console.log('[weekly-alerts] Starting weekly summary');
+  const BRUNO_EMAIL = 'biglesias@thinkpaladar.com';
 
-  // Calculate previous week range (Mon-Sun)
+  // ── Date ranges ──────────────────────────────
   const now = new Date();
   const spainNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
-  const prevMonday = new Date(spainNow);
-  prevMonday.setDate(spainNow.getDate() - 7);
-  while (prevMonday.getDay() !== 1) prevMonday.setDate(prevMonday.getDate() - 1);
+
+  // This week = previous Mon-Sun
+  const thisMonday = new Date(spainNow);
+  thisMonday.setDate(spainNow.getDate() - 7);
+  while (thisMonday.getDay() !== 1) thisMonday.setDate(thisMonday.getDate() - 1);
+  const thisSunday = new Date(thisMonday);
+  thisSunday.setDate(thisMonday.getDate() + 6);
+
+  // Previous week = Mon-Sun before that
+  const prevMonday = new Date(thisMonday);
+  prevMonday.setDate(thisMonday.getDate() - 7);
   const prevSunday = new Date(prevMonday);
   prevSunday.setDate(prevMonday.getDate() + 6);
 
-  const weekLabel = `${prevMonday.getDate()}/${prevMonday.getMonth() + 1} - ${prevSunday.getDate()}/${prevSunday.getMonth() + 1}`;
+  // Month-to-date: 1st of the month → thisSunday
+  const monthStart = new Date(thisSunday.getFullYear(), thisSunday.getMonth(), 1);
 
+  const weekLabel = toWeekLabel(thisMonday, thisSunday);
+  console.log(`[weekly-alerts] Week: ${weekLabel} (${toTimestamp(thisMonday)} → ${toTimestamp(thisSunday)})`);
+
+  // ── Fetch active companies ───────────────────
+  const { data: companiesRaw, error: companiesError } = await supabase
+    .from('crp_portal__dt_company')
+    .select('pk_id_company, des_company_name, des_status, des_key_account_manager, pk_ts_month')
+    .order('pk_ts_month', { ascending: false });
+
+  if (companiesError) {
+    console.error('[weekly-alerts] Companies query error:', companiesError.message);
+    return { status: 500, body: { error: 'Failed to fetch companies' } };
+  }
+
+  // Deduplicate by pk_id_company (keep most recent snapshot) then filter status
+  const seen = new Map<string, { id: string; name: string; manager: string | null }>();
+  for (const c of companiesRaw ?? []) {
+    const id = String(c.pk_id_company);
+    if (!seen.has(id)) {
+      seen.set(id, {
+        id,
+        name: c.des_company_name ?? id,
+        manager: c.des_key_account_manager ?? null,
+      });
+    }
+  }
+  // Filter by valid statuses using the most recent snapshot
+  const statusMap = new Map<string, string>();
+  for (const c of companiesRaw ?? []) {
+    const id = String(c.pk_id_company);
+    if (!statusMap.has(id)) statusMap.set(id, c.des_status ?? '');
+  }
+  const activeCompanies = Array.from(seen.values()).filter(
+    (c) => VALID_COMPANY_STATUSES.includes(statusMap.get(c.id) ?? ''),
+  );
+
+  console.log(`[weekly-alerts] Active companies: ${activeCompanies.length}`);
+  if (activeCompanies.length === 0) {
+    return { status: 200, body: { message: 'No active companies', emails_sent: 0 } };
+  }
+
+  // ── Fetch consultant profiles ────────────────
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, email, full_name, role, slack_user_id')
+    .in('role', ['consultant', 'manager', 'admin']);
+
+  const consultantProfiles: ConsultantProfile[] = profiles ?? [];
+
+  // ── Process each company ─────────────────────
+  let emailsSent = 0;
+  let emailErrors = 0;
+  const companyResults: { company: string; status: string }[] = [];
+
+  for (const company of activeCompanies) {
+    try {
+      console.log(`[weekly-alerts] Processing: ${company.name} (${company.id})`);
+
+      // Fetch metrics for 3 periods in parallel
+      const [thisWeekResult, prevWeekResult, monthResult] = await Promise.all([
+        supabase.rpc('get_controlling_metrics', {
+          p_company_ids: [company.id],
+          p_start_date: toTimestamp(thisMonday),
+          p_end_date: toTimestamp(thisSunday),
+        }),
+        supabase.rpc('get_controlling_metrics', {
+          p_company_ids: [company.id],
+          p_start_date: toTimestamp(prevMonday),
+          p_end_date: toTimestamp(prevSunday),
+        }),
+        supabase.rpc('get_controlling_metrics', {
+          p_company_ids: [company.id],
+          p_start_date: toTimestamp(monthStart),
+          p_end_date: toTimestamp(thisSunday),
+        }),
+      ]);
+
+      if (thisWeekResult.error) {
+        console.error(`[weekly-alerts] RPC error for ${company.name}:`, thisWeekResult.error.message);
+        companyResults.push({ company: company.name, status: 'rpc_error' });
+        continue;
+      }
+
+      const thisWeekRows: MetricRow[] = thisWeekResult.data ?? [];
+      const prevWeekRows: MetricRow[] = prevWeekResult.data ?? [];
+      const monthRows: MetricRow[] = monthResult.data ?? [];
+
+      if (thisWeekRows.length === 0) {
+        console.log(`[weekly-alerts] No data for ${company.name}, skipping`);
+        companyResults.push({ company: company.name, status: 'no_data' });
+        continue;
+      }
+
+      // Fetch dimension names for stores and addresses
+      const storeIds = [...new Set(thisWeekRows.map((r) => r.pfk_id_store))];
+      const addressIds = [...new Set(thisWeekRows.map((r) => r.pfk_id_store_address))];
+
+      const [storesResult, addressesResult] = await Promise.all([
+        storeIds.length > 0
+          ? supabase
+              .from('crp_portal__dt_store')
+              .select('pk_id_store, des_store')
+              .in('pk_id_store', storeIds)
+              .order('pk_ts_month', { ascending: false })
+              .limit(10000)
+          : { data: [] },
+        addressIds.length > 0
+          ? supabase
+              .from('crp_portal__dt_address')
+              .select('pk_id_address, des_address')
+              .in('pk_id_address', addressIds)
+              .order('pk_ts_month', { ascending: false })
+              .limit(10000)
+          : { data: [] },
+      ]);
+
+      // Deduplicate dimension rows (keep first = most recent)
+      const storeNames = new Map<string, string>();
+      for (const s of (storesResult.data ?? []) as { pk_id_store: string; des_store: string }[]) {
+        if (!storeNames.has(String(s.pk_id_store))) {
+          storeNames.set(String(s.pk_id_store), s.des_store);
+        }
+      }
+      const addressNames = new Map<string, string>();
+      for (const a of (addressesResult.data ?? []) as { pk_id_address: string; des_address: string }[]) {
+        if (!addressNames.has(String(a.pk_id_address))) {
+          addressNames.set(String(a.pk_id_address), a.des_address);
+        }
+      }
+
+      const dims: DimensionMaps = { storeNames, addressNames };
+
+      // Aggregate report data
+      const reportData = aggregateWeeklyReport(
+        company.id,
+        company.name,
+        weekLabel,
+        thisWeekRows,
+        prevWeekRows,
+        monthRows,
+        dims,
+      );
+
+      // Build HTML
+      const html = buildWeeklyReportHtml(reportData);
+
+      // Match consultant by key_account_manager name
+      const consultant = matchConsultant(company.manager, consultantProfiles);
+      const toEmail = consultant?.email ?? BRUNO_EMAIL;
+      const cc = toEmail !== BRUNO_EMAIL ? BRUNO_EMAIL : undefined;
+
+      const subject = `📊 Informe Semanal: ${company.name} (${weekLabel})`;
+
+      const sent = await sendEmail({ to: toEmail, cc, subject, html });
+      if (sent) {
+        emailsSent++;
+        companyResults.push({ company: company.name, status: 'sent' });
+        console.log(`[weekly-alerts] Email sent for ${company.name} → ${toEmail}`);
+      } else {
+        emailErrors++;
+        companyResults.push({ company: company.name, status: 'send_failed' });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[weekly-alerts] Error processing ${company.name}:`, msg);
+      emailErrors++;
+      companyResults.push({ company: company.name, status: 'error' });
+    }
+  }
+
+  // ── Slack summary ────────────────────────────
   const blocks: SlackBlock[] = [
-    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDCCA Resumen semanal (${weekLabel})`, emoji: true } },
-    { type: 'section', text: { type: 'mrkdwn', text: ':construction: _Resumen semanal en desarrollo. Próximamente incluirá: pedidos, revenue, reseñas y delivery time de la semana anterior por consultor._' } },
-    { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub Alertas · Resumen semanal' }] },
+    { type: 'header', text: { type: 'plain_text', text: `\uD83D\uDCCA Informes semanales enviados (${weekLabel})`, emoji: true } },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `:white_check_mark: *${emailsSent}* emails enviados` +
+          (emailErrors > 0 ? ` · :warning: ${emailErrors} errores` : '') +
+          `\n_${activeCompanies.length} compañías activas procesadas_`,
+      },
+    },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'TPHub · Informe semanal' }] },
   ];
-  await sendSlack(`Resumen semanal ${weekLabel}`, blocks);
-  console.log('[weekly-alerts] Done (placeholder)');
-  return { status: 200, body: { message: 'Weekly summary sent (placeholder)', week: weekLabel } };
+  await sendSlack(`Informes semanales: ${emailsSent} enviados`, blocks);
+
+  console.log(`[weekly-alerts] Done: ${emailsSent} emails sent, ${emailErrors} errors`);
+  return {
+    status: 200,
+    body: {
+      message: 'Weekly reports sent',
+      week: weekLabel,
+      companies_processed: activeCompanies.length,
+      emails_sent: emailsSent,
+      email_errors: emailErrors,
+      details: companyResults,
+    },
+  };
 }
 
 // ============================================

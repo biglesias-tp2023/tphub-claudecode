@@ -7,3 +7,5 @@ export type {
   Review,
   ReputationData,
 } from './useReputationData';
+
+export { useOrderLines, useOrderCustomerInfo, useCustomerProfile } from './useOrderLines';

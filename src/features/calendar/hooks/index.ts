@@ -29,3 +29,6 @@ export * from './useCampaigns';
 export * from './useCalendarEvents';
 export * from './useWeather';
 export * from './useProducts';
+export * from './useCalendarDailyRevenue';
+export * from './useCalendarObjectives';
+export * from './useCalendarShareLink';

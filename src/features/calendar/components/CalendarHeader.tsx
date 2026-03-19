@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Search, Settings, Share2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-export type CalendarViewType = 'day' | 'week' | 'month' | 'agenda' | '4days';
+export type CalendarViewType = 'week' | 'month' | 'agenda';
 
 interface CalendarHeaderProps {
   year: number;
@@ -24,8 +24,6 @@ const MONTHS = [
 ];
 
 const VIEW_OPTIONS: { id: CalendarViewType; label: string }[] = [
-  { id: 'day', label: 'Día' },
-  { id: '4days', label: '4 días' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
   { id: 'agenda', label: 'Agenda' },
@@ -43,10 +41,6 @@ function getDisplayTitle(view: CalendarViewType, year: number, month: number, da
   const monthName = MONTHS[month - 1];
 
   switch (view) {
-    case 'day':
-      return day ? `${day} de ${monthName} ${year}` : `${monthName} ${year}`;
-    case '4days':
-      return `${monthName} ${year}`;
     case 'week':
       if (day) {
         const weekNum = getWeekNumber(year, month, day);

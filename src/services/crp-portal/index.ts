@@ -180,6 +180,28 @@ export {
 
 export type { CrpProduct } from './products';
 
+// Product Sales (aggregated via RPC)
+export { fetchProductSales, channelIdsToPortalIds } from './productSales';
+
+export type {
+  ProductSalesRow as CrpProductSalesRow,
+  FetchProductSalesParams,
+} from './productSales';
+
+// Order Lines (line items + customer profile)
+export {
+  fetchOrderLinesByOrderId,
+  fetchOrderCustomerInfo,
+  fetchCustomerProfile,
+} from './orderLines';
+
+export type {
+  OrderLineItem,
+  CustomerOrderSummary,
+  CustomerProfile,
+  OrderCustomerInfo,
+} from './orderLines';
+
 // P&L (period aggregations for Finance dashboard)
 export { fetchPnLPeriods } from './pnl';
 
@@ -199,6 +221,10 @@ export type {
   AdsHourlyDistributionRow,
   AdsWeeklyHeatmapRow,
 } from './ads';
+
+// Daily Revenue (for Calendar)
+export { fetchDailyRevenueByChannel } from './dailyRevenue';
+export type { DailyRevenueParams, DailyChannelRevenue } from './dailyRevenue';
 
 // Customers (analytics)
 export {

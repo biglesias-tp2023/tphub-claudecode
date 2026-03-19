@@ -9,6 +9,7 @@ import {
   fetchSalesProjection,
   fetchSalesProjectionsByBrand,
   fetchSalesProjectionsByCompanyIds,
+  fetchAllChildProjections,
   upsertSalesProjection,
   updateSalesProjectionTargets,
   deleteSalesProjection,
@@ -67,6 +68,20 @@ export function useSalesProjectionsBulk(companyIds: string[]) {
   });
 }
 
+/**
+ * Fetch ALL non-company-level projections for a company.
+ * Used for bottom-up aggregation at company level.
+ */
+export function useAllChildProjections(companyId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.salesProjections.allChildren(companyId),
+    queryFn: () => fetchAllChildProjections(companyId),
+    enabled: !!companyId && enabled,
+    staleTime: QUERY_STALE_MEDIUM,
+    gcTime: QUERY_GC_MEDIUM,
+  });
+}
+
 // ============================================
 // MUTATIONS
 // ============================================
@@ -94,6 +109,10 @@ export function useUpsertSalesProjection() {
           queryKey: queryKeys.salesProjections.byBrand(variables.companyId, variables.brandId),
         });
       }
+      // Invalidate children cache for bottom-up aggregation
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.salesProjections.allChildren(variables.companyId),
+      });
     },
   });
 }
@@ -151,6 +170,10 @@ export function useDeleteSalesProjection() {
           queryKey: queryKeys.salesProjections.byBrand(vars.companyId, vars.brandId),
         });
       }
+      // Invalidate children cache for bottom-up aggregation
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.salesProjections.allChildren(vars.companyId),
+      });
     },
   });
 }

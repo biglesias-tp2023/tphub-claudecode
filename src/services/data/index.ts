@@ -85,6 +85,7 @@ export {
   fetchSalesProjection,
   fetchSalesProjectionsByBrand,
   fetchSalesProjectionsByCompanyIds,
+  fetchAllChildProjections,
   upsertSalesProjection,
   updateSalesProjectionTargets,
   deleteSalesProjection,

@@ -1,8 +1,7 @@
 /**
  * Campaign Hooks
  *
- * React Query hooks for managing promotional campaigns.
- * Supports both localStorage (demo mode) and Supabase (production).
+ * React Query hooks for managing promotional campaigns via Supabase.
  *
  * @module features/calendar/hooks/useCampaigns
  */
@@ -18,60 +17,6 @@ import type {
   CampaignStatus,
   DbPromotionalCampaign,
 } from '@/types';
-
-// ============================================
-// CONFIGURATION
-// ============================================
-
-/**
- * Use localStorage for campaigns (demo mode).
- * Controlled by VITE_CAMPAIGNS_USE_LOCAL_STORAGE environment variable.
- * Set to 'false' in .env.local to use Supabase with CRP Portal references.
- */
-const USE_LOCAL_STORAGE = import.meta.env.VITE_CAMPAIGNS_USE_LOCAL_STORAGE !== 'false';
-const STORAGE_KEY = 'tphub_campaigns';
-
-// ============================================
-// LOCAL STORAGE HELPERS
-// ============================================
-
-function getStoredCampaigns(): PromotionalCampaign[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    const parsed = JSON.parse(stored);
-
-    // Validate that parsed data is an array
-    if (!Array.isArray(parsed)) {
-      if (import.meta.env.DEV) console.warn('[useCampaigns] Invalid localStorage data: expected array, got', typeof parsed);
-      return [];
-    }
-
-    return parsed;
-  } catch (error) {
-    if (import.meta.env.DEV) console.warn('[useCampaigns] Failed to parse localStorage campaigns:', error);
-    return [];
-  }
-}
-
-function setStoredCampaigns(campaigns: PromotionalCampaign[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(campaigns));
-}
-
-function generateId(): string {
-  return `demo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Calculate campaign status based on dates
- */
-function calculateStatus(startDate: string, endDate: string): CampaignStatus {
-  const today = new Date().toISOString().split('T')[0];
-  if (today > endDate) return 'completed';
-  if (today >= startDate && today <= endDate) return 'active';
-  return 'scheduled';
-}
 
 // ============================================
 // MAPPERS
@@ -114,7 +59,7 @@ export interface CampaignInputWithCrp extends PromotionalCampaignInput {
 }
 
 // ============================================
-// DATA FUNCTIONS (LOCAL STORAGE MODE)
+// FETCH PARAMS
 // ============================================
 
 interface FetchCampaignsParams {
@@ -125,144 +70,16 @@ interface FetchCampaignsParams {
   endDate?: string;
 }
 
-async function fetchCampaignsLocal(params: FetchCampaignsParams = {}): Promise<PromotionalCampaign[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  let campaigns = getStoredCampaigns();
-
-  // Update statuses based on current date
-  campaigns = campaigns.map(c => ({
-    ...c,
-    status: calculateStatus(c.startDate, c.endDate),
-  }));
-
-  // Apply filters
-  if (params.restaurantIds?.length) {
-    // Include campaigns for specific restaurants OR campaigns that apply to "all"
-    campaigns = campaigns.filter(c =>
-      c.restaurantId === 'all' || params.restaurantIds!.includes(c.restaurantId)
-    );
-  }
-
-  if (params.platforms?.length) {
-    campaigns = campaigns.filter(c => params.platforms!.includes(c.platform));
-  }
-
-  if (params.status) {
-    campaigns = campaigns.filter(c => c.status === params.status);
-  }
-
-  if (params.startDate) {
-    campaigns = campaigns.filter(c => c.endDate >= params.startDate!);
-  }
-
-  if (params.endDate) {
-    campaigns = campaigns.filter(c => c.startDate <= params.endDate!);
-  }
-
-  return campaigns.sort((a, b) => a.startDate.localeCompare(b.startDate));
-}
-
-async function fetchCampaignsByMonthLocal(
-  restaurantIds: string[],
-  year: number,
-  month: number
-): Promise<PromotionalCampaign[]> {
-  const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-  return fetchCampaignsLocal({ restaurantIds, startDate, endDate });
-}
-
-async function fetchCampaignByIdLocal(id: string): Promise<PromotionalCampaign | null> {
-  await new Promise(resolve => setTimeout(resolve, 50));
-  const campaigns = getStoredCampaigns();
-  return campaigns.find(c => c.id === id) || null;
-}
-
-async function createCampaignLocal(input: PromotionalCampaignInput): Promise<PromotionalCampaign> {
-  await new Promise(resolve => setTimeout(resolve, 200));
-
-  const now = new Date().toISOString();
-  const newCampaign: PromotionalCampaign = {
-    id: generateId(),
-    restaurantId: input.restaurantId,
-    platform: input.platform,
-    campaignType: input.campaignType,
-    name: input.name || null,
-    config: input.config,
-    productIds: input.productIds || [],
-    startDate: input.startDate,
-    endDate: input.endDate,
-    status: calculateStatus(input.startDate, input.endDate),
-    metrics: undefined,
-    createdBy: null,
-    updatedBy: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  const campaigns = getStoredCampaigns();
-  campaigns.push(newCampaign);
-  setStoredCampaigns(campaigns);
-
-  return newCampaign;
-}
-
-async function updateCampaignLocal(
-  id: string,
-  updates: Partial<PromotionalCampaignInput> & { status?: CampaignStatus }
-): Promise<PromotionalCampaign> {
-  await new Promise(resolve => setTimeout(resolve, 150));
-
-  const campaigns = getStoredCampaigns();
-  const index = campaigns.findIndex(c => c.id === id);
-
-  if (index === -1) {
-    throw new Error('Campaign not found');
-  }
-
-  const updated: PromotionalCampaign = {
-    ...campaigns[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-
-  // Recalculate status if dates changed
-  if (updates.startDate || updates.endDate) {
-    updated.status = calculateStatus(updated.startDate, updated.endDate);
-  }
-
-  campaigns[index] = updated;
-  setStoredCampaigns(campaigns);
-
-  return updated;
-}
-
-async function deleteCampaignLocal(id: string): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  const campaigns = getStoredCampaigns();
-  const filtered = campaigns.filter(c => c.id !== id);
-  setStoredCampaigns(filtered);
-}
-
-async function cancelCampaignLocal(id: string): Promise<PromotionalCampaign> {
-  return updateCampaignLocal(id, { status: 'cancelled' });
-}
-
 // ============================================
-// DATA FUNCTIONS (SUPABASE MODE)
+// DATA FUNCTIONS (SUPABASE)
 // ============================================
 
-async function fetchCampaignsSupabase(params: FetchCampaignsParams = {}): Promise<PromotionalCampaign[]> {
+async function fetchCampaigns(params: FetchCampaignsParams = {}): Promise<PromotionalCampaign[]> {
   let query = supabase
     .from('promotional_campaigns')
     .select('*')
     .order('start_date', { ascending: true });
 
-  // Filter by CRP restaurant IDs or UUID restaurant IDs
-  // Also include campaigns that apply to "all" restaurants
   if (params.restaurantIds?.length) {
     query = query.or(
       `crp_restaurant_id.in.(${params.restaurantIds.join(',')}),restaurant_id.in.(${params.restaurantIds.join(',')}),crp_restaurant_id.eq.all,restaurant_id.eq.all`
@@ -291,7 +108,7 @@ async function fetchCampaignsSupabase(params: FetchCampaignsParams = {}): Promis
   return (data as DbCampaignWithCrp[]).map(mapDbCampaignToCampaign);
 }
 
-async function fetchCampaignsByMonthSupabase(
+async function fetchCampaignsByMonth(
   restaurantIds: string[],
   year: number,
   month: number
@@ -299,10 +116,10 @@ async function fetchCampaignsByMonthSupabase(
   const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
   const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-  return fetchCampaignsSupabase({ restaurantIds, startDate, endDate });
+  return fetchCampaigns({ restaurantIds, startDate, endDate });
 }
 
-async function fetchCampaignByIdSupabase(id: string): Promise<PromotionalCampaign | null> {
+async function fetchCampaignById(id: string): Promise<PromotionalCampaign | null> {
   const { data, error } = await supabase
     .from('promotional_campaigns')
     .select('*')
@@ -317,7 +134,7 @@ async function fetchCampaignByIdSupabase(id: string): Promise<PromotionalCampaig
   return mapDbCampaignToCampaign(data as DbCampaignWithCrp);
 }
 
-async function createCampaignSupabase(input: CampaignInputWithCrp): Promise<PromotionalCampaign> {
+async function createCampaign(input: CampaignInputWithCrp): Promise<PromotionalCampaign> {
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id || null;
 
@@ -333,7 +150,6 @@ async function createCampaignSupabase(input: CampaignInputWithCrp): Promise<Prom
     updated_by: userId,
   };
 
-  // Use CRP references if provided, otherwise use UUID
   if (input.crpRestaurantId) {
     dbInput.crp_restaurant_id = input.crpRestaurantId;
     dbInput.crp_company_id = input.crpCompanyId || null;
@@ -352,7 +168,7 @@ async function createCampaignSupabase(input: CampaignInputWithCrp): Promise<Prom
   return mapDbCampaignToCampaign(data as DbCampaignWithCrp);
 }
 
-async function updateCampaignSupabase(
+async function updateCampaign(
   id: string,
   updates: Partial<CampaignInputWithCrp> & { status?: CampaignStatus }
 ): Promise<PromotionalCampaign> {
@@ -372,7 +188,6 @@ async function updateCampaignSupabase(
   if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
   if (updates.status !== undefined) dbUpdates.status = updates.status;
 
-  // CRP references
   if (updates.crpRestaurantId !== undefined) dbUpdates.crp_restaurant_id = updates.crpRestaurantId;
   if (updates.crpCompanyId !== undefined) dbUpdates.crp_company_id = updates.crpCompanyId;
   if (updates.crpBrandId !== undefined) dbUpdates.crp_brand_id = updates.crpBrandId;
@@ -388,7 +203,7 @@ async function updateCampaignSupabase(
   return mapDbCampaignToCampaign(data as DbCampaignWithCrp);
 }
 
-async function deleteCampaignSupabase(id: string): Promise<void> {
+async function deleteCampaignById(id: string): Promise<void> {
   const { error } = await supabase
     .from('promotional_campaigns')
     .delete()
@@ -397,31 +212,23 @@ async function deleteCampaignSupabase(id: string): Promise<void> {
   if (error) throw new Error(`Error deleting campaign: ${error.message}`);
 }
 
-async function cancelCampaignSupabase(id: string): Promise<PromotionalCampaign> {
-  return updateCampaignSupabase(id, { status: 'cancelled' });
+async function cancelCampaign(id: string): Promise<PromotionalCampaign> {
+  return updateCampaign(id, { status: 'cancelled' });
 }
 
 // ============================================
 // HOOKS
 // ============================================
 
-/**
- * Hook to fetch campaigns with optional filtering
- */
 export function useCampaigns(params: FetchCampaignsParams = {}) {
   return useQuery({
     queryKey: queryKeys.campaigns.list(params),
-    queryFn: () => USE_LOCAL_STORAGE
-      ? fetchCampaignsLocal(params)
-      : fetchCampaignsSupabase(params),
+    queryFn: () => fetchCampaigns(params),
     staleTime: QUERY_STALE_SHORT,
     gcTime: QUERY_GC_SHORT,
   });
 }
 
-/**
- * Hook to fetch campaigns for a specific month
- */
 export function useCampaignsByMonth(
   restaurantIds: string[],
   year: number,
@@ -429,74 +236,50 @@ export function useCampaignsByMonth(
 ) {
   return useQuery({
     queryKey: queryKeys.campaigns.byMonth(restaurantIds, year, month),
-    queryFn: () => USE_LOCAL_STORAGE
-      ? fetchCampaignsByMonthLocal(restaurantIds, year, month)
-      : fetchCampaignsByMonthSupabase(restaurantIds, year, month),
+    queryFn: () => fetchCampaignsByMonth(restaurantIds, year, month),
     enabled: restaurantIds.length > 0,
     staleTime: QUERY_STALE_SHORT,
     gcTime: QUERY_GC_SHORT,
   });
 }
 
-/**
- * Hook to fetch campaigns for a single restaurant
- */
 export function useCampaignsByRestaurant(restaurantId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.campaigns.byRestaurant(restaurantId || ''),
-    queryFn: () => USE_LOCAL_STORAGE
-      ? fetchCampaignsLocal({ restaurantIds: [restaurantId!] })
-      : fetchCampaignsSupabase({ restaurantIds: [restaurantId!] }),
+    queryFn: () => fetchCampaigns({ restaurantIds: [restaurantId!] }),
     enabled: !!restaurantId,
     staleTime: QUERY_STALE_SHORT,
     gcTime: QUERY_GC_SHORT,
   });
 }
 
-/**
- * Hook to fetch a single campaign by ID
- */
 export function useCampaign(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.campaigns.detail(id || ''),
-    queryFn: () => USE_LOCAL_STORAGE
-      ? fetchCampaignByIdLocal(id!)
-      : fetchCampaignByIdSupabase(id!),
+    queryFn: () => fetchCampaignById(id!),
     enabled: !!id,
     staleTime: QUERY_STALE_SHORT,
     gcTime: QUERY_GC_SHORT,
   });
 }
 
-/**
- * Hook to create a new campaign
- * Supports CRP Portal references for tracking
- */
 export function useCreateCampaign() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: CampaignInputWithCrp) =>
-      USE_LOCAL_STORAGE
-        ? createCampaignLocal(input)
-        : createCampaignSupabase(input),
+    mutationFn: (input: CampaignInputWithCrp) => createCampaign(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
     },
   });
 }
 
-/**
- * Hook to update a campaign
- */
 export function useUpdateCampaign() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<CampaignInputWithCrp> & { status?: CampaignStatus } }) =>
-      USE_LOCAL_STORAGE
-        ? updateCampaignLocal(id, updates)
-        : updateCampaignSupabase(id, updates),
+      updateCampaign(id, updates),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.campaigns.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
@@ -504,17 +287,11 @@ export function useUpdateCampaign() {
   });
 }
 
-/**
- * Hook to delete a campaign
- */
 export function useDeleteCampaign() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) =>
-      USE_LOCAL_STORAGE
-        ? deleteCampaignLocal(id)
-        : deleteCampaignSupabase(id),
+    mutationFn: (id: string) => deleteCampaignById(id),
     onSuccess: (_, id) => {
       queryClient.removeQueries({ queryKey: queryKeys.campaigns.detail(id) });
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
@@ -522,17 +299,11 @@ export function useDeleteCampaign() {
   });
 }
 
-/**
- * Hook to cancel a campaign
- */
 export function useCancelCampaign() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) =>
-      USE_LOCAL_STORAGE
-        ? cancelCampaignLocal(id)
-        : cancelCampaignSupabase(id),
+    mutationFn: (id: string) => cancelCampaign(id),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.campaigns.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });

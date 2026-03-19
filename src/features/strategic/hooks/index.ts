@@ -46,6 +46,7 @@ export {
   useSalesProjection,
   useSalesProjectionsByBrand,
   useSalesProjectionsBulk,
+  useAllChildProjections,
   useUpsertSalesProjection,
   useUpdateSalesProjectionTargets,
   useDeleteSalesProjection,
