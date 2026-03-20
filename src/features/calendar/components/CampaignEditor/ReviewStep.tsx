@@ -116,18 +116,151 @@ export function ReviewStep({
                 <div className="mt-2 space-y-1">
                   {Object.entries(config).map(([key, value]) => {
                     if (value === undefined || value === null) return null;
+                    // Skip internal/schedule sub-fields (shown with parent)
+                    if (['scheduleDays', 'scheduleStartTime', 'scheduleEndTime', 'timeSlotStart', 'timeSlotEnd', 'jeCustomDays', 'jeHoursStart', 'jeHoursEnd'].includes(key)) return null;
+                    // Skip custom input companion fields
+                    if (key.endsWith('_custom')) return null;
+                    // Skip info_text fields
                     const field = typeConfig?.fields.find(f => f.key === key);
-                    const label = field?.label || key;
-                    let displayValue = value;
+                    if (field?.type === 'info_text') return null;
+                    // Skip fields whose dependency isn't met
+                    if (field?.dependsOn && field?.showWhen) {
+                      const siblingValue = config[field.dependsOn as keyof CampaignConfig];
+                      if (siblingValue !== field.showWhen) return null;
+                    }
 
-                    if (Array.isArray(value)) {
+                    const label = field?.label || key;
+                    let displayValue: string;
+
+                    if (key === 'audience' || key === 'adAudience') {
+                      const opt = field?.options?.find(o => o.value === value);
+                      displayValue = opt?.label || String(value);
+                    } else if (key === 'acquisitionTarget') {
+                      displayValue = `${value} pedidos`;
+                    } else if (key === 'primeBoost') {
+                      displayValue = value === false ? 'Desactivado' : `+${value}% extra Prime`;
+                    } else if (key === 'weekDays' && Array.isArray(value)) {
+                      const dayLabels: Record<string, string> = { mon: 'L', tue: 'M', wed: 'X', thu: 'J', fri: 'V', sat: 'S', sun: 'D' };
+                      displayValue = (value as string[]).length === 7
+                        ? 'Todos los dias'
+                        : (value as string[]).map(d => dayLabels[d] || d).join(', ');
+                    } else if (key === 'timeSlot') {
+                      const slotLabels: Record<string, string> = { all_day: 'Todo el dia', breakfast: 'Desayuno', lunch: 'Comida', snack: 'Merienda', dinner: 'Cena', custom: 'Personalizado' };
+                      displayValue = slotLabels[value as string] || String(value);
+                      if (value === 'custom' && config.timeSlotStart && config.timeSlotEnd) {
+                        displayValue += ` (${config.timeSlotStart}–${config.timeSlotEnd})`;
+                      }
+                    } else if (key === 'duration') {
+                      displayValue = value === 'permanent' ? 'Permanente' : 'Temporal';
+                    } else if (key === 'deliveryDiscount') {
+                      displayValue = value === 'free' ? 'Envio gratis' : 'Descuento fijo';
+                    } else if (key === 'budgetLimit') {
+                      displayValue = value === null ? 'Sin limite' : `${value} €`;
+                    } else if (key === 'totalBudget') {
+                      displayValue = value === null ? 'Sin limite' : `${value} €`;
+                    } else if (key === 'cpcBid') {
+                      if (value === 'auto') {
+                        displayValue = 'Automatica';
+                      } else if (value === 'custom') {
+                        const customVal = config[`${key}_custom` as keyof CampaignConfig];
+                        displayValue = customVal ? `${customVal} €/clic` : 'Personalizado';
+                      } else {
+                        displayValue = String(value);
+                      }
+                    } else if (key === 'adFormat') {
+                      const formatLabels: Record<string, string> = {
+                        sponsored_search: 'Busqueda Patrocinada', home_banner: 'Home / Banner',
+                        premium_category: 'Ubicacion Premium', in_order: 'Pedido en Curso',
+                      };
+                      displayValue = formatLabels[value as string] || String(value);
+                    } else if (key === 'discountType') {
+                      displayValue = value === 'percentage' ? 'Porcentaje' : 'Cantidad fija';
+                    // Just Eat-specific fields
+                    } else if (key === 'triggerType') {
+                      displayValue = value === 'buy_item' ? 'Al comprar otro articulo' : 'Al gastar un importe minimo';
+                    } else if (key === 'bogoType') {
+                      const bogoLabels: Record<string, string> = {
+                        free: '2o gratis', '50_off': '2o al 50%', '25_off': '2o al 25%',
+                      };
+                      displayValue = bogoLabels[value as string] || String(value);
+                    } else if (key === 'jeScheduleDays') {
+                      const schedLabels: Record<string, string> = {
+                        every_day: 'Todos los dias', weekdays: 'Entre semana (L-V)',
+                        weekends: 'Fines de semana (S-D)', custom: 'Dias especificos',
+                      };
+                      displayValue = schedLabels[value as string] || String(value);
+                      if (value === 'custom' && config.jeCustomDays && Array.isArray(config.jeCustomDays)) {
+                        const dayLabelsJE: Record<string, string> = { mon: 'L', tue: 'M', wed: 'X', thu: 'J', fri: 'V', sat: 'S', sun: 'D' };
+                        displayValue += ` (${(config.jeCustomDays as string[]).map(d => dayLabelsJE[d] || d).join(', ')})`;
+                      }
+                    } else if (key === 'jeScheduleHours') {
+                      displayValue = value === 'all_hours' ? 'Todo el horario' : 'Horas seleccionadas';
+                      if (value === 'selected_hours' && config.jeHoursStart && config.jeHoursEnd) {
+                        displayValue += ` (${config.jeHoursStart}–${config.jeHoursEnd})`;
+                      }
+                    } else if (key === 'startWhen') {
+                      displayValue = value === 'now' ? 'Ahora' : 'Fecha programada';
+                    } else if (key === 'endWhen') {
+                      displayValue = value === 'manual' ? 'Manualmente' : 'Despues de X semanas';
+                    } else if (key === 'durationWeeks') {
+                      displayValue = `${value} semanas`;
+                    } else if (key === 'maxRedemptions') {
+                      displayValue = value === 'unlimited' ? 'Sin limite' : 'Limitado';
+                    } else if (key === 'maxRedemptionsCount') {
+                      displayValue = `${value} usos`;
+                    } else if (key === 'stampCardEnabled') {
+                      displayValue = value === 'active' ? 'Activado' : 'Desactivado';
+                    } else if (key === 'deliveryArea') {
+                      displayValue = value === 'all_zones' ? 'Todas las zonas' : 'Zonas seleccionadas';
+                    } else if (key === 'weeklyBudget') {
+                      displayValue = `${value} €/semana`;
+                    // Cheerfy-specific fields
+                    } else if (key === 'communicationType') {
+                      displayValue = value === 'email' ? 'Email' : 'SMS';
+                    } else if (key === 'isAutomationActive') {
+                      displayValue = value === 'true' || value === true ? 'Activo' : 'Pausado';
+                    } else if (key === 'triggerCondition') {
+                      const triggerLabels: Record<string, string> = {
+                        on_arrival: 'Al llegar', on_transaction: 'Al comprar',
+                        on_departure: 'Al irse', on_birthday: 'Cumpleanos',
+                      };
+                      displayValue = triggerLabels[value as string] || String(value);
+                    } else if (key === 'minSpend') {
+                      displayValue = `${value} €`;
+                    } else if (key === 'durationPreset') {
+                      const presetLabels: Record<string, string> = {
+                        '1_año': '1 ano', '6_meses': '6 meses', '30_dias': '30 dias',
+                        '45_dias': '45 dias', 'en_curso': 'En curso', 'personalizar': 'Personalizado',
+                      };
+                      displayValue = presetLabels[value as string] || String(value);
+                      // Append schedule info if present
+                      if (config.scheduleStartTime && config.scheduleEndTime) {
+                        displayValue += ` (${config.scheduleStartTime}–${config.scheduleEndTime})`;
+                      }
+                      if (config.scheduleDays && Array.isArray(config.scheduleDays) && config.scheduleDays.length < 7) {
+                        displayValue += ` — ${(config.scheduleDays as string[]).join(', ')}`;
+                      }
+                    } else if (key === 'weeklySpendLimit') {
+                      displayValue = value === null ? 'Sin limite' : `${value} €/semana`;
+                    } else if (key === 'dynamicSavings') {
+                      displayValue = value ? 'Activado' : 'Desactivado';
+                    } else if (key === 'flatOffPair' && typeof value === 'object' && value !== null) {
+                      const pair = value as { spend: number; save: number };
+                      displayValue = `Gasta ${pair.spend} €, ahorra ${pair.save} €`;
+                    } else if (key === 'adBidMode') {
+                      displayValue = value === 'automatico' ? 'Automatico' : 'Personalizado';
+                    } else if (Array.isArray(value)) {
                       displayValue = value.join(', ');
-                    } else if (field?.type === 'percent') {
+                    } else if (field?.type === 'percent' || field?.type === 'percent_radio') {
                       displayValue = `${value}%`;
-                    } else if (field?.type === 'currency') {
-                      displayValue = `${value} EUR`;
+                    } else if (field?.type === 'currency' || field?.type === 'currency_radio' || field?.type === 'ad_budget') {
+                      displayValue = `${value} €`;
                     } else if (field?.suffix) {
                       displayValue = `${value} ${field.suffix}`;
+                    } else if (typeof value === 'boolean') {
+                      displayValue = value ? 'Si' : 'No';
+                    } else {
+                      displayValue = String(value);
                     }
 
                     return (

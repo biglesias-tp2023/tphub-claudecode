@@ -18,9 +18,8 @@
  *
  * ## Weather (useWeather.ts)
  *
- * Integrates with Open-Meteo API.
- * - `useWeatherByMonth` - Combined historical + forecast data
- * - `useWeatherByRestaurant` - 7-day forecast for restaurant
+ * Reads pre-fetched weather data from Supabase (per business area).
+ * - `useWeatherByMonth` - Weather data for a month by area
  *
  * @module features/calendar/hooks
  */

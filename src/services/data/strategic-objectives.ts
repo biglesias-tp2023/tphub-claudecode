@@ -73,6 +73,7 @@ export function mapDbStrategicObjective(db: DbStrategicObjective): StrategicObje
     priority: PRIORITY_DB_TO_TS[Number(db.priority)] || 'medium',
     isArchived: db.is_archived || false,
     fieldData,
+    startDate: db.start_date,
     evaluationDate: db.evaluation_date,
     completedAt: db.completed_at,
     displayOrder: db.display_order,
@@ -202,6 +203,7 @@ export async function createStrategicObjective(
       priority: input.priority || 'medium',
       isArchived: input.isArchived || false,
       fieldData: input.fieldData || null,
+      startDate: input.startDate || new Date().toISOString().split('T')[0],
       evaluationDate: input.evaluationDate || null,
       completedAt: null,
       displayOrder: input.displayOrder || 0,
@@ -236,6 +238,7 @@ export async function createStrategicObjective(
     priority: PRIORITY_TS_TO_DB[input.priority || 'medium'] || 2,
     is_archived: input.isArchived || false,
     field_data: input.fieldData ? JSON.stringify(input.fieldData) : null,
+    start_date: input.startDate || new Date().toISOString().split('T')[0],
     evaluation_date: input.evaluationDate || null,
     display_order: input.displayOrder || 0,
     created_by: userId,
@@ -283,6 +286,7 @@ export async function updateStrategicObjective(
     // Priority and archiving
     if (updates.priority !== undefined) mockUpdates.priority = updates.priority;
     if (updates.isArchived !== undefined) mockUpdates.isArchived = updates.isArchived;
+    if (updates.startDate !== undefined) mockUpdates.startDate = updates.startDate;
     if (updates.evaluationDate !== undefined) mockUpdates.evaluationDate = updates.evaluationDate;
     if (updates.displayOrder !== undefined) mockUpdates.displayOrder = updates.displayOrder;
     if (updates.responsible !== undefined) mockUpdates.responsible = updates.responsible;
@@ -324,6 +328,7 @@ export async function updateStrategicObjective(
   // Priority and archiving (TS string -> DB integer)
   if (updates.priority !== undefined) dbUpdates.priority = PRIORITY_TS_TO_DB[updates.priority] || 2;
   if (updates.isArchived !== undefined) dbUpdates.is_archived = updates.isArchived;
+  if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate;
   if (updates.evaluationDate !== undefined) dbUpdates.evaluation_date = updates.evaluationDate;
   if (updates.displayOrder !== undefined) dbUpdates.display_order = updates.displayOrder;
 

@@ -282,16 +282,33 @@ export function CampaignEditor({
         if (!platform || !campaignType) return false;
         const typeConfig = getCampaignTypeConfig(platform, campaignType);
         if (!typeConfig) return false;
-        // Check required non-product fields
+
+        // Check required non-product fields, respecting dependsOn/showWhen
         const configFieldsValid = typeConfig.fields
-          .filter(f => f.required && f.type !== 'product' && f.type !== 'products')
+          .filter(f => {
+            if (!f.required) return false;
+            if (f.type === 'product' || f.type === 'products') return false;
+            if (f.type === 'info_text') return false;
+            // Skip fields whose dependency condition is not met
+            if (f.dependsOn && f.showWhen) {
+              const siblingValue = config[f.dependsOn as keyof CampaignConfig];
+              if (siblingValue !== f.showWhen) return false;
+            }
+            return true;
+          })
           .every(f => {
             const value = config[f.key as keyof CampaignConfig];
+            // Accept defaultValue as valid when field hasn't been explicitly set
+            if ((value === undefined || value === null || value === '') && f.defaultValue !== undefined) {
+              return true;
+            }
             return value !== undefined && value !== null && value !== '';
           });
-        // Check required product fields
+
+        // Check required product fields (skip if dependency not met)
         const hasRequiredProductFields = typeConfig.fields.some(
           f => (f.type === 'product' || f.type === 'products') && f.required
+            && !(f.dependsOn && f.showWhen && config[f.dependsOn as keyof CampaignConfig] !== f.showWhen)
         );
         const productFieldsValid = !hasRequiredProductFields || productIds.length > 0;
         return configFieldsValid && productFieldsValid;

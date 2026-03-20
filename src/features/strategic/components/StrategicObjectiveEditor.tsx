@@ -53,6 +53,7 @@ interface FormData {
   category: ObjectiveCategory;
   objectiveTypeId: string;
   responsible: ObjectiveResponsible;
+  startDate: string; // YYYY-MM-DD
   deadline: string; // YYYY-MM-DD
   fieldData: ObjectiveFieldData;
   // KPI fields
@@ -402,25 +403,41 @@ function ObjectiveForm({
           />
         </div>
 
-        {/* Deadline Date Picker */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            <Calendar className="w-4 h-4 inline mr-1" />
-            Fecha límite
-          </label>
-          <div
-            className="relative cursor-pointer"
-            onClick={() => dateInputRef.current?.showPicker()}
-          >
+        {/* Date Range: Start + Deadline */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <Calendar className="w-4 h-4 inline mr-1" />
+              Fecha inicio
+            </label>
             <input
-              ref={dateInputRef}
               type="date"
-              value={formData.deadline}
-              onChange={(e) => updateField('deadline', e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+              value={formData.startDate}
+              onChange={(e) => updateField('startDate', e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 cursor-pointer"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <Calendar className="w-4 h-4 inline mr-1" />
+              Fecha límite
+            </label>
+            <div
+              className="relative cursor-pointer"
+              onClick={() => dateInputRef.current?.showPicker()}
+            >
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={formData.deadline}
+                onChange={(e) => updateField('deadline', e.target.value)}
+                min={formData.startDate || new Date().toISOString().split('T')[0]}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 cursor-pointer"
+              />
+            </div>
+          </div>
+        </div>
+        <div>
 
           {/* Quick date presets */}
           <div className="mt-2 flex items-center gap-2">
@@ -533,6 +550,7 @@ export function StrategicObjectiveEditor({
       category: defaultCategory,
       objectiveTypeId,
       responsible: (objective?.responsible as ObjectiveResponsible) || defaultType?.defaultResponsible || 'thinkpaladar',
+      startDate: objective?.startDate ? objective.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
       deadline: objective?.evaluationDate ? objective.evaluationDate.split('T')[0] : '',
       fieldData: objective?.fieldData || {},
       linkedKpiId: objective?.kpiType || (kpiMapping ? kpiMapping.kpiType : null),
@@ -559,6 +577,7 @@ export function StrategicObjectiveEditor({
       status: isEditing ? objective?.status : 'in_progress',
       responsible: formData.responsible,
       fieldData: formData.fieldData,
+      startDate: formData.startDate || undefined,
       evaluationDate: formData.deadline || undefined,
       // KPI fields
       kpiType: formData.linkedKpiId || undefined,

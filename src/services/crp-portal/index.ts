@@ -178,7 +178,7 @@ export {
   fetchCrpProductsByIds,
 } from './products';
 
-export type { CrpProduct } from './products';
+export type { CrpProduct, ProductSalesTag } from './products';
 
 // Product Sales (aggregated via RPC)
 export { fetchProductSales, channelIdsToPortalIds } from './productSales';

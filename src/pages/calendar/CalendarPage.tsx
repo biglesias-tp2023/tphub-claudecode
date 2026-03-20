@@ -8,9 +8,9 @@
  * @module pages/calendar/CalendarPage
  */
 
-import { useReducer, useCallback, useMemo, useEffect } from 'react';
+import { useState, useReducer, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Calendar, CloudOff } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { Card, ToastContainer } from '@/components/ui';
 import { DashboardFilters } from '@/features/dashboard';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
@@ -198,6 +198,7 @@ export function CalendarPage() {
   const { toasts, closeToast, success } = useToast();
 
   const [state, dispatch] = useReducer(calendarReducer, null, createInitialState);
+  const [showObjectives, setShowObjectives] = useState(true);
 
   // Persist calendar filters to sessionStorage
   useEffect(() => {
@@ -286,9 +287,9 @@ export function CalendarPage() {
     state.selectedRegion.startsWith('ES-') ? 'ES' : state.selectedRegion
   );
 
-  // Fetch weather
+  // Fetch weather (by business area — weather is per-city, not per-restaurant)
   const { data: weatherForecasts = [] } = useWeatherByMonth(
-    selectedRestaurant,
+    selectedRestaurant?.areaId ?? undefined,
     state.currentMonth.year,
     state.currentMonth.month
   );
@@ -306,12 +307,6 @@ export function CalendarPage() {
     year: state.currentMonth.year,
     month: state.currentMonth.month,
   });
-
-  // Weather availability check
-  const hasRestaurantWithCoordinates = selectedRestaurant &&
-    selectedRestaurant.latitude != null &&
-    selectedRestaurant.longitude != null;
-  const showWeatherUnavailableMessage = !hasRestaurantWithCoordinates;
 
   // Campaign mutations
   const createCampaign = useCreateCampaign();
@@ -478,25 +473,20 @@ export function CalendarPage() {
               onEventCategoriesChange={handleEventCategoriesChange}
               selectedRegion={state.selectedRegion}
               onRegionChange={handleRegionChange}
+              showObjectives={showObjectives}
+              onShowObjectivesChange={setShowObjectives}
               campaigns={campaigns}
             />
           )}
 
           {/* Calendar area */}
           <div className="flex-1 p-6 overflow-hidden flex flex-col">
-            {showWeatherUnavailableMessage && (
-              <div className="mb-3 flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
-                <CloudOff className="w-4 h-4" />
-                <span>Selecciona un establecimiento con coordenadas para ver el clima</span>
-              </div>
-            )}
-
             <CalendarView
               campaigns={filteredCampaigns}
               events={filteredEvents}
               weatherForecasts={weatherForecasts}
               revenueByDate={stableRevenueByDate}
-              objectives={objectiveItems}
+              objectives={showObjectives ? objectiveItems : []}
               isLoading={campaignsLoading}
               onNewCampaign={handleNewCampaign}
               onCampaignClick={handleCampaignClick}

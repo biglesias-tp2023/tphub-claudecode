@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, ChevronLeft, ChevronRight, ChevronDown, Calendar, Flag, Trophy, ShoppingBag, MapPin } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, Calendar, Flag, Trophy, ShoppingBag, MapPin, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { PLATFORMS } from '../config/platforms';
 import { PlatformLogo } from './CampaignEditor';
@@ -11,21 +11,24 @@ interface CalendarSidebarProps {
   onCreateClick: () => void;
   selectedPlatforms: CampaignPlatform[];
   onPlatformsChange: (platforms: CampaignPlatform[]) => void;
-  selectedStatuses: string[];
-  onStatusesChange: (statuses: string[]) => void;
+  selectedStatuses?: string[];
+  onStatusesChange?: (statuses: string[]) => void;
   selectedEventCategories: EventCategory[];
   onEventCategoriesChange: (categories: EventCategory[]) => void;
   selectedRegion: string;
   onRegionChange: (region: string) => void;
+  showObjectives?: boolean;
+  onShowObjectivesChange?: (show: boolean) => void;
   campaigns?: PromotionalCampaign[];
 }
 
-const STATUSES = [
-  { id: 'scheduled', label: 'Programada', color: 'bg-blue-100 border-blue-300' },
-  { id: 'active', label: 'Activa', color: 'bg-green-100 border-green-300' },
-  { id: 'completed', label: 'Finalizada', color: 'bg-gray-100 border-gray-300' },
-  { id: 'cancelled', label: 'Cancelada', color: 'bg-red-100 border-red-300' },
-];
+// Status constants kept for reference but filter removed from UI
+// const STATUSES = [
+//   { id: 'scheduled', label: 'Programada', color: 'bg-blue-100 border-blue-300' },
+//   { id: 'active', label: 'Activa', color: 'bg-green-100 border-green-300' },
+//   { id: 'completed', label: 'Finalizada', color: 'bg-gray-100 border-gray-300' },
+//   { id: 'cancelled', label: 'Cancelada', color: 'bg-red-100 border-red-300' },
+// ];
 
 const EVENT_CATEGORIES: { id: EventCategory; label: string; icon: typeof Flag; color: string }[] = [
   { id: 'holiday', label: 'Festivos', icon: Flag, color: 'text-red-500' },
@@ -69,12 +72,14 @@ export function CalendarSidebar({
   onCreateClick,
   selectedPlatforms,
   onPlatformsChange,
-  selectedStatuses,
-  onStatusesChange,
+  selectedStatuses: _selectedStatuses,
+  onStatusesChange: _onStatusesChange,
   selectedEventCategories,
   onEventCategoriesChange,
   selectedRegion,
   onRegionChange,
+  showObjectives = true,
+  onShowObjectivesChange,
   campaigns = [],
 }: CalendarSidebarProps) {
   const [miniCalendarDate, setMiniCalendarDate] = useState(selectedDate);
@@ -172,14 +177,6 @@ export function CalendarSidebar({
       onPlatformsChange(selectedPlatforms.filter(p => p !== platformId));
     } else {
       onPlatformsChange([...selectedPlatforms, platformId]);
-    }
-  };
-
-  const toggleStatus = (statusId: string) => {
-    if (selectedStatuses.includes(statusId)) {
-      onStatusesChange(selectedStatuses.filter(s => s !== statusId));
-    } else {
-      onStatusesChange([...selectedStatuses, statusId]);
     }
   };
 
@@ -369,37 +366,22 @@ export function CalendarSidebar({
           )}
         </div>
 
-        {/* Status filter */}
+        {/* Objectives toggle */}
         <div>
           <button
-            onClick={() => toggleSection('status')}
-            className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-700"
+            onClick={() => onShowObjectivesChange?.(!showObjectives)}
+            className="w-full flex items-center justify-between py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
           >
-            <span>Estado</span>
-            <ChevronDown className={cn(
-              'w-4 h-4 text-gray-400 transition-transform',
-              expandedSections.status && 'rotate-180'
-            )} />
+            <span className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm border border-dashed border-indigo-400 bg-indigo-50" />
+              Objetivos
+            </span>
+            {showObjectives ? (
+              <Eye className="w-4 h-4 text-indigo-500" />
+            ) : (
+              <EyeOff className="w-4 h-4 text-gray-400" />
+            )}
           </button>
-          {expandedSections.status && (
-            <div className="space-y-1 mt-1">
-              {STATUSES.map(status => (
-                <label
-                  key={status.id}
-                  className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedStatuses.includes(status.id)}
-                    onChange={() => toggleStatus(status.id)}
-                    className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
-                  />
-                  <div className={cn('w-3 h-3 rounded-sm border', status.color)} />
-                  <span className="text-sm text-gray-700">{status.label}</span>
-                </label>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </aside>

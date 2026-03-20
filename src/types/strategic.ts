@@ -280,6 +280,7 @@ export interface StrategicObjective {
   isArchived: boolean;                  // Soft delete / hide from main view
   // Dynamic field data (JSON stored in DB)
   fieldData: ObjectiveFieldData | null;
+  startDate: string | null;
   evaluationDate: string | null;
   completedAt: string | null;
   displayOrder: number;
@@ -317,6 +318,7 @@ export interface StrategicObjectiveInput {
   isArchived?: boolean;
   // Dynamic field data
   fieldData?: ObjectiveFieldData;
+  startDate?: string;
   evaluationDate?: string;
   displayOrder?: number;
 }
@@ -349,6 +351,7 @@ export interface DbStrategicObjective {
   is_archived: boolean;
   // Other fields
   field_data: string | null;            // JSON string
+  start_date: string | null;
   evaluation_date: string | null;
   completed_at: string | null;
   display_order: number;

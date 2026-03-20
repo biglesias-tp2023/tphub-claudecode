@@ -22,7 +22,7 @@ interface GanttTooltipProps {
 
 export function GanttTooltip({ objective, healthStatus, progressPct, position, hasFallbackEnd, taskCount }: GanttTooltipProps) {
   const category = CATEGORIES.find(c => c.id === objective.category);
-  const startLabel = new Date(objective.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  const startLabel = new Date(objective.startDate || objective.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   const endLabel = objective.evaluationDate
     ? new Date(objective.evaluationDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
     : null;

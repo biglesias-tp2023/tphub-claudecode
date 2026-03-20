@@ -8,11 +8,12 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Search, Package, Check, Loader2 } from 'lucide-react';
+import { Search, Package, Check, Loader2, Flame, TrendingUp } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { useProducts } from '../../hooks/useProducts';
 import { formatCurrency } from '@/utils/formatters';
 import type { CampaignPlatform } from '@/types';
+// Sales tags come from CrpProduct.salesTag field
 
 // ============================================
 // TYPES
@@ -193,16 +194,35 @@ export function ProductSelector({
 
                     {/* Product info */}
                     <div className="text-left">
-                      <p className={`text-sm ${isSelected ? 'font-medium text-primary-900' : 'text-gray-900'}`}>
-                        {product.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm ${isSelected ? 'font-medium text-primary-900' : 'text-gray-900'}`}>
+                          {product.name}
+                        </p>
+                        {product.salesTag === 'top_venta' && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full">
+                            <Flame className="w-3 h-3" />
+                            Top Venta
+                          </span>
+                        )}
+                        {product.salesTag === 'populares' && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded-full">
+                            <TrendingUp className="w-3 h-3" />
+                            Popular
+                          </span>
+                        )}
+                      </div>
+                      {product.unitsSold > 0 && (
+                        <p className="text-xs text-gray-400">{product.unitsSold} uds. ultimos 30 dias</p>
+                      )}
                     </div>
                   </div>
 
                   {/* Price */}
-                  <span className={`text-sm font-medium ${isSelected ? 'text-primary-700' : 'text-gray-600'}`}>
-                    {formatCurrency(product.price)}
-                  </span>
+                  {product.price > 0 && (
+                    <span className={`text-sm font-medium ${isSelected ? 'text-primary-700' : 'text-gray-600'}`}>
+                      {formatCurrency(product.price)}
+                    </span>
+                  )}
                 </button>
               );
             })}

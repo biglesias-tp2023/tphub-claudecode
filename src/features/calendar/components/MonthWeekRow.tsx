@@ -17,6 +17,7 @@ import type { CalendarObjectiveItem } from '../hooks/useCalendarObjectives';
 
 interface MonthWeekRowProps {
   weekDates: string[]; // 7 date strings (Mon-Sun)
+  weekNumber?: number;
   year: number;
   month: number;
   campaigns: PromotionalCampaign[];
@@ -50,6 +51,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 function arePropsEqual(prev: MonthWeekRowProps, next: MonthWeekRowProps): boolean {
   return (
     prev.weekDates === next.weekDates &&
+    prev.weekNumber === next.weekNumber &&
     prev.year === next.year &&
     prev.month === next.month &&
     prev.campaigns === next.campaigns &&
@@ -66,6 +68,7 @@ function arePropsEqual(prev: MonthWeekRowProps, next: MonthWeekRowProps): boolea
 
 export const MonthWeekRow = memo(function MonthWeekRow({
   weekDates,
+  weekNumber,
   year,
   month,
   campaigns,
@@ -87,7 +90,7 @@ export const MonthWeekRow = memo(function MonthWeekRow({
     [campaigns, weekDates]
   );
 
-  // Compute objective layout similarly
+  // Compute objective layout with row stacking (avoid overlaps)
   const objectiveLayout = useMemo(() => {
     if (objectives.length === 0) return [];
 
@@ -96,14 +99,37 @@ export const MonthWeekRow = memo(function MonthWeekRow({
     const dateToCol = new Map<string, number>();
     weekDates.forEach((d, i) => dateToCol.set(d, i));
 
-    return objectives
+    const items = objectives
       .filter(item => item.startDate <= weekEnd && item.endDate >= weekStart)
       .map(item => {
         const startCol = Math.max(0, dateToCol.get(item.startDate) ?? (item.startDate < weekStart ? 0 : 7));
         const endCol = Math.min(6, dateToCol.get(item.endDate) ?? (item.endDate > weekEnd ? 6 : -1));
-        return { item, startCol, endCol };
+        return { item, startCol, endCol, row: 0 };
       })
       .filter(o => o.startCol <= 6 && o.endCol >= 0 && o.startCol <= o.endCol);
+
+    // Assign rows: track which columns are occupied per row
+    const rowOccupancy: boolean[][] = [];
+    for (const obj of items) {
+      let assignedRow = -1;
+      for (let r = 0; r < rowOccupancy.length; r++) {
+        let canFit = true;
+        for (let c = obj.startCol; c <= obj.endCol; c++) {
+          if (rowOccupancy[r][c]) { canFit = false; break; }
+        }
+        if (canFit) { assignedRow = r; break; }
+      }
+      if (assignedRow === -1) {
+        assignedRow = rowOccupancy.length;
+        rowOccupancy.push(new Array(7).fill(false));
+      }
+      obj.row = assignedRow;
+      for (let c = obj.startCol; c <= obj.endCol; c++) {
+        rowOccupancy[assignedRow][c] = true;
+      }
+    }
+
+    return items;
   }, [objectives, weekDates]);
 
   const maxCampaignRows = useMemo(
@@ -128,10 +154,23 @@ export const MonthWeekRow = memo(function MonthWeekRow({
 
   // Height for campaign bars area
   const barAreaHeight = Math.min(maxCampaignRows, MAX_VISIBLE_ROWS) * 22;
-  const objectiveAreaHeight = objectiveLayout.length > 0 ? 18 : 0;
+  const maxObjectiveRows = objectiveLayout.length > 0
+    ? Math.max(...objectiveLayout.map(o => o.row)) + 1
+    : 0;
+  const objectiveAreaHeight = maxObjectiveRows * 18;
 
   return (
-    <div className="relative grid grid-cols-7" style={{ minHeight: `${100 + barAreaHeight + objectiveAreaHeight}px` }}>
+    <div className="flex">
+      {/* Week number */}
+      {weekNumber !== undefined && (
+        <div
+          className="w-8 shrink-0 flex items-start justify-center pt-2 border-b border-r border-gray-100 bg-gray-50/50"
+          title={`Semana ${weekNumber}`}
+        >
+          <span className="text-[10px] font-medium text-gray-400">S{weekNumber}</span>
+        </div>
+      )}
+    <div className="relative grid grid-cols-7 flex-1" style={{ minHeight: `${100 + barAreaHeight + objectiveAreaHeight}px` }}>
       {/* Day cells (background) */}
       {weekDates.map((dateStr, colIdx) => {
         const date = new Date(dateStr + 'T00:00:00');
@@ -179,15 +218,17 @@ export const MonthWeekRow = memo(function MonthWeekRow({
       ))}
 
       {/* Objective bars (dashed-border, distinct from campaigns) */}
-      {objectiveLayout.map(({ item, startCol, endCol }) => (
+      {objectiveLayout.map(({ item, startCol, endCol, row }) => (
         <ObjectiveBar
           key={item.objective.id}
           item={item}
           startCol={startCol}
           endCol={endCol}
-          rowOffset={Math.min(maxCampaignRows, MAX_VISIBLE_ROWS)}
+          campaignRowOffset={Math.min(maxCampaignRows, MAX_VISIBLE_ROWS)}
+          objectiveRow={row}
         />
       ))}
+    </div>
     </div>
   );
 }, arePropsEqual);
@@ -274,21 +315,23 @@ interface ObjectiveBarProps {
   item: CalendarObjectiveItem;
   startCol: number;
   endCol: number;
-  rowOffset: number;
+  campaignRowOffset: number;
+  objectiveRow: number;
 }
 
 const ObjectiveBar = memo(function ObjectiveBar({
   item,
   startCol,
   endCol,
-  rowOffset,
+  campaignRowOffset,
+  objectiveRow,
 }: ObjectiveBarProps) {
   const { objective } = item;
   const color = CATEGORY_COLORS[objective.category] ?? '#6b7280';
 
   const left = `calc(${(startCol / 7) * 100}% + 2px)`;
   const width = `calc(${((endCol - startCol + 1) / 7) * 100}% - 4px)`;
-  const top = `${28 + rowOffset * 22 + 2}px`;
+  const top = `${28 + campaignRowOffset * 22 + objectiveRow * 18 + 2}px`;
 
   return (
     <div

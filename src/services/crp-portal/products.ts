@@ -1,9 +1,12 @@
 /**
  * CRP Portal Products Service
  *
- * Fetches product data from crp_portal__ft_order_line for use in campaign configuration.
- * Products are filtered by company and portal (platform) to ensure only relevant products
- * are shown for each promotion type.
+ * Fetches product catalog from crp_portal__dt_product (dimension table)
+ * and enriches with sales ranking from crp_portal__ft_order_line.
+ *
+ * Products with most units sold in the last 30 days get tags:
+ * - Top 3: "top_venta"
+ * - Positions 4-6: "populares"
  *
  * @module services/crp-portal/products
  */
@@ -16,10 +19,6 @@ import { handleCrpError } from './errors';
 // CONSTANTS
 // ============================================
 
-/**
- * Portal IDs para order_line
- * E22BC362 (Glovo antiguo) excluido — stores migradas a E22BC362-2.
- */
 const ORDER_LINE_PORTAL_IDS = {
   GLOVO: ['E22BC362-2'],
   UBEREATS: ['3CCD6861'],
@@ -29,27 +28,27 @@ const ORDER_LINE_PORTAL_IDS = {
 // TYPES
 // ============================================
 
+export type ProductSalesTag = 'top_venta' | 'populares' | null;
+
 export interface CrpProduct {
   id: string;
   name: string;
   price: number;
+  /** Sales tag based on last 30 days ranking */
+  salesTag: ProductSalesTag;
+  /** Total units sold in last 30 days (0 if no sales data) */
+  unitsSold: number;
 }
 
-interface DbProductRow {
+interface DbCatalogRow {
   pk_id_product: string;
   des_product: string;
-  amt_unit_price: number;
 }
 
 // ============================================
 // HELPERS
 // ============================================
 
-/**
- * Get the portal IDs for a given platform (for order_line table)
- *
- * Returns an array of IDs because Glovo has two sources (antiguo + nuevo).
- */
 function getPortalIdsForPlatform(platform: CampaignPlatform): string[] | null {
   switch (platform) {
     case 'glovo':
@@ -57,7 +56,7 @@ function getPortalIdsForPlatform(platform: CampaignPlatform): string[] | null {
     case 'ubereats':
       return [...ORDER_LINE_PORTAL_IDS.UBEREATS];
     case 'justeat':
-      // JustEat portal ID pending
+      // JustEat portal ID pending — products still show from catalog
       return null;
     default:
       return null;
@@ -69,121 +68,167 @@ function getPortalIdsForPlatform(platform: CampaignPlatform): string[] | null {
 // ============================================
 
 interface FetchProductsParams {
-  /** Company ID (pfk_id_company from crp_portal) */
   companyId: string | number;
-  /** Platform to filter products by */
   platform: CampaignPlatform;
-  /** Optional restaurant/address ID to further filter.
-   * Use 'all' or omit to get products from all addresses for the company */
   addressId?: string;
-  /** Optional array of address IDs to filter products from multiple specific addresses */
   addressIds?: string[];
-  /** Search term for filtering by product name */
   search?: string;
-  /** Limit number of results */
   limit?: number;
 }
 
 /**
- * Fetch unique products for a company and platform.
+ * Fetch products for a company with sales ranking.
  *
- * Products are fetched from crp_portal__ft_order_line and deduplicated by pk_id_product.
- * Only products that have been sold on the specified platform are returned.
- *
- * When addressId is 'all' or not provided, products from all addresses are aggregated.
- * When addressIds array is provided, products from those specific addresses are aggregated.
+ * 1. Reads product catalog from dt_product (latest month snapshot, active)
+ * 2. Fetches sales data from ft_order_line (last 30 days, platform-filtered)
+ * 3. Enriches products with salesTag (top_venta / populares / null)
  */
 export async function fetchCrpProducts(params: FetchProductsParams): Promise<CrpProduct[]> {
-  // Note: addressId and addressIds are kept for future use but not currently used
-  const { companyId, platform, search, limit = 100 } = params;
+  const { companyId, platform, search, limit = 200 } = params;
+  const companyStr = String(companyId);
 
-  const portalIds = getPortalIdsForPlatform(platform);
-  if (!portalIds || portalIds.length === 0) {
-    return [];
-  }
-
-  // Query to get unique products with their most recent price
-  // We use a subquery to get distinct products
-  // IMPORTANT: All ID columns are VARCHAR in the database, so we must ensure string values
-  // NOTE: crp_portal__ft_order_line table does NOT have pfk_id_store_address column,
-  // so we cannot filter by address. Products are filtered by company and portal only.
-  let query = supabase
-    .from('crp_portal__ft_order_line')
-    .select('pk_id_product, des_product, amt_unit_price')
-    .eq('pfk_id_company', String(companyId))
-    .in('pfk_id_portal', portalIds)
-    .not('pk_id_product', 'is', null)
+  // --- 1) Fetch product catalog from dt_product ---
+  let catalogQuery = supabase
+    .from('crp_portal__dt_product')
+    .select('pk_id_product, des_product')
+    .eq('pfk_id_company', companyStr)
+    .eq('flg_deleted', 0)
     .not('des_product', 'is', null)
     .order('des_product', { ascending: true });
 
-  // NOTE: Address filtering removed - crp_portal__ft_order_line doesn't have address column
-  // Products are aggregated from all addresses for the company/portal combination
-  // The addressId/addressIds parameters are kept in the interface for potential future use
-
-  // Filter by search term
   if (search) {
-    query = query.ilike('des_product', `%${search}%`);
+    catalogQuery = catalogQuery.ilike('des_product', `%${search}%`);
   }
 
-  // Limit results
-  query = query.limit(limit * 5); // Fetch more to account for duplicates
+  // Get latest month snapshot only — order by pk_ts_month desc and deduplicate
+  catalogQuery = catalogQuery.order('pk_ts_month', { ascending: false }).limit(limit * 3);
 
-  const { data, error } = await query;
+  const { data: catalogData, error: catalogError } = await catalogQuery;
 
-  if (error) {
-    throw new Error(`Error fetching products: ${error.message}`);
+  if (catalogError) {
+    throw new Error(`Error fetching product catalog: ${catalogError.message}`);
   }
 
-  if (!data || data.length === 0) {
+  if (!catalogData || catalogData.length === 0) {
     return [];
   }
 
-  // Deduplicate by pk_id_product, keeping the most recent entry (first one due to ordering)
-  const productMap = new Map<string, CrpProduct>();
-
-  for (const row of data as DbProductRow[]) {
-    if (!productMap.has(row.pk_id_product)) {
-      productMap.set(row.pk_id_product, {
-        id: row.pk_id_product,
-        name: row.des_product,
-        price: row.amt_unit_price,
-      });
+  // Deduplicate by product ID (keep first = latest month)
+  const catalogMap = new Map<string, DbCatalogRow>();
+  for (const row of catalogData as DbCatalogRow[]) {
+    if (!catalogMap.has(row.pk_id_product)) {
+      catalogMap.set(row.pk_id_product, row);
     }
   }
 
-  // Convert to array and limit
-  const products = Array.from(productMap.values());
+  // --- 2) Fetch sales data from ft_order_line (last 30 days) ---
+  const portalIds = getPortalIdsForPlatform(platform);
+  const salesMap = new Map<string, { totalQty: number; price: number }>();
 
-  // Sort alphabetically by name
-  products.sort((a, b) => a.name.localeCompare(b.name));
+  if (portalIds && portalIds.length > 0) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const since = thirtyDaysAgo.toISOString();
+
+    // Get product IDs from catalog to filter sales
+    const productIds = Array.from(catalogMap.keys());
+
+    // Fetch in batches if needed (Supabase IN limit)
+    const batchSize = 200;
+    for (let i = 0; i < productIds.length; i += batchSize) {
+      const batch = productIds.slice(i, i + batchSize);
+
+      const { data: salesData, error: salesError } = await supabase
+        .from('crp_portal__ft_order_line')
+        .select('pk_id_product, amt_unit_price, val_quantity')
+        .eq('pfk_id_company', companyStr)
+        .in('pfk_id_portal', portalIds)
+        .in('pk_id_product', batch)
+        .gte('td_updated_at', since)
+        .not('pk_id_product', 'is', null);
+
+      if (salesError) {
+        console.warn('Error fetching sales data:', salesError.message);
+        break;
+      }
+
+      if (salesData) {
+        for (const row of salesData as Array<{ pk_id_product: string; amt_unit_price: number; val_quantity: number }>) {
+          const existing = salesMap.get(row.pk_id_product);
+          const qty = row.val_quantity ?? 1;
+          if (existing) {
+            existing.totalQty += qty;
+            // Keep latest price
+            if (row.amt_unit_price > 0) existing.price = row.amt_unit_price;
+          } else {
+            salesMap.set(row.pk_id_product, {
+              totalQty: qty,
+              price: row.amt_unit_price ?? 0,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // --- 3) Build ranked product list ---
+  // Sort by sales volume to determine tags
+  const salesRanking = Array.from(salesMap.entries())
+    .sort((a, b) => b[1].totalQty - a[1].totalQty);
+
+  const tagMap = new Map<string, ProductSalesTag>();
+  salesRanking.forEach(([productId], index) => {
+    if (index < 3) tagMap.set(productId, 'top_venta');
+    else if (index < 6) tagMap.set(productId, 'populares');
+  });
+
+  // --- 4) Merge catalog + sales into final products ---
+  const products: CrpProduct[] = [];
+
+  for (const [productId, catalogRow] of catalogMap) {
+    const sales = salesMap.get(productId);
+    products.push({
+      id: productId,
+      name: catalogRow.des_product,
+      price: sales?.price ?? 0,
+      salesTag: tagMap.get(productId) || null,
+      unitsSold: sales?.totalQty ?? 0,
+    });
+  }
+
+  // Sort: tagged products first (top_venta → populares → rest alphabetically)
+  products.sort((a, b) => {
+    const tagOrder = { top_venta: 0, populares: 1 } as Record<string, number>;
+    const aOrder = a.salesTag ? tagOrder[a.salesTag] ?? 2 : 2;
+    const bOrder = b.salesTag ? tagOrder[b.salesTag] ?? 2 : 2;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    // Within same tag group, sort by units sold desc, then name
+    if (a.unitsSold !== b.unitsSold) return b.unitsSold - a.unitsSold;
+    return a.name.localeCompare(b.name);
+  });
 
   return products.slice(0, limit);
 }
 
 /**
- * Fetch products by their IDs
+ * Fetch products by their IDs (for review step display)
  */
 export async function fetchCrpProductsByIds(
   productIds: string[],
   companyId: string | number,
-  platform: CampaignPlatform
+  _platform: CampaignPlatform
 ): Promise<CrpProduct[]> {
   if (productIds.length === 0) {
     return [];
   }
 
-  const portalIds = getPortalIdsForPlatform(platform);
-  if (!portalIds || portalIds.length === 0) {
-    return [];
-  }
-
-  // IMPORTANT: pfk_id_company is VARCHAR in the database, so we must ensure string value
   const { data, error } = await supabase
-    .from('crp_portal__ft_order_line')
-    .select('pk_id_product, des_product, amt_unit_price')
+    .from('crp_portal__dt_product')
+    .select('pk_id_product, des_product')
     .eq('pfk_id_company', String(companyId))
-    .in('pfk_id_portal', portalIds)
     .in('pk_id_product', productIds)
+    .eq('flg_deleted', 0)
+    .order('pk_ts_month', { ascending: false })
     .limit(productIds.length * 3);
 
   if (error) {
@@ -194,15 +239,16 @@ export async function fetchCrpProductsByIds(
     return [];
   }
 
-  // Deduplicate
+  // Deduplicate (latest month first)
   const productMap = new Map<string, CrpProduct>();
-
-  for (const row of data as DbProductRow[]) {
+  for (const row of data as DbCatalogRow[]) {
     if (!productMap.has(row.pk_id_product)) {
       productMap.set(row.pk_id_product, {
         id: row.pk_id_product,
         name: row.des_product,
-        price: row.amt_unit_price,
+        price: 0,
+        salesTag: null,
+        unitsSold: 0,
       });
     }
   }

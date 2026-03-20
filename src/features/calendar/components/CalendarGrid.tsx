@@ -14,6 +14,16 @@ import type { PromotionalCampaign, CalendarEvent, WeatherForecast } from '@/type
 import type { DailyChannelRevenue } from '@/services/crp-portal/dailyRevenue';
 import type { CalendarObjectiveItem } from '../hooks/useCalendarObjectives';
 
+/** Get ISO week number for a date string (YYYY-MM-DD) */
+function getISOWeekNumber(dateStr: string): number {
+  const date = new Date(dateStr + 'T12:00:00');
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
 interface CalendarGridProps {
   year: number;
   month: number;
@@ -180,15 +190,18 @@ export function CalendarGrid({
       onMouseLeave={handleMouseUp}
     >
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-        {WEEKDAY_NAMES.map(day => (
-          <div
-            key={day}
-            className="px-2 py-1.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-          >
-            {day}
-          </div>
-        ))}
+      <div className="flex border-b border-gray-200 bg-gray-50">
+        <div className="w-8 shrink-0" />
+        <div className="grid grid-cols-7 flex-1">
+          {WEEKDAY_NAMES.map(day => (
+            <div
+              key={day}
+              className="px-2 py-1.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Week rows */}
@@ -197,6 +210,7 @@ export function CalendarGrid({
           <MonthWeekRow
             key={weekDates[0]}
             weekDates={weekDates}
+            weekNumber={getISOWeekNumber(weekDates[0])}
             year={year}
             month={month}
             campaigns={campaigns}

@@ -97,11 +97,11 @@ function computeHealthStatus(obj: StrategicObjective): HealthStatus {
 
   // Expected progress from time
   if (!obj.evaluationDate) return progress > 0 ? 'on_track' : 'at_risk';
-  const created = new Date(obj.createdAt).getTime();
+  const startTime = (obj.startDate ? new Date(obj.startDate) : new Date(obj.createdAt)).getTime();
   const deadline = new Date(obj.evaluationDate).getTime();
-  const totalDuration = deadline - created;
+  const totalDuration = deadline - startTime;
   if (totalDuration <= 0) return progress >= 100 ? 'completed' : 'off_track';
-  const elapsed = Date.now() - created;
+  const elapsed = Date.now() - startTime;
   const expectedProgress = Math.min((elapsed / totalDuration) * 100, 100);
 
   if (expectedProgress === 0) return 'on_track';
@@ -137,7 +137,7 @@ export function GanttChart({
   const objectiveDates = useMemo(() => {
     const map = new Map<string, { start: Date; end: Date; hasFallbackEnd: boolean }>();
     for (const obj of objectives) {
-      const start = new Date(obj.createdAt);
+      const start = obj.startDate ? new Date(obj.startDate) : new Date(obj.createdAt);
       let end: Date;
       let hasFallbackEnd = false;
       if (obj.evaluationDate) {
