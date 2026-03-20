@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, ChevronsUpDown } from 'lucide-react';
-import { GanttRow, LABEL_COL_WIDTH, WEEK_COL_WIDTH } from './GanttRow';
+import { GanttRow, LABEL_COL_WIDTH } from './GanttRow';
+import { useUpdateStrategicObjective } from '../../hooks';
 import type { StrategicObjective, HealthStatus, Company, Brand } from '@/types';
 
 // ============================================
@@ -37,65 +38,58 @@ function getMonday(d: Date): Date {
 
 /** Get Sunday of a given date's week */
 function getSunday(d: Date): Date {
-  const mon = getMonday(d);
-  const sun = new Date(mon);
-  sun.setDate(sun.getDate() + 6);
-  return sun;
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? 0 : 7 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(23, 59, 59, 999);
+  return date;
 }
 
-/** Format week label: "9-15 Mar" or "30 Mar-5 Abr" */
+/** Format week label for compact display */
 function formatWeekLabel(monday: Date): string {
-  const sunday = new Date(monday);
-  sunday.setDate(sunday.getDate() + 6);
-
-  const startDay = monday.getDate();
-  const endDay = sunday.getDate();
-  const startMonth = monday.toLocaleDateString('es-ES', { month: 'short' });
-  const endMonth = sunday.toLocaleDateString('es-ES', { month: 'short' });
-
-  if (startMonth === endMonth) {
-    return `${startDay}-${endDay} ${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)}`;
+  const sun = new Date(monday);
+  sun.setDate(sun.getDate() + 6);
+  const dStart = monday.getDate();
+  const dEnd = sun.getDate();
+  const mStart = monday.toLocaleDateString('es-ES', { month: 'short' });
+  const mEnd = sun.toLocaleDateString('es-ES', { month: 'short' });
+  const formattedMStart = mStart.charAt(0).toUpperCase() + mStart.slice(1);
+  const formattedMEnd = mEnd.charAt(0).toUpperCase() + mEnd.slice(1);
+  if (mStart === mEnd) {
+    return `${dStart}-${dEnd} ${formattedMStart}`;
   }
-  const fmtStart = startMonth.charAt(0).toUpperCase() + startMonth.slice(1);
-  const fmtEnd = endMonth.charAt(0).toUpperCase() + endMonth.slice(1);
-  return `${startDay} ${fmtStart}-${endDay} ${fmtEnd}`;
+  return `${dStart} ${formattedMStart}-${dEnd} ${formattedMEnd}`;
 }
 
-/** Horizon-based fallback duration in days */
 const HORIZON_FALLBACK_DAYS: Record<string, number> = {
   short: 90,
   medium: 270,
   long: 730,
 };
 
-/** Compute a simple health status from objective data */
+/** Compute health status for Gantt rendering */
 function computeHealthStatus(obj: StrategicObjective): HealthStatus {
   if (obj.status === 'completed') return 'completed';
   if (obj.status === 'cancelled') return 'off_track';
-
-  const hasKpi = obj.kpiCurrentValue != null && obj.kpiTargetValue != null && obj.baselineValue != null;
-  if (!hasKpi) {
-    // Estimate from time elapsed
+  if (obj.kpiCurrentValue == null || obj.kpiTargetValue == null) {
     if (!obj.evaluationDate) return 'on_track';
-    const now = Date.now();
     const deadline = new Date(obj.evaluationDate).getTime();
-    const remaining = deadline - now;
-    if (remaining < 0) return 'off_track';
-    if (remaining < 14 * 86400000) return 'at_risk';
-    return 'on_track';
+    const now = Date.now();
+    if (now > deadline) return 'off_track';
+    const daysLeft = (deadline - now) / 86400000;
+    return daysLeft < 14 ? 'at_risk' : 'on_track';
   }
 
-  const current = obj.kpiCurrentValue!;
-  const target = obj.kpiTargetValue!;
+  const current = obj.kpiCurrentValue;
+  const target = obj.kpiTargetValue;
   const baseline = obj.baselineValue!;
 
-  // Progress
   const range = target - baseline;
   if (range === 0) return current >= target ? 'completed' : 'on_track';
   const progress = ((current - baseline) / range) * 100;
   if (progress >= 100) return 'exceeded';
 
-  // Expected progress from time
   if (!obj.evaluationDate) return progress > 0 ? 'on_track' : 'at_risk';
   const startTime = (obj.startDate ? new Date(obj.startDate) : new Date(obj.createdAt)).getTime();
   const deadline = new Date(obj.evaluationDate).getTime();
@@ -132,6 +126,23 @@ export function GanttChart({
   taskCountByObjectiveId,
 }: GanttChartProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const updateObjective = useUpdateStrategicObjective();
+
+  // Measure container width for flexible week columns
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
 
   // Compute bar dates for each objective
   const objectiveDates = useMemo(() => {
@@ -147,7 +158,6 @@ export function GanttChart({
         end = new Date(start.getTime() + fallbackDays * 86400000);
         hasFallbackEnd = true;
       }
-      // Ensure end >= start
       if (end < start) end = new Date(start.getTime() + 7 * 86400000);
       map.set(obj.id, { start, end, hasFallbackEnd });
     }
@@ -175,12 +185,10 @@ export function GanttChart({
       latest = Math.max(latest, dates.end.getTime());
     }
 
-    // Also consider "today" to ensure it's visible
     const now = Date.now();
     earliest = Math.min(earliest, now);
     latest = Math.max(latest, now);
 
-    // Snap to Monday/Sunday, add 1 week padding each side
     const startMonday = getMonday(new Date(earliest));
     startMonday.setDate(startMonday.getDate() - 7);
     const endSunday = getSunday(new Date(latest));
@@ -193,7 +201,6 @@ export function GanttChart({
       cursor.setDate(cursor.getDate() + 7);
     }
 
-    // Minimum 12 weeks
     while (ws.length < 12) {
       const last = ws[ws.length - 1];
       const next = new Date(last);
@@ -227,6 +234,10 @@ export function GanttChart({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [objectives, allCompanies]);
 
+  // Flexible week width: fill available space
+  const trackWidth = Math.max(containerWidth - LABEL_COL_WIDTH, weeks.length * 56);
+  const weekColWidth = weeks.length > 0 ? trackWidth / weeks.length : 56;
+
   // "Today" marker position
   const todayPct = useMemo(() => {
     const now = Date.now();
@@ -247,12 +258,19 @@ export function GanttChart({
 
   const toggleAllGroups = () => {
     setCollapsedGroups(prev => {
-      // If all are collapsed, expand all; otherwise collapse all
       const allCollapsed = groups.every(g => prev.has(g.id));
       if (allCollapsed) return new Set();
       return new Set(groups.map(g => g.id));
     });
   };
+
+  // Handle drag date change from GanttRow
+  const handleDateChange = useCallback((objectiveId: string, startDate: string, endDate: string) => {
+    updateObjective.mutate({
+      id: objectiveId,
+      updates: { startDate, evaluationDate: endDate },
+    });
+  }, [updateObjective]);
 
   if (objectives.length === 0) {
     return (
@@ -262,10 +280,8 @@ export function GanttChart({
     );
   }
 
-  const trackWidth = weeks.length * WEEK_COL_WIDTH;
-
   // Determine month boundaries for header
-  const monthHeaders = useMemo(() => {
+  const monthHeaders = (() => {
     const headers: { label: string; startIdx: number; span: number }[] = [];
     let currentMonth = '';
     let startIdx = 0;
@@ -285,10 +301,10 @@ export function GanttChart({
     }
     if (currentMonth) headers.push({ label: currentMonth, startIdx, span });
     return headers;
-  }, [weeks]);
+  })();
 
   return (
-    <div className="overflow-x-auto border border-gray-100 rounded-lg">
+    <div ref={containerRef} className="overflow-x-auto border border-gray-100 rounded-lg">
       <div style={{ minWidth: LABEL_COL_WIDTH + trackWidth }}>
         {/* Header: Month row */}
         <div className="flex sticky top-0 z-20 bg-gray-50 border-b border-gray-200">
@@ -296,12 +312,12 @@ export function GanttChart({
             className="sticky left-0 z-30 bg-gray-50 shrink-0 border-r border-gray-200"
             style={{ width: LABEL_COL_WIDTH, minWidth: LABEL_COL_WIDTH }}
           />
-          <div className="flex" style={{ minWidth: trackWidth }}>
+          <div className="flex" style={{ width: trackWidth }}>
             {monthHeaders.map((mh, i) => (
               <div
                 key={i}
                 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-1 py-1.5 border-r border-gray-200 text-center truncate"
-                style={{ width: mh.span * WEEK_COL_WIDTH }}
+                style={{ width: mh.span * weekColWidth }}
               >
                 {mh.label}
               </div>
@@ -324,12 +340,12 @@ export function GanttChart({
               <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400" />
             </button>
           </div>
-          <div className="flex relative" style={{ minWidth: trackWidth }}>
+          <div className="flex relative" style={{ width: trackWidth }}>
             {weeks.map((w, i) => (
               <div
                 key={i}
                 className="text-[10px] text-gray-400 text-center py-1.5 border-r border-gray-100 truncate"
-                style={{ width: WEEK_COL_WIDTH }}
+                style={{ width: weekColWidth }}
               >
                 {formatWeekLabel(w)}
               </div>
@@ -386,6 +402,7 @@ export function GanttChart({
                       barEnd={dates.end}
                       hasFallbackEnd={dates.hasFallbackEnd}
                       onObjectiveClick={onObjectiveClick}
+                      onDateChange={handleDateChange}
                       index={currentIndex}
                       taskCount={taskCountByObjectiveId[obj.id]}
                     />
