@@ -14,7 +14,7 @@ import { Calendar } from 'lucide-react';
 import { Card, ToastContainer } from '@/components/ui';
 import { DashboardFilters } from '@/features/dashboard';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
-import { useRestaurants } from '@/features/dashboard/hooks';
+import { useRestaurants, useAreas } from '@/features/dashboard/hooks';
 import { useToast } from '@/hooks/useToast';
 import {
   CalendarView,
@@ -193,7 +193,7 @@ function createInitialState(): CalendarState {
 
 export function CalendarPage() {
   const [searchParams] = useSearchParams();
-  const { restaurantIds } = useDashboardFiltersStore();
+  const { restaurantIds, areaIds } = useDashboardFiltersStore();
   const { companyIds } = useGlobalFiltersStore();
   const { toasts, closeToast, success } = useToast();
 
@@ -266,12 +266,20 @@ export function CalendarPage() {
     }
   }, [searchParams]);
 
-  // Get restaurants based on filters
+  // Get restaurants and areas based on filters
   const { data: restaurants = [] } = useRestaurants();
+  const { data: areas = [] } = useAreas();
 
   const selectedRestaurant = restaurantIds.length > 0
     ? restaurants.find(r => restaurantIds.includes(r.id))
     : restaurants[0];
+
+  // Resolve weather area: use selected area from filters, or first available area
+  const weatherAreaId = useMemo(() => {
+    if (areaIds.length > 0) return areaIds[0];
+    if (areas.length > 0) return areas[0].id;
+    return undefined;
+  }, [areaIds, areas]);
 
   // Fetch campaigns for current month
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaignsByMonth(
@@ -289,7 +297,7 @@ export function CalendarPage() {
 
   // Fetch weather (by business area — weather is per-city, not per-restaurant)
   const { data: weatherForecasts = [] } = useWeatherByMonth(
-    selectedRestaurant?.areaId ?? undefined,
+    weatherAreaId,
     state.currentMonth.year,
     state.currentMonth.month
   );

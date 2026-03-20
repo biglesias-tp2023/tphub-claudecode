@@ -63,6 +63,16 @@ const START_HOUR = 9;
 const END_HOUR = 23;
 const HOUR_HEIGHT = 48; // px per hour
 
+const OBJECTIVE_CATEGORY_COLORS: Record<string, string> = {
+  finanzas: '#22c55e',
+  operaciones: '#3b82f6',
+  clientes: '#f97316',
+  marca: '#ec4899',
+  reputacion: '#f59e0b',
+  proveedores: '#6b7280',
+  menu: '#6366f1',
+};
+
 const EVENT_CATEGORY_CONFIG: Record<EventCategory, { icon: LucideIcon; color: string; bgColor: string }> = {
   holiday: { icon: Flag, color: 'text-red-600', bgColor: 'bg-red-100' },
   sports: { icon: Trophy, color: 'text-green-600', bgColor: 'bg-green-100' },
@@ -170,8 +180,49 @@ export function CalendarWeek({
     [allDayLayout]
   );
 
-  // Objectives are available via props for future hourly grid rendering
-  void objectives;
+  // Objective layout for all-day section
+  const objectiveLayout = useMemo(() => {
+    if (objectives.length === 0) return [];
+
+    const dateToCol = new Map<string, number>();
+    weekDateStrings.forEach((d, i) => dateToCol.set(d, i));
+
+    const items = objectives
+      .filter(item => item.startDate <= weekEnd && item.endDate >= weekStart)
+      .map(item => {
+        const startCol = Math.max(0, dateToCol.get(item.startDate) ?? (item.startDate < weekStart ? 0 : 7));
+        const endCol = Math.min(6, dateToCol.get(item.endDate) ?? (item.endDate > weekEnd ? 6 : -1));
+        return { item, startCol, endCol, row: 0 };
+      })
+      .filter(o => o.startCol <= 6 && o.endCol >= 0 && o.startCol <= o.endCol);
+
+    // Assign rows to avoid overlaps
+    const rowOccupancy: boolean[][] = [];
+    for (const obj of items) {
+      let assignedRow = -1;
+      for (let r = 0; r < rowOccupancy.length; r++) {
+        let canFit = true;
+        for (let c = obj.startCol; c <= obj.endCol; c++) {
+          if (rowOccupancy[r][c]) { canFit = false; break; }
+        }
+        if (canFit) { assignedRow = r; break; }
+      }
+      if (assignedRow === -1) {
+        assignedRow = rowOccupancy.length;
+        rowOccupancy.push(new Array(7).fill(false));
+      }
+      obj.row = assignedRow;
+      for (let c = obj.startCol; c <= obj.endCol; c++) {
+        rowOccupancy[assignedRow][c] = true;
+      }
+    }
+
+    return items;
+  }, [objectives, weekDateStrings, weekStart, weekEnd]);
+
+  const objectiveMaxRows = objectiveLayout.length > 0
+    ? Math.max(...objectiveLayout.map(o => o.row)) + 1
+    : 0;
 
   // Current time position
   const currentTimePosition = useMemo(() => {
@@ -265,7 +316,7 @@ export function CalendarWeek({
       <div className="border-b border-gray-200">
         <div className="grid grid-cols-[60px_repeat(7,1fr)]">
           <div className="px-1 py-1 text-[10px] text-gray-400 text-right">todo el día</div>
-          <div className="col-span-7 relative" style={{ minHeight: `${allDayMaxRows * 24 + 8}px` }}>
+          <div className="col-span-7 relative" style={{ minHeight: `${allDayMaxRows * 24 + objectiveMaxRows * 18 + 8}px` }}>
             <div className="absolute inset-0 grid grid-cols-7">
               {weekDays.map((dayData) => (
                 <div key={`allday-bg-${dayData.dateStr}`} className={cn(
@@ -308,6 +359,28 @@ export function CalendarWeek({
                     style={{ backgroundColor: isPast ? '#9ca3af' : platform.color }} />
                   <span className="truncate">{displayText}</span>
                 </button>
+              );
+            })}
+
+            {/* Objective bars in all-day */}
+            {objectiveLayout.map(({ item, startCol, endCol, row }) => {
+              const color = OBJECTIVE_CATEGORY_COLORS[item.objective.category] ?? '#6b7280';
+              return (
+                <div
+                  key={item.objective.id}
+                  className="absolute h-[14px] z-10 flex items-center px-1.5 text-[9px] font-medium truncate rounded-sm opacity-70"
+                  style={{
+                    left: `calc(${(startCol / 7) * 100}% + 2px)`,
+                    width: `calc(${((endCol - startCol + 1) / 7) * 100}% - 4px)`,
+                    top: `${allDayMaxRows * 24 + row * 18 + 4}px`,
+                    border: `1px dashed ${color}`,
+                    color,
+                    backgroundColor: color + '10',
+                  }}
+                  title={item.objective.title}
+                >
+                  <span className="truncate">{item.objective.title}</span>
+                </div>
               );
             })}
 
