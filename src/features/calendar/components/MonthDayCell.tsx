@@ -11,9 +11,13 @@ import { memo, useMemo } from 'react';
 import { Cloud, Flag, Trophy, Tv, ShoppingBag, type LucideIcon } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { resolveIcon } from '@/utils/iconResolver';
-import { DailyRevenueIndicator } from './DailyRevenueIndicator';
 import type { CalendarEvent, WeatherForecast, EventCategory } from '@/types';
 import type { DailyChannelRevenue } from '@/services/crp-portal/dailyRevenue';
+
+function formatCompactRevenue(amount: number): string {
+  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}k`;
+  return Math.round(amount).toString();
+}
 
 interface MonthDayCellProps {
   dateStr: string;
@@ -167,13 +171,6 @@ export const MonthDayCell = memo(function MonthDayCell({
         </div>
       )}
 
-      {/* Revenue badges (bottom of cell) */}
-      {revenue && revenue.total > 0 && (
-        <div className="mt-auto pt-0.5">
-          <DailyRevenueIndicator revenue={revenue} isPast={isPast} />
-        </div>
-      )}
-
       {/* Overflow indicator */}
       {overflowCount > 0 && (
         <div className={cn(
@@ -181,6 +178,30 @@ export const MonthDayCell = memo(function MonthDayCell({
           isPast ? 'text-gray-400' : 'text-primary-600'
         )}>
           +{overflowCount} más
+        </div>
+      )}
+
+      {/* Revenue by channel (bottom of cell) */}
+      {isCurrentMonth && (
+        <div className="absolute bottom-1 left-1 right-1">
+          <div className="flex items-center justify-between gap-0.5">
+            {/* Glovo (left) */}
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500 leading-none">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
+              {isPast && revenue && revenue.glovo > 0
+                ? <span>{formatCompactRevenue(revenue.glovo)}€</span>
+                : <span className="text-gray-300">- €</span>
+              }
+            </span>
+            {/* UberEats (right) */}
+            <span className="flex items-center gap-0.5 text-[9px] text-gray-500 leading-none">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-600" />
+              {isPast && revenue && revenue.ubereats > 0
+                ? <span>{formatCompactRevenue(revenue.ubereats)}€</span>
+                : <span className="text-gray-300">- €</span>
+              }
+            </span>
+          </div>
         </div>
       )}
     </div>
