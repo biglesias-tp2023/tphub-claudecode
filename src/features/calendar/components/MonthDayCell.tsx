@@ -182,7 +182,7 @@ export const MonthDayCell = memo(function MonthDayCell({
       )}
 
       {/* Revenue by channel (bottom of cell) */}
-      {isCurrentMonth && (
+      {(
         <div className="absolute bottom-1 left-1 right-1">
           <div className="flex items-center justify-between gap-0.5">
             {/* Glovo (left) */}
