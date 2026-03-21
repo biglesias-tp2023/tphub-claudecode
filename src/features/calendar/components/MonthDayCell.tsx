@@ -186,19 +186,19 @@ export const MonthDayCell = memo(function MonthDayCell({
         <div className="absolute bottom-1 left-1 right-1">
           <div className="flex items-center justify-between gap-0.5">
             {/* Glovo (left) */}
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500 leading-none">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
-              {isPast && revenue && revenue.glovo > 0
-                ? <span>{formatCompactRevenue(revenue.glovo)}€</span>
-                : <span className="text-gray-300">- €</span>
+            <span className={cn('flex items-center gap-0.5 text-[9px] leading-none', isPast ? 'text-gray-500' : 'text-gray-300')}>
+              <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', isPast ? 'bg-amber-400' : 'bg-amber-300')} />
+              {isPast
+                ? <span>{revenue && revenue.glovo > 0 ? `${formatCompactRevenue(revenue.glovo)}€` : '0€'}</span>
+                : <span>- €</span>
               }
             </span>
             {/* UberEats (right) */}
-            <span className="flex items-center gap-0.5 text-[9px] text-gray-500 leading-none">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-green-600" />
-              {isPast && revenue && revenue.ubereats > 0
-                ? <span>{formatCompactRevenue(revenue.ubereats)}€</span>
-                : <span className="text-gray-300">- €</span>
+            <span className={cn('flex items-center gap-0.5 text-[9px] leading-none', isPast ? 'text-gray-500' : 'text-gray-300')}>
+              <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', isPast ? 'bg-green-600' : 'bg-green-300')} />
+              {isPast
+                ? <span>{revenue && revenue.ubereats > 0 ? `${formatCompactRevenue(revenue.ubereats)}€` : '0€'}</span>
+                : <span>- €</span>
               }
             </span>
           </div>
