@@ -15,6 +15,9 @@ import { Card, ToastContainer } from '@/components/ui';
 import { DashboardFilters } from '@/features/dashboard';
 import { useDashboardFiltersStore, useGlobalFiltersStore } from '@/stores/filtersStore';
 import { useRestaurants, useAreas } from '@/features/dashboard/hooks';
+import { useCompanies } from '@/features/clients/hooks/useCompanies';
+import { useBrands } from '@/hooks/useBrands';
+import { expandBrandIds, expandRestaurantIds } from '@/hooks/idExpansion';
 import { useToast } from '@/hooks/useToast';
 import {
   CalendarView,
@@ -193,8 +196,18 @@ function createInitialState(): CalendarState {
 
 export function CalendarPage() {
   const [searchParams] = useSearchParams();
-  const { restaurantIds, areaIds } = useDashboardFiltersStore();
-  const { companyIds } = useGlobalFiltersStore();
+  const { restaurantIds, areaIds, brandIds } = useDashboardFiltersStore();
+  const { companyIds: globalCompanyIds } = useGlobalFiltersStore();
+  const { data: brandsData } = useBrands();
+  const { data: allCompanies = [] } = useCompanies();
+
+  // When "Todas" is selected, companyIds is [] — use all available companies as fallback
+  const companyIds = useMemo(
+    () => globalCompanyIds.length > 0
+      ? globalCompanyIds
+      : allCompanies.map(c => c.id),
+    [globalCompanyIds, allCompanies]
+  );
   const { toasts, closeToast, success } = useToast();
 
   const [state, dispatch] = useReducer(calendarReducer, null, createInitialState);
@@ -270,6 +283,16 @@ export function CalendarPage() {
   const { data: restaurants = [] } = useRestaurants();
   const { data: areas = [] } = useAreas();
 
+  // Expand brand/address IDs for daily revenue filtering
+  const expandedBrandIds = useMemo(
+    () => expandBrandIds(brandIds, brandsData || []),
+    [brandIds, brandsData]
+  );
+  const expandedAddressIds = useMemo(
+    () => expandRestaurantIds(restaurantIds, restaurants),
+    [restaurantIds, restaurants]
+  );
+
   const selectedRestaurant = restaurantIds.length > 0
     ? restaurants.find(r => restaurantIds.includes(r.id))
     : restaurants[0];
@@ -302,9 +325,11 @@ export function CalendarPage() {
     state.currentMonth.month
   );
 
-  // Fetch daily revenue
+  // Fetch daily revenue (filtered by brand/address when selected)
   const { data: revenueByDate } = useCalendarDailyRevenue({
     companyIds,
+    brandIds: expandedBrandIds.length > 0 ? expandedBrandIds : undefined,
+    addressIds: expandedAddressIds.length > 0 ? expandedAddressIds : undefined,
     year: state.currentMonth.year,
     month: state.currentMonth.month,
   });
@@ -432,10 +457,6 @@ export function CalendarPage() {
     dispatch({ type: 'SET_PLATFORMS', platforms });
   }, []);
 
-  const handleStatusesChange = useCallback((statuses: string[]) => {
-    dispatch({ type: 'SET_STATUSES', statuses });
-  }, []);
-
   const handleEventCategoriesChange = useCallback((categories: EventCategory[]) => {
     dispatch({ type: 'SET_EVENT_CATEGORIES', categories });
   }, []);
@@ -475,8 +496,6 @@ export function CalendarPage() {
               onCreateClick={handleNewCampaign}
               selectedPlatforms={state.selectedPlatforms}
               onPlatformsChange={handlePlatformsChange}
-              selectedStatuses={state.selectedStatuses}
-              onStatusesChange={handleStatusesChange}
               selectedEventCategories={state.selectedEventCategories}
               onEventCategoriesChange={handleEventCategoriesChange}
               selectedRegion={state.selectedRegion}
