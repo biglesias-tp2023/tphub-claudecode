@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, ChevronsUpDown } from 'lucide-react';
-import { GanttRow, LABEL_COL_WIDTH } from './GanttRow';
+import { GanttRow, DEFAULT_LABEL_COL_WIDTH } from './GanttRow';
 import { useUpdateStrategicObjective } from '../../hooks';
 import type { StrategicObjective, HealthStatus, Company, Brand } from '@/types';
 
@@ -128,7 +128,35 @@ export function GanttChart({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [labelWidth, setLabelWidth] = useState(DEFAULT_LABEL_COL_WIDTH);
   const updateObjective = useUpdateStrategicObjective();
+
+  // Column resize drag
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startWidth: labelWidth };
+
+    const handleMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const delta = ev.clientX - resizeRef.current.startX;
+      setLabelWidth(Math.max(180, Math.min(600, resizeRef.current.startWidth + delta)));
+    };
+
+    const handleUp = () => {
+      resizeRef.current = null;
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  }, [labelWidth]);
+
+  // Undo stack for drag operations
+  type UndoEntry = { objectiveId: string; startDate: string; endDate: string };
+  const undoStackRef = useRef<UndoEntry[]>([]);
 
   // Measure container width for flexible week columns
   useEffect(() => {
@@ -235,7 +263,7 @@ export function GanttChart({
   }, [objectives, allCompanies]);
 
   // Flexible week width: fill available space
-  const trackWidth = Math.max(containerWidth - LABEL_COL_WIDTH, weeks.length * 56);
+  const trackWidth = Math.max(containerWidth - labelWidth, weeks.length * 56);
   const weekColWidth = weeks.length > 0 ? trackWidth / weeks.length : 56;
 
   // "Today" marker position
@@ -266,11 +294,44 @@ export function GanttChart({
 
   // Handle drag date change from GanttRow
   const handleDateChange = useCallback((objectiveId: string, startDate: string, endDate: string) => {
+    // Save previous dates for undo
+    const obj = objectives.find((o) => o.id === objectiveId);
+    if (obj) {
+      undoStackRef.current.push({
+        objectiveId,
+        startDate: obj.startDate || obj.createdAt.split('T')[0],
+        endDate: obj.evaluationDate || '',
+      });
+    }
+
     updateObjective.mutate({
       id: objectiveId,
       updates: { startDate, evaluationDate: endDate },
     });
+  }, [updateObjective, objectives]);
+
+  // Ctrl+Z undo handler
+  const handleUndo = useCallback(() => {
+    const entry = undoStackRef.current.pop();
+    if (!entry) return;
+    updateObjective.mutate({
+      id: entry.objectiveId,
+      updates: { startDate: entry.startDate, evaluationDate: entry.endDate || undefined },
+    });
   }, [updateObjective]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        if (undoStackRef.current.length > 0) {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [handleUndo]);
 
   if (objectives.length === 0) {
     return (
@@ -305,12 +366,12 @@ export function GanttChart({
 
   return (
     <div ref={containerRef} className="overflow-x-auto border border-gray-100 rounded-lg">
-      <div style={{ minWidth: LABEL_COL_WIDTH + trackWidth }}>
+      <div style={{ width: Math.max(labelWidth + trackWidth, containerWidth) }}>
         {/* Header: Month row */}
         <div className="flex sticky top-0 z-20 bg-gray-50 border-b border-gray-200">
           <div
             className="sticky left-0 z-30 bg-gray-50 shrink-0 border-r border-gray-200"
-            style={{ width: LABEL_COL_WIDTH, minWidth: LABEL_COL_WIDTH }}
+            style={{ width: labelWidth, minWidth: labelWidth }}
           />
           <div className="flex" style={{ width: trackWidth }}>
             {monthHeaders.map((mh, i) => (
@@ -328,8 +389,8 @@ export function GanttChart({
         {/* Header: Week row */}
         <div className="flex sticky top-[29px] z-20 bg-white border-b border-gray-200">
           <div
-            className="sticky left-0 z-30 bg-white shrink-0 px-3 flex items-center justify-between text-[10px] font-medium text-gray-400 uppercase tracking-wider border-r border-gray-200"
-            style={{ width: LABEL_COL_WIDTH, minWidth: LABEL_COL_WIDTH }}
+            className="sticky left-0 z-30 bg-white shrink-0 px-3 flex items-center justify-between text-[10px] font-medium text-gray-400 uppercase tracking-wider border-r border-gray-200 relative"
+            style={{ width: labelWidth, minWidth: labelWidth }}
           >
             <span>Objetivo</span>
             <button
@@ -339,6 +400,12 @@ export function GanttChart({
             >
               <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400" />
             </button>
+            {/* Resize handle */}
+            <div
+              className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary-300 active:bg-primary-400 transition-colors"
+              onMouseDown={handleResizeStart}
+              title="Arrastrar para redimensionar"
+            />
           </div>
           <div className="flex relative" style={{ width: trackWidth }}>
             {weeks.map((w, i) => (
@@ -358,7 +425,7 @@ export function GanttChart({
           {/* Today line */}
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-primary-500 z-[5] pointer-events-none"
-            style={{ left: LABEL_COL_WIDTH + (todayPct / 100) * trackWidth }}
+            style={{ left: labelWidth + (todayPct / 100) * trackWidth }}
           >
             <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-primary-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-b shadow-sm">
               Hoy
@@ -405,6 +472,7 @@ export function GanttChart({
                       onDateChange={handleDateChange}
                       index={currentIndex}
                       taskCount={taskCountByObjectiveId[obj.id]}
+                      labelWidth={labelWidth}
                     />
                   );
                 })}
