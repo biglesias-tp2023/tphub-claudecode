@@ -38,6 +38,11 @@ interface MonthWeekRowProps {
 
 const MAX_VISIBLE_ROWS = 3;
 
+function formatWeekRevenue(amount: number): string {
+  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}k`;
+  return `${Math.round(amount)}€`;
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   finanzas: '#22c55e',
   operaciones: '#3b82f6',
@@ -159,15 +164,46 @@ export const MonthWeekRow = memo(function MonthWeekRow({
     : 0;
   const objectiveAreaHeight = maxObjectiveRows * 18;
 
+  // Weekly revenue totals by channel
+  const weeklyRevenue = useMemo(() => {
+    let glovo = 0, ubereats = 0, justeat = 0;
+    for (const dateStr of weekDates) {
+      // Only sum past days (up to today)
+      if (dateStr > todayStr) continue;
+      const rev = revenueByDate.get(dateStr);
+      if (rev) {
+        glovo += rev.glovo;
+        ubereats += rev.ubereats;
+        justeat += rev.justeat;
+      }
+    }
+    return { glovo, ubereats, justeat, total: glovo + ubereats + justeat };
+  }, [weekDates, revenueByDate, todayStr]);
+
+  const isCurrentWeek = weekDates[0] <= todayStr && weekDates[6] >= todayStr;
+  const isPastWeek = weekDates[6] < todayStr;
+
   return (
     <div className="flex">
-      {/* Week number */}
+      {/* Week number + weekly revenue */}
       {weekNumber !== undefined && (
         <div
-          className="w-8 shrink-0 flex items-start justify-center pt-2 border-b border-r border-gray-100 bg-gray-50/50"
-          title={`Semana ${weekNumber}`}
+          className="w-10 shrink-0 flex flex-col items-center pt-2 gap-1 border-b border-r border-gray-100 bg-gray-50/50"
+          title={`Semana ${weekNumber}${weeklyRevenue.total > 0 ? `\nGlovo: ${Math.round(weeklyRevenue.glovo)}€\nUber: ${Math.round(weeklyRevenue.ubereats)}€` : ''}`}
         >
           <span className="text-[10px] font-medium text-gray-400">S{weekNumber}</span>
+          {(isPastWeek || isCurrentWeek) && weeklyRevenue.total > 0 && (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-0.5">
+                <span className="w-1 h-1 rounded-full bg-amber-400" />
+                <span className="text-[8px] text-gray-500 leading-none">{formatWeekRevenue(weeklyRevenue.glovo)}</span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <span className="w-1 h-1 rounded-full bg-green-600" />
+                <span className="text-[8px] text-gray-500 leading-none">{formatWeekRevenue(weeklyRevenue.ubereats)}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     <div className="relative grid grid-cols-7 flex-1" style={{ minHeight: `${100 + barAreaHeight + objectiveAreaHeight}px` }}>
