@@ -40,6 +40,18 @@ export interface DailyChannelRevenue {
 export async function fetchDailyRevenueByChannel(
   params: DailyRevenueParams
 ): Promise<Map<string, DailyChannelRevenue>> {
+  if (params.companyIds.length === 0) {
+    return new Map();
+  }
+
+  console.debug('[dailyRevenue] calling RPC with:', {
+    companyIds: params.companyIds,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    brandIds: params.brandIds,
+    addressIds: params.addressIds,
+  });
+
   const { data, error } = await supabase.rpc('get_daily_revenue_by_channel', {
     p_company_ids: params.companyIds,
     p_start_date: params.startDate,
@@ -49,7 +61,8 @@ export async function fetchDailyRevenueByChannel(
   });
 
   if (error) {
-    throw new Error(`Error fetching daily revenue: ${error.message}`);
+    console.error('[dailyRevenue] RPC error:', error);
+    return new Map();
   }
 
   const result = new Map<string, DailyChannelRevenue>();
